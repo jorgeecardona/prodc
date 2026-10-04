@@ -19,7 +19,7 @@ from . import __version__
 from .config import Config, ConfigError
 from .loader import LoaderError, load_needs
 from .model import Need, NeedResult, NeedState, SourceKind
-from .status import Summary, orphans, resolve, summarize
+from .status import Recurrence, Summary, orphans, recurrence, resolve, summarize
 
 _LABEL = {
     NeedState.DELIVERED: "DELIVERED",
@@ -150,7 +150,24 @@ def _render_orphans(orphan_map: dict[str, list[str]]) -> str:
     return "\n".join(out)
 
 
-def _to_json(results: list[NeedResult], summary: Summary, orphan_map: dict[str, list[str]]) -> str:
+def _render_recurrence(recs: list[Recurrence]) -> str:
+    """Baselines shared across clients, most-shared first — the #32 recurrence view."""
+    out = [f"\nrecurrence (needs shared across clients): {len(recs)}"]
+    for rec in recs:
+        who = f" — {', '.join(rec.clients)}" if rec.clients else ""
+        out.append(
+            f"  {rec.baseline.id:<12} {rec.count} client{'s' if rec.count != 1 else ''}{who}"
+            f"    {rec.baseline.text[:60]}"
+        )
+    return "\n".join(out)
+
+
+def _to_json(
+    results: list[NeedResult],
+    summary: Summary,
+    orphan_map: dict[str, list[str]],
+    recs: list[Recurrence],
+) -> str:
     payload = {
         "summary": {
             "total": summary.total,
@@ -165,6 +182,15 @@ def _to_json(results: list[NeedResult], summary: Summary, orphan_map: dict[str, 
             "orphans": sum(len(v) for v in orphan_map.values()),
         },
         "orphans": orphan_map,
+        "recurrence": [
+            {
+                "baseline": rec.baseline.id,
+                "text": rec.baseline.text,
+                "count": rec.count,
+                "clients": list(rec.clients),
+            }
+            for rec in recs
+        ],
         "needs": [
             {
                 "id": r.need.id,
@@ -174,6 +200,8 @@ def _to_json(results: list[NeedResult], summary: Summary, orphan_map: dict[str, 
                 "state": r.state.value,
                 "grounds": r.state.value,
                 "warrant": _warrant(r.need),
+                "client": r.need.client,
+                "variant_of": r.need.variant_of,
                 "delivered": r.delivered,
                 "total": r.total,
                 "declared": r.declared,
@@ -210,14 +238,17 @@ def _cmd_status(args: argparse.Namespace) -> int:
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
     summary = summarize(results)
     orphan_map = orphans(needs, cfg.adapters)
+    recs = recurrence(needs)
 
     if args.json:
-        print(_to_json(results, summary, orphan_map))
+        print(_to_json(results, summary, orphan_map, recs))
     else:
         commit = _git_rev(cfg.root)
         print(f"prodc status — {cfg.root.name}{f' @ {commit}' if commit else ''}")
         print(_summary_line(summary))
         print(_render(results))
+        if recs:
+            print(_render_recurrence(recs))
         if orphan_map:
             print(_render_orphans(orphan_map))
 

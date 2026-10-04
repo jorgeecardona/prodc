@@ -95,3 +95,31 @@ def test_dangling_source_warns_distinct_from_opinion(tmp_path: Path) -> None:
     assert any("BROKEN source" in w for w in results["N-2"].warnings)
     # both are sourced, so neither is an opinion — BROKEN-source is a distinct signal
     assert not results["N-2"].need.is_opinion
+
+
+def test_recurrence_counts_clients_sharing_a_baseline() -> None:
+    from prodc.status import recurrence
+
+    base = Need(id="N-1", text="multi-location per customer")
+    v_acme = Need(id="N-1@acme", text="multi-location", client="acme", variant_of="N-1")
+    v_globex = Need(id="N-1@globex", text="multi-location", client="globex", variant_of="N-1")
+    lonely = Need(id="N-2", text="own voice")  # baseline with no variants — not recurring
+    recs = recurrence([base, v_acme, v_globex, lonely])
+    assert len(recs) == 1  # only N-1 is shared
+    (rec,) = recs
+    assert rec.baseline.id == "N-1"
+    assert rec.count == 2 and rec.clients == ("acme", "globex")
+
+
+def test_recurrence_sorted_most_shared_first() -> None:
+    from prodc.status import recurrence
+
+    needs = [
+        Need(id="A", text="a"),
+        Need(id="B", text="b"),
+        Need(id="A@x", text="a", client="x", variant_of="A"),
+        Need(id="B@x", text="b", client="x", variant_of="B"),
+        Need(id="B@y", text="b", client="y", variant_of="B"),
+    ]
+    recs = recurrence(needs)
+    assert [r.baseline.id for r in recs] == ["B", "A"]  # B shared by 2, A by 1

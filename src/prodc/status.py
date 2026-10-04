@@ -188,6 +188,42 @@ def summarize(results: list[NeedResult]) -> Summary:
     )
 
 
+@dataclass(frozen=True)
+class Recurrence:
+    """A baseline need and the clients that carry a variant of it (#32)."""
+
+    baseline: Need
+    clients: tuple[str, ...]  # distinct named clients with a variant, sorted
+    variants: int  # how many variants reference this baseline
+
+    @property
+    def count(self) -> int:
+        """How many clients share this baseline — the recurrence signal."""
+        return self.variants
+
+
+def recurrence(needs: list[Need]) -> list[Recurrence]:
+    """Baselines shared by at least one variant, most-shared first.
+
+    A variant points at its baseline via ``variant_of``; grouping on that id turns N
+    scattered per-client needs back into one baseline with a recurrence count, so the
+    board can weigh a request by how broadly it recurs instead of treating each ask as
+    unique.
+    """
+    by_id = {n.id: n for n in needs}
+    grouped: dict[str, list[Need]] = {}
+    for n in needs:
+        if n.variant_of is not None and n.variant_of in by_id:
+            grouped.setdefault(n.variant_of, []).append(n)
+
+    out: list[Recurrence] = []
+    for base_id, variants in grouped.items():
+        clients = tuple(sorted({v.client for v in variants if v.client}))
+        out.append(Recurrence(by_id[base_id], clients, len(variants)))
+    out.sort(key=lambda r: (-r.count, r.baseline.id))
+    return out
+
+
 def orphans(needs: list[Need], adapters: dict[str, Adapter]) -> dict[str, list[str]]:
     """Proof units claimed by no need, per enumerable adapter — the reverse of the board.
 
