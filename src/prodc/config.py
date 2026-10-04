@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
-from .adapters import Adapter, GherkinAdapter, PytestAdapter
+from .adapters import Adapter, FilesAdapter, GherkinAdapter, PytestAdapter
 
 
 class ConfigError(Exception):
@@ -70,6 +70,11 @@ class Config:
                     root=root / (sub if isinstance(sub, str) else "."),
                     results=results_s,
                 )
+            elif kind == "files":
+                sub = tbl.get("root", ".")
+                adapters[name] = FilesAdapter(root=root / (sub if isinstance(sub, str) else "."))
             else:
-                raise ConfigError(f"[proofs.{name}]: unknown kind {kind!r} (gherkin|pytest)")
+                raise ConfigError(
+                    f"[proofs.{name}]: unknown kind {kind!r} (gherkin|pytest|files)"
+                )
         return cls(root=root, need_globs=need_globs, adapters=adapters)

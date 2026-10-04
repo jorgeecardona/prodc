@@ -201,13 +201,21 @@ class PytestAdapter:
         return out
 
     def resolve(self, payload: str) -> ProofResult:
-        file_part, _, node = payload.partition("::")
-        func = node.split("[")[0]  # strip parametrisation
+        # Node id: file[::Class[::Nested]]::test_name, each segment may carry [params].
+        parts = [p.split("[")[0] for p in payload.split("::")]
+        file_part = parts[0]
+        node = parts[1:]
+        func = node[-1] if node else ""
+        classes = node[:-1]  # class path for class-based tests (file::TestX::test_y)
         fp = self._root / file_part
         if not fp.exists():
             return ProofResult(ProofState.BROKEN, False, f"no file '{file_part}'")
-        if func and f"def {func}" not in fp.read_text(encoding="utf-8"):
-            return ProofResult(ProofState.BROKEN, False, f"no test '{func}' in {file_part}")
+        text = fp.read_text(encoding="utf-8")
+        missing = [f"class {c}" for c in classes if f"class {c}" not in text]
+        if func and f"def {func}" not in text:
+            missing.append(f"def {func}")
+        if missing:
+            return ProofResult(ProofState.BROKEN, False, f"no {', '.join(missing)} in {file_part}")
         results = self._load_results()
         if func in results:
             ok = results[func]
@@ -217,3 +225,21 @@ class PytestAdapter:
                 "junit: passed" if ok else "junit: failing",
             )
         return ProofResult(ProofState.DELIVERED, True, "test exists")
+
+
+class FilesAdapter:
+    """Resolves ``path`` to a verification script's existence.
+
+    For proofs that are executable models/scripts, not pytest tests. Existence is a
+    *declared* DELIVERED — a script existing is not a script passing; a run/result
+    marker (confirmed) is left for later, mirroring the gherkin/pytest results split.
+    """
+
+    def __init__(self, root: Path) -> None:
+        self._root = root
+
+    def resolve(self, payload: str) -> ProofResult:
+        fp = self._root / payload
+        if not fp.exists():
+            return ProofResult(ProofState.BROKEN, False, f"no file '{payload}'")
+        return ProofResult(ProofState.DELIVERED, True, "script exists")
