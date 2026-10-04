@@ -168,3 +168,18 @@ def test_unknown_source_kind_raises(tmp_path: Path) -> None:
     )
     with pytest.raises(LoaderError, match="unknown kind 'rumor'"):
         load_needs(cfg)
+
+
+def test_importance_parsed_and_validated(tmp_path: Path) -> None:
+    cfg = _config(
+        tmp_path,
+        ("a.yaml", "needs:\n  - id: A-1\n    text: t\n    importance: 3\n"),
+    )
+    (need,) = load_needs(cfg)
+    assert need.importance == 3
+
+
+def test_importance_rejects_non_positive_and_bool(tmp_path: Path) -> None:
+    bad = _config(tmp_path, ("a.yaml", "needs:\n  - id: A-1\n    text: t\n    importance: 0\n"))
+    with pytest.raises(LoaderError, match="positive integer ordinal"):
+        load_needs(bad)

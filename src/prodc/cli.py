@@ -24,6 +24,7 @@ from .status import (
     Summary,
     applicable_needs,
     orphans,
+    rank,
     recurrence,
     resolve,
     summarize,
@@ -421,6 +422,69 @@ def _cmd_brief(args: argparse.Namespace) -> int:
     return 0
 
 
+def _importance_cell(need: Need) -> str:
+    """The importance column; a value entered by a weak-warrant author is flagged a guess."""
+    if need.importance is None:
+        return ""
+    weak = need.strongest_kind is None or need.strongest_kind in (
+        SourceKind.PROXY,
+        SourceKind.INTERNAL,
+    )
+    return f"imp={need.importance}{' (guess)' if weak else ''}"
+
+
+def _render_plan(results: list[NeedResult]) -> str:
+    ranked = rank(results)
+    out = ["plan — ranked backlog (must + state + evidence, importance refines)"]
+    for i, r in enumerate(ranked, 1):
+        bang = "!!" if r.need.must else "  "
+        imp = _importance_cell(r.need)
+        out.append(
+            f"  {i:>3}. {bang} {r.need.id:<12} {_LABEL[r.state]:<10} "
+            f"{_warrant(r.need):<16} {imp:<12} {r.need.text[:48]}"
+        )
+    return "\n".join(out)
+
+
+def _plan_json(results: list[NeedResult]) -> str:
+    ranked = rank(results)
+    return json.dumps(
+        {
+            "plan": [
+                {
+                    "rank": i,
+                    "id": r.need.id,
+                    "text": r.need.text,
+                    "must": r.need.must,
+                    "state": r.state.value,
+                    "warrant": _warrant(r.need),
+                    "importance": r.need.importance,
+                    "importance_is_guess": (
+                        r.need.importance is not None
+                        and (
+                            r.need.strongest_kind is None
+                            or r.need.strongest_kind in (SourceKind.PROXY, SourceKind.INTERNAL)
+                        )
+                    ),
+                }
+                for i, r in enumerate(ranked, 1)
+            ]
+        },
+        indent=2,
+    )
+
+
+def _cmd_plan(args: argparse.Namespace) -> int:
+    """Emit a ranked backlog from recorded inputs — must+state+evidence, importance refines."""
+    loaded = _load_or_report(args)
+    if loaded is None:
+        return 2
+    cfg, needs = loaded
+    results = resolve(needs, cfg.adapters, cfg.source_adapters)
+    print(_plan_json(results) if args.json else _render_plan(results))
+    return 0
+
+
 @dataclass(frozen=True)
 class _RepoRow:
     """One repo's line in the portfolio roll-up."""
@@ -583,6 +647,11 @@ def main(argv: list[str] | None = None) -> int:
     br.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     br.add_argument("--json", action="store_true", help="machine-readable output")
     br.set_defaults(func=_cmd_brief)
+
+    pl = sub.add_parser("plan", help="ranked backlog from must + state + evidence (+ importance)")
+    pl.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    pl.add_argument("--json", action="store_true", help="machine-readable output")
+    pl.set_defaults(func=_cmd_plan)
 
     pf = sub.add_parser("portfolio", help="roll up many repos into one scoreboard")
     pf.add_argument("configs", nargs="+", metavar="PRODC_TOML", help="one or more prodc.toml paths")

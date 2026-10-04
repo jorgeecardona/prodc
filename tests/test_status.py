@@ -123,3 +123,24 @@ def test_recurrence_sorted_most_shared_first() -> None:
     ]
     recs = recurrence(needs)
     assert [r.baseline.id for r in recs] == ["B", "A"]  # B shared by 2, A by 1
+
+
+def test_rank_orders_by_must_state_then_evidence_then_importance() -> None:
+    from prodc.status import rank
+
+    interview = Source(kind=SourceKind.INTERVIEW, who="Ana", quote="q", date="2026-01-01")
+    internal = Source(kind=SourceKind.INTERNAL, date="2026-01-01")
+    needs = [
+        Need(id="D-1", text="delivered", proofs=("x:1",)),  # lowest priority
+        Need(id="MH-1", text="must hole", must=True),  # must-HOLE: top
+        Need(id="H-interview", text="hole w interview", sources=(interview,)),
+        Need(id="H-internal", text="hole w internal", sources=(internal,)),
+        Need(id="H-imp", text="hole w internal high imp", sources=(internal,), importance=3),
+    ]
+    ranked = rank(resolve(needs, {"x": _delivered()}))
+    order = [r.need.id for r in ranked]
+    assert order[0] == "MH-1"  # must-HOLE first
+    assert order.index("H-interview") < order.index("H-internal")  # interview outranks internal
+    # within internal-backed HOLEs, higher importance comes first
+    assert order.index("H-imp") < order.index("H-internal")
+    assert order[-1] == "D-1"  # delivered last

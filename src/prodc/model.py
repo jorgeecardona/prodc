@@ -78,6 +78,7 @@ class Need:
     label: str | None = None  # free text for the `who`, e.g. "design partner, Sincerely"
     client: str | None = None  # which client this instance is for; None = shared baseline
     variant_of: str | None = None  # id of the baseline need this specialises; None = standalone
+    importance: int | None = None  # author-supplied ordinal (higher = more); refines ranking
 
     @property
     def is_variant(self) -> bool:
@@ -93,6 +94,13 @@ class Need:
     def only_internal(self) -> bool:
         """Sourced, but only by the team's own assertion — not a customer."""
         return len(self.sources) > 0 and all(s.kind is SourceKind.INTERNAL for s in self.sources)
+
+    @property
+    def strongest_kind(self) -> SourceKind | None:
+        """The strongest source kind backing this need, or None when it is an opinion."""
+        order = list(SourceKind)  # declaration order is strongest-first
+        kinds = {s.kind for s in self.sources}
+        return next((k for k in order if k in kinds), None)
 
 
 # A leading verb that usually signals a solution-in-disguise, not a need (Torres, Ch. 6).

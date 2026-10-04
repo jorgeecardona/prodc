@@ -278,3 +278,13 @@ def test_brief_unknown_client_errors(tmp_path: Path, capsys: pytest.CaptureFixtu
     code = main(["brief", "nobody", "--config", str(_brief_project(tmp_path))])
     assert code == 2
     assert "no needs for client 'nobody'" in capsys.readouterr().err
+
+
+def test_plan_ranks_must_hole_first(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    import json
+
+    code = main(["plan", "--config", str(_project(tmp_path)), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload["plan"][0]["id"] == "H-1"  # the must-HOLE ranks first
+    assert payload["plan"][-1]["id"] == "D-1"  # the delivered need ranks last

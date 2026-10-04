@@ -15,6 +15,7 @@ from .model import (
     NeedResult,
     NeedState,
     ProofState,
+    SourceKind,
 )
 
 
@@ -222,6 +223,36 @@ def recurrence(needs: list[Need]) -> list[Recurrence]:
         out.append(Recurrence(by_id[base_id], clients, len(variants)))
     out.sort(key=lambda r: (-r.count, r.baseline.id))
     return out
+
+
+_STATE_RANK = {
+    NeedState.BROKEN: 1,
+    NeedState.PENDING: 2,
+    NeedState.UNRESOLVED: 3,
+    NeedState.HOLE: 4,
+    NeedState.DELIVERED: 5,
+}
+
+
+def _rank_key(r: NeedResult) -> tuple[int, int, int, str]:
+    """Pure ordering over recorded inputs only — never a conjured score (#34).
+
+    1. must + state: a must-HOLE sits at the top, then BROKEN, PENDING, …, DELIVERED.
+    2. evidence kind: a real `interview` outranks `proxy`/`internal`/opinion at the same
+       state, because a user actually asked — this is what reorders the author's guesses.
+    3. `importance`: the author's optional ordinal, higher first; absent falls to the back
+       of its tier, so it only refines (1)+(2) and never invents priority where none was set.
+    """
+    state_rank = 0 if (r.need.must and r.state is NeedState.HOLE) else _STATE_RANK[r.state]
+    kind = r.need.strongest_kind
+    kind_rank = list(SourceKind).index(kind) if kind is not None else len(SourceKind)
+    importance_rank = -(r.need.importance or 0)
+    return (state_rank, kind_rank, importance_rank, r.need.id)
+
+
+def rank(results: list[NeedResult]) -> list[NeedResult]:
+    """Order a resolved board into a backlog by :func:`_rank_key`."""
+    return sorted(results, key=_rank_key)
 
 
 def applicable_needs(needs: list[Need], client: str) -> list[Need]:

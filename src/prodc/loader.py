@@ -50,6 +50,17 @@ def _opt_str(value: object, where: str) -> str | None:
     return _as_str(value, where)
 
 
+def _opt_importance(value: object, where: str) -> int | None:
+    if value is None:
+        return None
+    # bool is a subclass of int — reject it so `importance: true` is not read as 1.
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise LoaderError(f"{where}: expected a positive integer ordinal")
+    if value < 1:
+        raise LoaderError(f"{where}: expected a positive integer ordinal, got {value}")
+    return value
+
+
 def _as_bool(value: object, where: str) -> bool:
     if not isinstance(value, bool):
         raise LoaderError(f"{where}: expected a boolean")
@@ -88,6 +99,7 @@ def _need(
     label = _opt_str(tbl.get("label"), f"{where}.label") or file_label
     client = _opt_str(tbl.get("client"), f"{where}.client") or file_client
     variant_of = _opt_str(tbl.get("variant_of"), f"{where}.variant_of")
+    importance = _opt_importance(tbl.get("importance"), f"{where}.importance")
 
     sources = tuple(
         _source(s, f"{where}.sources[{i}]")
@@ -115,6 +127,7 @@ def _need(
         label=label,
         client=client,
         variant_of=variant_of,
+        importance=importance,
     )
 
 
