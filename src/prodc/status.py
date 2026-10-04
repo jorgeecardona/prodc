@@ -104,6 +104,8 @@ class Resolver:
         declared = any(r.declared for r in results if r.state is ProofState.DELIVERED)
         if any(r.state is ProofState.BROKEN for r in results):
             state = NeedState.BROKEN
+        elif any(r.state is ProofState.UNRESOLVED for r in results):
+            state = NeedState.UNRESOLVED  # a source couldn't be read — can't judge yet
         elif delivered == len(results):
             state = NeedState.DELIVERED
         else:
@@ -125,6 +127,8 @@ class Resolver:
         total = len(child_states)
         if any(s is NeedState.BROKEN for s in child_states):
             state = NeedState.BROKEN
+        elif any(s is NeedState.UNRESOLVED for s in child_states):
+            state = NeedState.UNRESOLVED
         elif total and delivered == total:
             state = NeedState.DELIVERED
         elif not child_states or all(s is NeedState.HOLE for s in child_states):
@@ -154,12 +158,19 @@ class Summary:
     hole: int
     must_hole: int  # a HOLE on a must-have — the top of the board
     broken: int  # a dangling proof locator
+    unresolved: int  # a proof whose source could not be read (e.g. sibling repo absent)
     opinion: int  # a need with no source of any kind
 
     @property
     def coverage(self) -> float:
-        """Fraction of needs that are DELIVERED (0.0 when there are no needs)."""
-        return self.delivered / self.total if self.total else 0.0
+        """Fraction DELIVERED, of needs that could be read.
+
+        UNRESOLVED needs (a source that couldn't be read) are excluded from the
+        denominator — they neither help nor hurt coverage, so a `--min-coverage` gate
+        isn't failed by an absent sibling the way a BROKEN locator fails it.
+        """
+        judged = self.total - self.unresolved
+        return self.delivered / judged if judged else 0.0
 
 
 def summarize(results: list[NeedResult]) -> Summary:
@@ -172,6 +183,7 @@ def summarize(results: list[NeedResult]) -> Summary:
         hole=by_state[NeedState.HOLE],
         must_hole=sum(1 for r in results if r.need.must and r.state is NeedState.HOLE),
         broken=by_state[NeedState.BROKEN],
+        unresolved=by_state[NeedState.UNRESOLVED],
         opinion=sum(1 for r in results if r.need.is_opinion),
     )
 

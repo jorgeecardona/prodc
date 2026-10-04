@@ -10,6 +10,7 @@ from typing import cast
 from .adapters import (
     AcceptAdapter,
     Adapter,
+    External,
     FilesAdapter,
     FrontmatterAdapter,
     GherkinAdapter,
@@ -61,9 +62,13 @@ class Config:
             kind = tbl.get("kind")
             results = tbl.get("results")
             results_s = results if isinstance(results, str) else None
+            # `repo` points the adapter at a sibling repo checked out beside this one;
+            # its paths then resolve under that repo and reads are wrapped by External.
+            repo_field = tbl.get("repo")
+            proof_root = root / repo_field if isinstance(repo_field, str) else root
             if kind == "gherkin":
-                adapters[name] = GherkinAdapter(
-                    root=root,
+                inner: Adapter = GherkinAdapter(
+                    root=proof_root,
                     paths=_as_str_list(tbl.get("paths", []), f"[proofs.{name}].paths"),
                     delivered_tags=_as_str_list(
                         tbl.get("delivered", []), f"[proofs.{name}].delivered"
@@ -75,19 +80,22 @@ class Config:
                 )
             elif kind == "pytest":
                 sub = tbl.get("root", ".")
-                adapters[name] = PytestAdapter(
-                    root=root / (sub if isinstance(sub, str) else "."),
+                inner = PytestAdapter(
+                    root=proof_root / (sub if isinstance(sub, str) else "."),
                     results=results_s,
                 )
             elif kind == "files":
                 sub = tbl.get("root", ".")
-                adapters[name] = FilesAdapter(root=root / (sub if isinstance(sub, str) else "."))
+                inner = FilesAdapter(root=proof_root / (sub if isinstance(sub, str) else "."))
             elif kind == "accept":
-                adapters[name] = AcceptAdapter()
+                inner = AcceptAdapter()
             else:
                 raise ConfigError(
                     f"[proofs.{name}]: unknown kind {kind!r} (gherkin|pytest|files|accept)"
                 )
+            adapters[name] = (
+                External(inner, root / repo_field) if isinstance(repo_field, str) else inner
+            )
 
         source_adapters: dict[str, SourceAdapter] = {}
         sources = _as_dict(raw.get("sources", {}), "[sources]")

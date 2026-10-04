@@ -32,6 +32,21 @@ def _steps_passed(steps: list[object]) -> bool:
     return True
 
 
+def _git_head(repo: Path) -> str | None:
+    """Short git rev of a checked-out repo, read from .git/HEAD (no git binary needed)."""
+    head = repo / ".git" / "HEAD"
+    try:
+        ref = head.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    if ref.startswith("ref:"):
+        try:
+            return (repo / ".git" / ref[4:].strip()).read_text(encoding="utf-8").strip()[:7]
+        except OSError:
+            return None
+    return ref[:7]
+
+
 @dataclass(frozen=True)
 class ProofResult:
     state: ProofState
@@ -257,6 +272,30 @@ class AcceptAdapter:
         who, _, date = payload.partition("@")
         detail = "accepted" + (f" by {who}" if who else "") + (f" on {date}" if date else "")
         return ProofResult(ProofState.DELIVERED, True, detail)
+
+
+class External:
+    """Wraps a proof adapter that resolves against a sibling repo checked out at ``repo``.
+
+    If the sibling is absent the fact could not be read at all → UNRESOLVED, distinct
+    from a BROKEN locator (read, resolves to nothing) and not a coverage miss. On a read,
+    the sibling's git HEAD is appended to the detail so the result is traceable to the
+    exact upstream revision (reproducible across machines, not just per-checkout).
+    """
+
+    def __init__(self, inner: Adapter, repo: Path) -> None:
+        self._inner = inner
+        self._repo = repo
+
+    def resolve(self, payload: str) -> ProofResult:
+        if not self._repo.exists():
+            return ProofResult(
+                ProofState.UNRESOLVED, False, f"sibling '{self._repo.name}' not checked out"
+            )
+        res = self._inner.resolve(payload)
+        rev = _git_head(self._repo)
+        suffix = f" @ {self._repo.name}:{rev}" if rev else f" @ {self._repo.name}"
+        return ProofResult(res.state, res.declared, res.detail + suffix)
 
 
 @dataclass(frozen=True)

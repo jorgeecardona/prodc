@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from prodc.adapters import AcceptAdapter, FilesAdapter, FrontmatterAdapter, PytestAdapter
+from prodc.adapters import (
+    AcceptAdapter,
+    External,
+    FilesAdapter,
+    FrontmatterAdapter,
+    PytestAdapter,
+)
 from prodc.model import ProofState
 
 
@@ -78,3 +84,20 @@ def test_accept_adapter_is_declared_delivered() -> None:
     r = AcceptAdapter().resolve("jane@2026-09-20")
     assert r.state is ProofState.DELIVERED and r.declared  # a human sign-off, not a test
     assert "accepted by jane" in r.detail and "2026-09-20" in r.detail
+
+
+def test_external_unresolved_when_sibling_absent(tmp_path: Path) -> None:
+    ext = External(FilesAdapter(root=tmp_path / "sib"), tmp_path / "sib")  # not checked out
+    r = ext.resolve("verify.py")
+    assert r.state is ProofState.UNRESOLVED and not r.declared
+
+
+def test_external_reads_sibling_and_records_rev(tmp_path: Path) -> None:
+    sib = tmp_path / "sib"
+    sib.mkdir()
+    (sib / "verify.py").write_text("# model\n", encoding="utf-8")
+    (sib / ".git").mkdir()
+    (sib / ".git" / "HEAD").write_text("abc1234def5678\n", encoding="utf-8")  # detached HEAD
+    r = External(FilesAdapter(root=sib), sib).resolve("verify.py")
+    assert r.state is ProofState.DELIVERED
+    assert "@ sib:abc1234" in r.detail  # traceable to the sibling's exact revision

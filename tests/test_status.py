@@ -65,6 +65,21 @@ def test_solution_verb_warns() -> None:
     assert any("solution in disguise" in w for w in r.warnings)
 
 
+def test_unresolved_proof_is_excluded_from_coverage() -> None:
+    from prodc.status import summarize
+
+    delivered = StubAdapter(ProofResult(ProofState.DELIVERED, declared=True, detail="ok"))
+    unresolved = StubAdapter(ProofResult(ProofState.UNRESOLVED, declared=False, detail="absent"))
+    need_ok = Need(id="D", text="t", proofs=("web:x",))
+    need_un = Need(id="U", text="t", proofs=("ext:x",))
+    results = resolve([need_ok, need_un], {"web": delivered, "ext": unresolved})
+    by_id = {r.need.id: r for r in results}
+    assert by_id["U"].state is NeedState.UNRESOLVED
+    s = summarize(results)
+    assert s.unresolved == 1 and s.delivered == 1
+    assert s.coverage == 1.0  # 1 delivered / (2 total - 1 unresolved); the absent one is excluded
+
+
 def test_dangling_source_warns_distinct_from_opinion(tmp_path: Path) -> None:
     (tmp_path / "issues").mkdir()
     (tmp_path / "issues" / "reg.md").write_text("# A-1 ok\n", encoding="utf-8")

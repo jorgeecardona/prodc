@@ -27,6 +27,7 @@ class ProofState(StrEnum):
     DELIVERED = "delivered"  # the test exists and (if a results artifact is present) passes
     PENDING = "pending"  # declared/planned, not yet green
     BROKEN = "broken"  # the locator does not resolve to anything
+    UNRESOLVED = "unresolved"  # the source could not be read at all (e.g. sibling repo absent)
 
 
 class NeedState(StrEnum):
@@ -36,6 +37,7 @@ class NeedState(StrEnum):
     PENDING = "pending"
     HOLE = "hole"  # no proof at all — an honest gap, never a build failure
     BROKEN = "broken"  # a proof locator points at nothing
+    UNRESOLVED = "unresolved"  # a proof's source could not be read (e.g. sibling repo absent)
 
 
 @dataclass(frozen=True)

@@ -25,6 +25,7 @@ _LABEL = {
     NeedState.PENDING: "PENDING",
     NeedState.HOLE: "HOLE",
     NeedState.BROKEN: "BROKEN",
+    NeedState.UNRESOLVED: "UNRESOLVED",
 }
 
 
@@ -34,8 +35,9 @@ def _priority(r: NeedResult) -> int:
     return {
         NeedState.BROKEN: 1,
         NeedState.PENDING: 2,
-        NeedState.HOLE: 3,
-        NeedState.DELIVERED: 4,
+        NeedState.UNRESOLVED: 3,
+        NeedState.HOLE: 4,
+        NeedState.DELIVERED: 5,
     }[r.state]
 
 
@@ -87,6 +89,8 @@ def _summary_line(s: Summary) -> str:
         parts.append(f"{s.must_hole} must-HOLE")
     if s.broken:
         parts.append(f"{s.broken} BROKEN")
+    if s.unresolved:
+        parts.append(f"{s.unresolved} UNRESOLVED")
     if s.pending:
         parts.append(f"{s.pending} PENDING")
     if s.hole - s.must_hole:
@@ -154,6 +158,7 @@ def _to_json(results: list[NeedResult], summary: Summary, orphan_map: dict[str, 
             "hole": summary.hole,
             "must_hole": summary.must_hole,
             "broken": summary.broken,
+            "unresolved": summary.unresolved,
             "opinion": summary.opinion,
             "coverage": round(summary.coverage, 4),
             "orphans": sum(len(v) for v in orphan_map.values()),
