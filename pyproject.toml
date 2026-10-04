@@ -20,6 +20,9 @@ classifiers = [
 ]
 dependencies = ["pyyaml>=6"]
 
+[project.scripts]
+prodc = "prodc.cli:main"
+
 [project.optional-dependencies]
 # docs are an *extra* (not a uv dependency-group) so Read the Docs can install them via pip
 docs = [

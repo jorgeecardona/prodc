@@ -7,6 +7,8 @@ failure — it is an honest, visible gap.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from .adapters import Adapter, ProofResult
 from .model import (
     SOLUTION_VERBS,
@@ -107,3 +109,35 @@ class Resolver:
 def resolve(needs: list[Need], adapters: dict[str, Adapter]) -> list[NeedResult]:
     """Resolve every need to a :class:`NeedResult`."""
     return Resolver(needs, adapters).resolve_all()
+
+
+@dataclass(frozen=True)
+class Summary:
+    """The gap at a glance: how many needs sit in each state, and how many are opinions."""
+
+    total: int
+    delivered: int
+    pending: int
+    hole: int
+    must_hole: int  # a HOLE on a must-have — the top of the board
+    broken: int  # a dangling proof locator
+    opinion: int  # a need with no source of any kind
+
+    @property
+    def coverage(self) -> float:
+        """Fraction of needs that are DELIVERED (0.0 when there are no needs)."""
+        return self.delivered / self.total if self.total else 0.0
+
+
+def summarize(results: list[NeedResult]) -> Summary:
+    """Roll a resolved board up into its gap counts."""
+    by_state = {s: sum(1 for r in results if r.state is s) for s in NeedState}
+    return Summary(
+        total=len(results),
+        delivered=by_state[NeedState.DELIVERED],
+        pending=by_state[NeedState.PENDING],
+        hole=by_state[NeedState.HOLE],
+        must_hole=sum(1 for r in results if r.need.must and r.state is NeedState.HOLE),
+        broken=by_state[NeedState.BROKEN],
+        opinion=sum(1 for r in results if r.need.is_opinion),
+    )
