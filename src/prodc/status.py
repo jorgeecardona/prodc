@@ -16,6 +16,7 @@ from .model import (
     NeedState,
     ProofState,
     SourceKind,
+    ears_warnings,
 )
 
 
@@ -24,6 +25,8 @@ def _text_warnings(need: Need) -> list[str]:
     out: list[str] = []
     if first in SOLUTION_VERBS:
         out.append(f"text may be a solution in disguise (starts with '{first}')")
+    else:
+        out.extend(ears_warnings(need.text))  # EARS shape check (redundant on solution verbs)
     for src in need.sources:
         out.extend(src.warnings())
     return out

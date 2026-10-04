@@ -18,7 +18,7 @@ from typing import cast
 from . import __version__
 from .config import Config, ConfigError
 from .loader import LoaderError, load_needs
-from .model import Need, NeedResult, NeedState, SourceKind
+from .model import Need, NeedResult, NeedState, SourceKind, ears_shape
 from .status import (
     Recurrence,
     Summary,
@@ -294,6 +294,7 @@ def _render_show(r: NeedResult) -> str:
         f"{need.id}{'  !!' if need.must else ''}  {need.text}",
         f"  who: {who}",
         f"  grounds: {_LABEL[r.state]}{nm}    warrant: {_warrant(need)}",
+        f"  shape: {ears_shape(need.text).value}",
     ]
     if need.claim:
         lines.append(f"  claim: {need.claim}")
@@ -334,6 +335,7 @@ def _show_json(r: NeedResult) -> str:
             "state": r.state.value,
             "grounds": r.state.value,
             "warrant": _warrant(need),
+            "shape": ears_shape(need.text).value,
             "delivered": r.delivered,
             "total": r.total,
             "declared": r.declared,

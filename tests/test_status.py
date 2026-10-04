@@ -161,3 +161,27 @@ def test_hole_does_not_warn_about_attestation() -> None:
     # a HOLE has no green proof to over-trust, so there is nothing to attest
     (r,) = resolve([Need(id="H-1", text="no proof")], {})
     assert not any("warrant not human-reviewed" in w for w in r.warnings)
+
+
+def test_ears_shape_classification() -> None:
+    from prodc.model import EarsShape, ears_shape
+
+    assert ears_shape("When an invoice is paid, the owner can see it settled") is EarsShape.EVENT
+    assert ears_shape("While offline, a user can still draft") is EarsShape.STATE
+    assert ears_shape("Where multi-currency is on, finance can pick a rate") is EarsShape.OPTIONAL
+    assert ears_shape("If a payment fails, then the user can retry") is EarsShape.UNWANTED
+    assert ears_shape("The owner can export a statement") is EarsShape.UBIQUITOUS
+    assert ears_shape("multi-location per customer") is EarsShape.UNCLASSIFIED
+
+
+def test_ears_warns_on_trigger_without_outcome() -> None:
+    bad = Need(id="E-1", text="When an invoice is paid")  # trigger, no outcome
+    (r,) = resolve([bad], {})
+    assert any("without an observable outcome" in w for w in r.warnings)
+
+
+def test_ears_does_not_double_flag_solution_verb() -> None:
+    # a solution-in-disguise gets that warning, not also the generic EARS 'no outcome' one
+    (r,) = resolve([Need(id="S-1", text="implement a dashboard")], {})
+    assert any("solution in disguise" in w for w in r.warnings)
+    assert not any("no observable outcome" in w for w in r.warnings)

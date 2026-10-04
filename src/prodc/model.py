@@ -131,6 +131,57 @@ SOLUTION_VERBS = (
 )
 
 
+class EarsShape(StrEnum):
+    """The EARS clause a need's text follows (Easy Approach to Requirements Syntax)."""
+
+    EVENT = "event"  # "When <trigger>, <who> can <outcome>"
+    STATE = "state"  # "While <state>, <who> can <outcome>"
+    OPTIONAL = "optional"  # "Where <feature>, <who> can <outcome>"
+    UNWANTED = "unwanted"  # "If <condition>, then <who> can <outcome>"
+    UBIQUITOUS = "ubiquitous"  # a plain capability with no trigger clause
+    UNCLASSIFIED = "unclassified"  # no recognisable outcome phrasing
+
+
+# EARS trigger keyword (clause lead) → the shape it introduces. Each needs an outcome.
+_EARS_TRIGGERS = {
+    "when": EarsShape.EVENT,
+    "while": EarsShape.STATE,
+    "where": EarsShape.OPTIONAL,
+    "if": EarsShape.UNWANTED,
+}
+# Markers of an observable outcome ("<who> can see", "the system shall …").
+_EARS_OUTCOME = (" can ", " shall ", " is able to ", " able to ")
+
+
+def _has_outcome(text: str) -> bool:
+    return any(marker in f" {text.lower()} " for marker in _EARS_OUTCOME)
+
+
+def ears_shape(text: str) -> EarsShape:
+    """Classify a need's text into its EARS clause shape."""
+    first = text.strip().split(" ", 1)[0].lower().rstrip(":,")
+    trigger = _EARS_TRIGGERS.get(first)
+    if trigger is not None:
+        return trigger
+    return EarsShape.UBIQUITOUS if _has_outcome(text) else EarsShape.UNCLASSIFIED
+
+
+def ears_warnings(text: str) -> list[str]:
+    """Soft structural checks on need text — EARS shape, never a hard failure.
+
+    A trigger clause (When/While/Where/If) with no observable outcome is flagged, as is a
+    need with no outcome phrasing at all. These upgrade the solution-in-disguise heuristic
+    into a shape check without rejecting a PM's wording.
+    """
+    first = text.strip().split(" ", 1)[0].lower().rstrip(":,")
+    out: list[str] = []
+    if first in _EARS_TRIGGERS and not _has_outcome(text):
+        out.append(f"EARS: '{first}' clause without an observable outcome ('can'/'shall')")
+    elif ears_shape(text) is EarsShape.UNCLASSIFIED:
+        out.append("EARS: no observable outcome — try 'When <trigger>, <who> can <outcome>'")
+    return out
+
+
 @dataclass
 class NeedResult:
     """A resolved need: its state, its proof detail, and any hygiene warnings."""
