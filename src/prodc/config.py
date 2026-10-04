@@ -10,10 +10,13 @@ from typing import cast
 from .adapters import (
     AcceptAdapter,
     Adapter,
+    CoverageAdapter,
     External,
+    FieldAdapter,
     FilesAdapter,
     FrontmatterAdapter,
     GherkinAdapter,
+    PrototypeAdapter,
     PytestAdapter,
     SourceAdapter,
 )
@@ -89,9 +92,20 @@ class Config:
                 inner = FilesAdapter(root=proof_root / (sub if isinstance(sub, str) else "."))
             elif kind == "accept":
                 inner = AcceptAdapter()
+            elif kind == "prototype":
+                inner = PrototypeAdapter()
+            elif kind == "coverage":
+                cat = tbl.get("catalog", "")
+                inner = CoverageAdapter(
+                    root=proof_root, catalog=cat if isinstance(cat, str) else ""
+                )
+            elif kind == "field":
+                sch = tbl.get("schema", "")
+                inner = FieldAdapter(root=proof_root, schema=sch if isinstance(sch, str) else "")
             else:
                 raise ConfigError(
-                    f"[proofs.{name}]: unknown kind {kind!r} (gherkin|pytest|files|accept)"
+                    f"[proofs.{name}]: unknown kind {kind!r} "
+                    "(gherkin|pytest|files|accept|prototype|coverage|field)"
                 )
             adapters[name] = (
                 External(inner, root / repo_field) if isinstance(repo_field, str) else inner

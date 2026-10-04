@@ -274,6 +274,89 @@ class AcceptAdapter:
         return ProofResult(ProofState.DELIVERED, True, detail)
 
 
+class CoverageAdapter:
+    """Resolves a category path against a catalog of existing categories (one per line).
+
+    DELIVERED when a category matches (already covered — point them at it); PENDING when
+    nothing matches (declared, not yet covered — an honest gap, not a build failure).
+    """
+
+    def __init__(self, root: Path, catalog: str) -> None:
+        self._path = root / catalog
+        self._cats: set[str] | None = None
+
+    def _load(self) -> set[str]:
+        if self._cats is None:
+            out: set[str] = set()
+            if self._path.exists():
+                for line in self._path.read_text(encoding="utf-8").splitlines():
+                    s = line.strip()
+                    if s and not s.startswith("#"):
+                        out.add(s)
+            self._cats = out
+        return self._cats
+
+    def resolve(self, payload: str) -> ProofResult:
+        if payload in self._load():
+            return ProofResult(ProofState.DELIVERED, True, f"covered by '{payload}'")
+        return ProofResult(ProofState.PENDING, True, f"no category matches '{payload}'")
+
+
+class FieldAdapter:
+    """Resolves a field name against an upstream schema/sample JSON.
+
+    Schema: ``{"surfaced": [...], "received": [...]}``. DELIVERED if the field is surfaced;
+    PENDING otherwise, with a distinct detail for 'received but not surfaced' vs 'not
+    received upstream' — a different fix. Never a hard failure.
+    """
+
+    def __init__(self, root: Path, schema: str) -> None:
+        self._path = root / schema
+        self._data: tuple[set[str], set[str]] | None = None
+
+    def _load(self) -> tuple[set[str], set[str]]:
+        if self._data is None:
+            surfaced: set[str] = set()
+            received: set[str] = set()
+            if self._path.exists():
+                raw: object = json.loads(self._path.read_text(encoding="utf-8"))
+                if isinstance(raw, dict):
+                    d = cast("dict[str, object]", raw)
+                    s, r = d.get("surfaced"), d.get("received")
+                    if isinstance(s, list):
+                        surfaced = {x for x in cast("list[object]", s) if isinstance(x, str)}
+                    if isinstance(r, list):
+                        received = {x for x in cast("list[object]", r) if isinstance(x, str)}
+            self._data = (surfaced, received)
+        return self._data
+
+    def resolve(self, payload: str) -> ProofResult:
+        surfaced, received = self._load()
+        if payload in surfaced:
+            return ProofResult(ProofState.DELIVERED, True, f"'{payload}' present and surfaced")
+        if payload in received:
+            return ProofResult(ProofState.PENDING, True, f"'{payload}' received but not surfaced")
+        return ProofResult(ProofState.PENDING, True, f"'{payload}' not received upstream")
+
+
+class PrototypeAdapter:
+    """Resolves ``ref@who@date`` to a prototype validated with users in discovery.
+
+    For perception/experience needs with no pass/fail test: a prototype shown to users in
+    an interview is real evidence of the need and the chosen direction. A *declared*
+    DELIVERED (``*``), distinct from a shipped-feature test and from a human sign-off
+    (accept) — this validates the need/direction, not the implementation.
+    """
+
+    def resolve(self, payload: str) -> ProofResult:
+        ref, _, rest = payload.partition("@")
+        who, _, date = rest.partition("@")
+        detail = "prototype " + (ref or "?")
+        detail += f" shown to {who}" if who else ""
+        detail += f" on {date}" if date else ""
+        return ProofResult(ProofState.DELIVERED, True, detail)
+
+
 class External:
     """Wraps a proof adapter that resolves against a sibling repo checked out at ``repo``.
 

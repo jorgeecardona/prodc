@@ -6,9 +6,12 @@ from pathlib import Path
 
 from prodc.adapters import (
     AcceptAdapter,
+    CoverageAdapter,
     External,
+    FieldAdapter,
     FilesAdapter,
     FrontmatterAdapter,
+    PrototypeAdapter,
     PytestAdapter,
 )
 from prodc.model import ProofState
@@ -90,6 +93,32 @@ def test_external_unresolved_when_sibling_absent(tmp_path: Path) -> None:
     ext = External(FilesAdapter(root=tmp_path / "sib"), tmp_path / "sib")  # not checked out
     r = ext.resolve("verify.py")
     assert r.state is ProofState.UNRESOLVED and not r.declared
+
+
+def test_prototype_adapter_declared_delivered() -> None:
+    r = PrototypeAdapter().resolve("fig-12@users@2026-09-20")
+    assert r.state is ProofState.DELIVERED and r.declared
+    assert "prototype fig-12" in r.detail and "users" in r.detail
+
+
+def test_coverage_adapter(tmp_path: Path) -> None:
+    (tmp_path / "catalog.txt").write_text("billing/invoices\n# a comment\nroasting/queue\n",
+                                           encoding="utf-8")
+    a = CoverageAdapter(root=tmp_path, catalog="catalog.txt")
+    assert a.resolve("billing/invoices").state is ProofState.DELIVERED
+    assert a.resolve("shipping/labels").state is ProofState.PENDING  # not yet covered
+
+
+def test_field_adapter(tmp_path: Path) -> None:
+    (tmp_path / "schema.json").write_text(
+        '{"surfaced": ["total"], "received": ["total", "tax_id"]}', encoding="utf-8"
+    )
+    a = FieldAdapter(root=tmp_path, schema="schema.json")
+    assert a.resolve("total").state is ProofState.DELIVERED
+    r = a.resolve("tax_id")
+    assert r.state is ProofState.PENDING and "received but not surfaced" in r.detail
+    r2 = a.resolve("missing")
+    assert r2.state is ProofState.PENDING and "not received upstream" in r2.detail
 
 
 def test_external_reads_sibling_and_records_rev(tmp_path: Path) -> None:
