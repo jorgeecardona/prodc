@@ -43,9 +43,25 @@ prodc draws on, and tries to credit, several existing lines of work:
   IDs), which prodc follows in form but points at product artifacts rather than "shall"
   statements.
 
-> Status: v0.3, on PyPI (`pip install prodc`). The model (Need · Source · Proof), the proof
-> and source adapters, and the status / show / diff / portfolio commands are in; see
+> Status: v0.3, on PyPI (`pip install prodc`). The model (Need · Source · Proof) with a
+> baseline/variant scope per client, the proof and source adapters, and the
+> `status` / `show` / `brief` / `plan` / `diff` / `portfolio` commands are in; see
 > `docs/issues/` for what's still open.
+
+## Commands
+
+- `prodc status` — the board: needs vs what the suite proves, with gaps and coverage.
+- `prodc show <id>` — one need as a citable answer (grounds, warrant, sources, proofs).
+- `prodc brief <client>` — a pre-meeting agenda for one client: its applicable needs that
+  are opinions (no evidence) or HOLEs (no proof), must-haves first.
+- `prodc plan` — a ranked backlog from recorded inputs only (must + state + evidence kind,
+  refined by an optional `importance` ordinal); ordering, not a fabricated score.
+- `prodc diff <snapshot>` — what changed since a saved `status --json`.
+- `prodc portfolio <toml>…` — many repos rolled into one scoreboard.
+
+A need can be a shared **baseline** or a per-client **variant** (`variant_of` + `client`);
+the board counts cross-client **recurrence**, and a DELIVERED proof link carries a human
+**attestation** (who/date) so an unreviewed warrant is visible rather than trusted blindly.
 
 ## Install
 
