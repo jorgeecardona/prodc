@@ -11,6 +11,7 @@ import argparse
 import json
 import shutil
 import sys
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from . import __version__
@@ -54,15 +55,21 @@ def _warrant(need: Need) -> str:
     return strongest.value
 
 
+def _provenance_counts(results: list[NeedResult]) -> dict[str, int]:
+    """How many needs carry each warrant strength (interview/artifact/internal/opinion)."""
+    counts = {"interview": 0, "artifact": 0, "internal": 0, "opinion": 0}
+    for r in results:
+        counts[_warrant(r.need).split(":", 1)[0]] += 1
+    return counts
+
+
 def _provenance_line(results: list[NeedResult]) -> str:
     """Per-persona provenance mix — makes internal-only ('0 OPINION' but unvalidated) visible.
 
     OPINION (no source) stays distinct from a weak INTERNAL source; the headline a PM
     wants is how many needs trace to a real user (interview), not just 'has any source'.
     """
-    counts = {"interview": 0, "artifact": 0, "internal": 0, "opinion": 0}
-    for r in results:
-        counts[_warrant(r.need).split(":", 1)[0]] += 1
+    counts = _provenance_counts(results)
     return "provenance: " + "  ·  ".join(f"{counts[k]} {k}" for k in counts)
 
 
@@ -301,6 +308,66 @@ def _cmd_show(args: argparse.Namespace) -> int:
     return 0
 
 
+@dataclass(frozen=True)
+class _RepoRow:
+    """One repo's line in the portfolio roll-up."""
+
+    repo: str
+    delivered: int
+    total: int
+    must_hole: int
+    broken: int
+    coverage: float
+    provenance: dict[str, int]
+    error: str | None = None
+
+
+def _repo_row(config_path: str) -> _RepoRow:
+    p = Path(config_path)
+    name = p.parent.name or str(p)
+    try:
+        cfg = Config.load(p)
+        needs = load_needs(cfg)
+    except (ConfigError, LoaderError, OSError) as exc:
+        return _RepoRow(name, 0, 0, 0, 0, 0.0, {}, error=str(exc))
+    results = resolve(needs, cfg.adapters)
+    s = summarize(results)
+    return _RepoRow(
+        repo=cfg.root.name,
+        delivered=s.delivered,
+        total=s.total,
+        must_hole=s.must_hole,
+        broken=s.broken,
+        coverage=round(s.coverage, 4),
+        provenance=_provenance_counts(results),
+    )
+
+
+def _render_portfolio(rows: list[_RepoRow]) -> str:
+    out = [f"  {'repo':<18} {'cov':>4}  {'must-HOLE':>9}  {'BROKEN':>6}   prov intv/art/int/op"]
+    for row in rows:
+        if row.error is not None:
+            out.append(f"  {row.repo:<18} error: {row.error}")
+            continue
+        p = row.provenance
+        prov = f"{p['interview']}/{p['artifact']}/{p['internal']}/{p['opinion']}"
+        cov = f"{round(row.coverage * 100)}%"
+        out.append(
+            f"  {row.repo:<18} {cov:>4}  {row.must_hole:>9}  {row.broken:>6}   {prov}"
+        )
+    return "\n".join(out)
+
+
+def _cmd_portfolio(args: argparse.Namespace) -> int:
+    """Roll up many repos into one scoreboard — coverage, must-HOLEs, provenance per repo."""
+    rows = [_repo_row(path) for path in args.configs]
+    if args.json:
+        print(json.dumps([asdict(r) for r in rows], indent=2))
+    else:
+        print(_render_portfolio(rows))
+    return 2 if any(r.error is not None for r in rows) else 0
+
+
 def _git_rev(root: Path) -> str | None:
     head = root / ".git" / "HEAD"
     try:
@@ -352,6 +419,11 @@ def main(argv: list[str] | None = None) -> int:
     sh.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     sh.add_argument("--json", action="store_true", help="machine-readable output")
     sh.set_defaults(func=_cmd_show)
+
+    pf = sub.add_parser("portfolio", help="roll up many repos into one scoreboard")
+    pf.add_argument("configs", nargs="+", metavar="PRODC_TOML", help="one or more prodc.toml paths")
+    pf.add_argument("--json", action="store_true", help="machine-readable output")
+    pf.set_defaults(func=_cmd_portfolio)
 
     args = parser.parse_args(argv)
     return int(args.func(args))

@@ -54,8 +54,8 @@ Feature: orders
 
 
 def _project(tmp_path: Path) -> Path:
-    (tmp_path / "needs").mkdir()
-    (tmp_path / "features").mkdir()
+    (tmp_path / "needs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "features").mkdir(parents=True, exist_ok=True)
     (tmp_path / "prodc.toml").write_text(_TOML, encoding="utf-8")
     (tmp_path / "needs" / "a.yaml").write_text(_NEEDS, encoding="utf-8")
     (tmp_path / "features" / "orders.feature").write_text(_FEATURE, encoding="utf-8")
@@ -148,5 +148,32 @@ def test_show_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
 
 def test_show_unknown_need_exits_2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     code = main(["show", "NOPE", "--config", str(_project(tmp_path))])
+    capsys.readouterr()
+    assert code == 2
+
+
+def test_portfolio_rolls_up_many_repos(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    a = _project(tmp_path / "alpha")
+    b = _project(tmp_path / "beta")
+    code = main(["portfolio", str(a), str(b)])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "alpha" in out and "beta" in out
+    assert "33%" in out  # each repo is 1/3 delivered
+
+
+def test_portfolio_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    import json
+
+    main(["portfolio", str(_project(tmp_path / "alpha")), "--json"])
+    rows = json.loads(capsys.readouterr().out)
+    assert rows[0]["repo"] == "alpha" and rows[0]["total"] == 3
+    assert rows[0]["provenance"]["interview"] == 1
+
+
+def test_portfolio_bad_config_exits_2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(["portfolio", str(tmp_path / "nope.toml")])
     capsys.readouterr()
     assert code == 2
