@@ -168,17 +168,25 @@ def _to_json(results: list[NeedResult], summary: Summary, orphan_map: dict[str, 
     return json.dumps(payload, indent=2)
 
 
-def _cmd_status(args: argparse.Namespace) -> int:
+def _load_or_report(args: argparse.Namespace) -> tuple[Config, list[Need]] | None:
+    """Load config + needs, or print the error to stderr and return None."""
     cfg_path = Path(args.config)
     if not cfg_path.exists():
         print(f"prodc: no config at {cfg_path}", file=sys.stderr)
-        return 2
+        return None
     try:
         cfg = Config.load(cfg_path)
-        needs = load_needs(cfg)
+        return cfg, load_needs(cfg)
     except (ConfigError, LoaderError) as exc:
         print(f"prodc: {exc}", file=sys.stderr)
+        return None
+
+
+def _cmd_status(args: argparse.Namespace) -> int:
+    loaded = _load_or_report(args)
+    if loaded is None:
         return 2
+    cfg, needs = loaded
     results = resolve(needs, cfg.adapters)
     summary = summarize(results)
     orphan_map = orphans(needs, cfg.adapters)
@@ -214,6 +222,82 @@ def _exit_code(args: argparse.Namespace, summary: Summary, orphan_total: int) ->
         return 1
     if args.strict and summary.opinion:
         return 1
+    return 0
+
+
+def _render_show(r: NeedResult) -> str:
+    """One need as a citable answer — the artifact you drop into a thread."""
+    need = r.need
+    who = (need.who + (f" ({need.label})" if need.label else "")) if need.who else "(unassigned)"
+    nm = f"  {r.delivered}/{r.total}" if r.total else ""
+    lines = [
+        f"{need.id}{'  !!' if need.must else ''}  {need.text}",
+        f"  who: {who}",
+        f"  grounds: {_LABEL[r.state]}{nm}    warrant: {_warrant(need)}",
+    ]
+    if need.sources:
+        lines.append("  sources:")
+        for s in need.sources:
+            bits = [s.kind.value]
+            bits += [f"{k}={v}" for k, v in (("who", s.who), ("date", s.date),
+                                             ("locator", s.locator)) if v]
+            line = "    - " + "  ".join(bits)
+            lines.append(line + (f'  "{s.quote}"' if s.quote else ""))
+    else:
+        lines.append("  sources: (none — opinion)")
+    if need.children:
+        lines.append(f"  children: {', '.join(need.children)}")
+    if need.proofs:
+        lines.append("  proofs:")
+        lines += [f"    - {d}" for d in r.detail]
+    elif not need.children:
+        lines.append("  proofs: (none — HOLE)")
+    lines += [f"  ⚠ {w}" for w in r.warnings]
+    return "\n".join(lines)
+
+
+def _show_json(r: NeedResult) -> str:
+    need = r.need
+    return json.dumps(
+        {
+            "id": need.id,
+            "text": need.text,
+            "who": need.who,
+            "label": need.label,
+            "must": need.must,
+            "state": r.state.value,
+            "grounds": r.state.value,
+            "warrant": _warrant(need),
+            "delivered": r.delivered,
+            "total": r.total,
+            "declared": r.declared,
+            "opinion": need.is_opinion,
+            "only_internal": need.only_internal,
+            "sources": [
+                {"kind": s.kind.value, "who": s.who, "date": s.date,
+                 "quote": s.quote, "locator": s.locator}
+                for s in need.sources
+            ],
+            "proofs": list(need.proofs),
+            "children": list(need.children),
+            "detail": r.detail,
+            "warnings": r.warnings,
+        },
+        indent=2,
+    )
+
+
+def _cmd_show(args: argparse.Namespace) -> int:
+    loaded = _load_or_report(args)
+    if loaded is None:
+        return 2
+    cfg, needs = loaded
+    by_id = {r.need.id: r for r in resolve(needs, cfg.adapters)}
+    r = by_id.get(args.need_id)
+    if r is None:
+        print(f"prodc: no need '{args.need_id}'", file=sys.stderr)
+        return 2
+    print(_show_json(r) if args.json else _render_show(r))
     return 0
 
 
@@ -262,6 +346,12 @@ def main(argv: list[str] | None = None) -> int:
         help="gate: exit 1 if more than N proof scenarios are claimed by no need",
     )
     st.set_defaults(func=_cmd_status)
+
+    sh = sub.add_parser("show", help="show one need as a citable answer")
+    sh.add_argument("need_id", help="the need id to show, e.g. N-1")
+    sh.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    sh.add_argument("--json", action="store_true", help="machine-readable output")
+    sh.set_defaults(func=_cmd_show)
 
     args = parser.parse_args(argv)
     return int(args.func(args))

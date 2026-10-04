@@ -126,3 +126,27 @@ def test_orphans_in_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> 
     payload = json.loads(capsys.readouterr().out)
     assert payload["summary"]["orphans"] == 1
     assert payload["orphans"]["web"] == ["orders.feature#Unclaimed extra"]
+
+
+def test_show_single_need(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(["show", "D-1", "--config", str(_project(tmp_path))])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "D-1" in out and "a delivered need" in out
+    assert "grounds: DELIVERED" in out and "interview:John" in out
+    assert "I need this" in out  # the source quote
+
+
+def test_show_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    import json
+
+    main(["show", "D-1", "--config", str(_project(tmp_path)), "--json"])
+    p = json.loads(capsys.readouterr().out)
+    assert p["id"] == "D-1" and p["warrant"] == "interview:John"
+    assert p["sources"][0]["kind"] == "interview" and p["sources"][0]["who"] == "John"
+
+
+def test_show_unknown_need_exits_2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(["show", "NOPE", "--config", str(_project(tmp_path))])
+    capsys.readouterr()
+    assert code == 2
