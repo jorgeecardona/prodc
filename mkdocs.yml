@@ -20,7 +20,7 @@ theme:
     - navigation.sections
     - content.code.copy
 
-# The cabildo issue register under docs/issues/ is plain config, not site content.
+# The issue register under docs/issues/ is plain config, not site content.
 exclude_docs: |
   issues/
 

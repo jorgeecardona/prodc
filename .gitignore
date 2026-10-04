@@ -32,12 +32,12 @@ logs/
 # Personal, machine-specific agent overrides (AGENTS.md + CLAUDE.md are tracked)
 CLAUDE.local.md
 
-# Local agent wiring: names cabildo-issues-mcp, which is not a dependency of this
-# package. docs/issues/ IS tracked — the register is plain markdown anyone can read.
+# Local MCP/agent wiring — not a dependency of this package. docs/issues/ IS
+# tracked — the register is plain markdown anyone can read.
 .mcp.json
 
 # Local agent runtime state (scheduled-task locks, session scratch)
 .claude/
 
-# Local multi-agent coordination config (cabildo) — not part of the package
+# Local multi-agent coordination state — not part of the package
 .cabildo/

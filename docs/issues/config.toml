@@ -1,7 +1,8 @@
 # docs/issues/config.toml — what this folder's issues must say.
 #
-# Read by `cabildo issues`: the CLI, the `issues` MCP server, and any pre-commit gate are one
-# module, so the tool an agent calls and the gate that grades it cannot disagree.
+# Describes the plain-markdown issue register under docs/issues/: the fields each issue
+# carries and how the generated index is built. Any tool or pre-commit gate that reads
+# this folder should follow this one schema, so the register and its checks agree.
 
 date_style = "DMY"          # 03-08-2026-short-kebab-summary.md
 index = true                # the generated table in README.md

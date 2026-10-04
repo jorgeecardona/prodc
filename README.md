@@ -40,6 +40,6 @@ new grammar.
 ## Layout
 
 - `src/prodc/` — the package (typed; `py.typed`).
-- `docs/issues/` — follow-ups (the `cabildo issues` convention).
+- `docs/issues/` — follow-ups, as a plain-markdown issue register.
 - `Makefile` — `format` / `lint` / `typecheck` / `test` / `check` / `build` / `docs`.
 - `AGENTS.md` — build/test/style/gotchas for coding agents.
