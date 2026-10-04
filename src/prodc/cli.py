@@ -13,6 +13,7 @@ import shutil
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import cast
 
 from . import __version__
 from .config import Config, ConfigError
@@ -380,6 +381,51 @@ def _cmd_portfolio(args: argparse.Namespace) -> int:
     return 2 if any(r.error is not None for r in rows) else 0
 
 
+def _cmd_diff(args: argparse.Namespace) -> int:
+    """Diff the current board against a prior `status --json` snapshot."""
+    loaded = _load_or_report(args)
+    if loaded is None:
+        return 2
+    cfg, needs = loaded
+    current = {r.need.id: r.state.value for r in resolve(needs, cfg.adapters, cfg.source_adapters)}
+
+    snap = Path(args.snapshot)
+    try:
+        payload: object = json.loads(snap.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"prodc: cannot read snapshot {snap}: {exc}", file=sys.stderr)
+        return 2
+    raw_needs = cast("dict[str, object]", payload).get("needs") if isinstance(payload, dict) else None
+    old: dict[str, str] = {}
+    for n in cast("list[object]", raw_needs) if isinstance(raw_needs, list) else []:
+        if isinstance(n, dict):
+            entry = cast("dict[str, object]", n)
+            nid, st = entry.get("id"), entry.get("state")
+            if isinstance(nid, str) and isinstance(st, str):
+                old[nid] = st
+
+    new = {i: current[i] for i in sorted(current.keys() - old.keys())}
+    removed = sorted(old.keys() - current.keys())
+    changed = {
+        i: [old[i], current[i]] for i in sorted(old.keys() & current.keys()) if old[i] != current[i]
+    }
+    if args.json:
+        print(json.dumps({"new": new, "removed": removed, "changed": changed}, indent=2))
+        return 0
+    if not (new or removed or changed):
+        print("no changes since snapshot")
+        return 0
+    out: list[str] = []
+    for i, st in new.items():
+        out.append(f"  new      {i:<10} ({st})")
+    for i in removed:
+        out.append(f"  removed  {i}")
+    for i, (was, now) in changed.items():
+        out.append(f"  changed  {i:<10} {was} → {now}")
+    print("\n".join(out))
+    return 0
+
+
 def _git_rev(root: Path) -> str | None:
     head = root / ".git" / "HEAD"
     try:
@@ -436,6 +482,12 @@ def main(argv: list[str] | None = None) -> int:
     pf.add_argument("configs", nargs="+", metavar="PRODC_TOML", help="one or more prodc.toml paths")
     pf.add_argument("--json", action="store_true", help="machine-readable output")
     pf.set_defaults(func=_cmd_portfolio)
+
+    df = sub.add_parser("diff", help="diff the current board against a prior status --json snapshot")
+    df.add_argument("snapshot", help="path to a saved `prodc status --json` file")
+    df.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    df.add_argument("--json", action="store_true", help="machine-readable output")
+    df.set_defaults(func=_cmd_diff)
 
     args = parser.parse_args(argv)
     return int(args.func(args))

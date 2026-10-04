@@ -179,6 +179,30 @@ def test_portfolio_bad_config_exits_2(tmp_path: Path, capsys: pytest.CaptureFixt
     assert code == 2
 
 
+def test_diff_no_changes(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    toml = str(_project(tmp_path))
+    main(["status", "--config", toml, "--json"])
+    snap = tmp_path / "snap.json"
+    snap.write_text(capsys.readouterr().out, encoding="utf-8")
+    main(["diff", str(snap), "--config", toml])
+    assert "no changes" in capsys.readouterr().out
+
+
+def test_diff_reports_new_need(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    toml = str(_project(tmp_path))
+    main(["status", "--config", toml, "--json"])
+    snap = tmp_path / "snap.json"
+    snap.write_text(capsys.readouterr().out, encoding="utf-8")
+    # add a brand-new need, then diff against the snapshot
+    (tmp_path / "needs" / "a.yaml").write_text(
+        _NEEDS + "  - id: X-9\n    text: a newly added need\n", encoding="utf-8"
+    )
+    code = main(["diff", str(snap), "--config", toml])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "new" in out and "X-9" in out
+
+
 def test_proxy_source_kind_warrant(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     import json
 
