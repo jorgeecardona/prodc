@@ -1,8 +1,7 @@
 """Resolve needs into states: the engine behind ``prodc status``.
 
-A leaf need's state comes from its proofs; a need with children is a flow and its
-state aggregates its sub-needs ("3 of 5"). ``HOLE`` (no proof) is deliberately not a
-failure — it is an honest, visible gap.
+A leaf's state comes from its proofs; a flow (need with children) aggregates its
+sub-needs. ``HOLE`` (no proof) is deliberately not a failure — it is an honest gap.
 """
 
 from __future__ import annotations

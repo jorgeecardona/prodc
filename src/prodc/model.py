@@ -1,11 +1,9 @@
 """The prodc data model: Need, Source, and the derived status states.
 
-Three nouns. A **Need** is what a named person wants (Torres: an opportunity).
-A **Source** is its provenance (Torres: an interview snapshot / evidence); a Need
-with no Source is an *opinion*. A **proof** is an explicit locator to a delivery
-test, resolved by an adapter. Everything else — "flow", "feature", "persona",
-"assumption" — is expressed with these: a flow is a Need with children, a persona
-is the ``who`` field, an assumption is a Source with no evidence.
+Three nouns (Torres): a Need is what a named person wants (an opportunity); a
+Source is its provenance (evidence) — a Need with no Source is an opinion; a proof
+is a locator to a delivery test, resolved by an adapter. Everything else is
+expressed with these: a flow is a Need with children, a persona is ``who``.
 """
 
 from __future__ import annotations
@@ -87,8 +85,7 @@ class Need:
         return len(self.sources) > 0 and all(s.kind is SourceKind.INTERNAL for s in self.sources)
 
 
-# A verb that, at the start of a need's text, usually signals a solution-in-disguise
-# rather than a customer need (Torres, Ch. 6, "solutions in disguise").
+# A leading verb that usually signals a solution-in-disguise, not a need (Torres, Ch. 6).
 SOLUTION_VERBS = (
     "implement",
     "add",

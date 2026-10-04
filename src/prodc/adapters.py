@@ -1,9 +1,8 @@
 """Proof adapters: resolve a locator payload to a :class:`ProofState`.
 
-An adapter reads a repo *as it already is* — Gherkin titles, pytest node ids — and
-never asks the repo to adopt prodc's format. Status comes from a test-results
-artifact (cucumber-json / junit) when one is configured and present; otherwise the
-adapter reports a *declared* state (from tags or mere existence) and says so.
+An adapter reads a repo as it already is (Gherkin titles, pytest node ids). Status
+comes from a test-results artifact (cucumber-json / junit) when configured and
+present; otherwise it reports a *declared* state (from tags or existence) and says so.
 """
 
 from __future__ import annotations

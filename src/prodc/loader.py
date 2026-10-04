@@ -1,10 +1,8 @@
 """Load need files (YAML) into :class:`~prodc.model.Need` objects.
 
-One file per ``who``: a file carries a file-level ``who`` and ``label`` that
-default every need in it, and a need may override either. IDs are unique across
-*all* files (``status`` indexes needs by a flat id and children reference ids
-globally), so a duplicate id is a :class:`LoaderError`. A need with ``children``
-is a flow and must not also carry ``proofs``.
+A file-level ``who``/``label`` default every need in it; a need may override either.
+IDs are globally unique (children reference ids across files), so a duplicate is a
+:class:`LoaderError`. A flow (need with ``children``) must not also carry ``proofs``.
 """
 
 from __future__ import annotations

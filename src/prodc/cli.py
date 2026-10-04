@@ -1,9 +1,8 @@
 """``prodc`` command line: one verb, ``status`` — the board.
 
-Reads the gap between what a named person asked for (needs) and what the test
-suite proves (proofs), and prints it sorted by what needs attention first.
-Exit 1 on a BROKEN proof; ``--strict`` also exits 1 on an opinion (a need with no
-source). A HOLE never fails — it is the honest gap you want people to keep writing.
+Prints the gap between needs and what the test suite proves, sorted by what needs
+attention first. Exit 1 on a BROKEN proof; ``--strict`` also on an opinion. A HOLE
+never fails — it is the honest gap you want people to keep writing.
 """
 
 from __future__ import annotations
@@ -38,8 +37,7 @@ def _priority(r: NeedResult) -> int:
     }[r.state]
 
 
-# Warrant strength, strongest first: a customer interview outweighs a documentary
-# artifact, which outweighs the team's own internal assertion (Torres).
+# Warrant strength, strongest first: interview > artifact > internal (Torres).
 _WARRANT_ORDER = (SourceKind.INTERVIEW, SourceKind.ARTIFACT, SourceKind.INTERNAL)
 
 
@@ -78,9 +76,8 @@ def _render(results: list[NeedResult]) -> str:
         groups.setdefault(r.need.who or "(unassigned)", []).append(r)
 
     out: list[str] = []
-    # Two columns carry the Toulmin split: GROUNDS (does a test prove it?) and
-    # WARRANT (is there a user signal it matters?). A need can be green on one and
-    # empty on the other — that gap is the whole point.
+    # The Toulmin split: GROUNDS (does a test prove it?) vs WARRANT (user signal it
+    # matters?). A need can be green on one and empty on the other — that gap is the point.
     out.append(f"  {'':2} {'id':<9} {'GROUNDS':<10}{'':5} {'need':<48}  WARRANT")
     for who in sorted(groups):
         rs = sorted(groups[who], key=_priority)
@@ -163,11 +160,10 @@ def _cmd_status(args: argparse.Namespace) -> int:
 
 
 def _exit_code(args: argparse.Namespace, summary: Summary) -> int:
-    """Gate: 0 unless a configured threshold is crossed. HOLE never fails.
+    """Gate: 0 unless a threshold is crossed; HOLE never fails.
 
-    Default: any BROKEN locator fails. ``--max-dangling N`` instead tolerates up to
-    N broken. ``--min-coverage F`` fails when delivered/total < F. ``--strict`` fails
-    on any opinion (a need with no source).
+    Default fails on any BROKEN; ``--max-dangling N`` tolerates N; ``--min-coverage F``
+    fails when delivered/total < F; ``--strict`` fails on any opinion.
     """
     if args.max_dangling is not None:
         if summary.broken > args.max_dangling:
