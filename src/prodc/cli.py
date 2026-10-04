@@ -194,7 +194,7 @@ def _cmd_status(args: argparse.Namespace) -> int:
     if loaded is None:
         return 2
     cfg, needs = loaded
-    results = resolve(needs, cfg.adapters)
+    results = resolve(needs, cfg.adapters, cfg.source_adapters)
     summary = summarize(results)
     orphan_map = orphans(needs, cfg.adapters)
 
@@ -299,7 +299,7 @@ def _cmd_show(args: argparse.Namespace) -> int:
     if loaded is None:
         return 2
     cfg, needs = loaded
-    by_id = {r.need.id: r for r in resolve(needs, cfg.adapters)}
+    by_id = {r.need.id: r for r in resolve(needs, cfg.adapters, cfg.source_adapters)}
     r = by_id.get(args.need_id)
     if r is None:
         print(f"prodc: no need '{args.need_id}'", file=sys.stderr)
@@ -330,7 +330,7 @@ def _repo_row(config_path: str) -> _RepoRow:
         needs = load_needs(cfg)
     except (ConfigError, LoaderError, OSError) as exc:
         return _RepoRow(name, 0, 0, 0, 0, 0.0, {}, error=str(exc))
-    results = resolve(needs, cfg.adapters)
+    results = resolve(needs, cfg.adapters, cfg.source_adapters)
     s = summarize(results)
     return _RepoRow(
         repo=cfg.root.name,

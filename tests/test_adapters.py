@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from prodc.adapters import FilesAdapter, PytestAdapter
+from prodc.adapters import FilesAdapter, FrontmatterAdapter, PytestAdapter
 from prodc.model import ProofState
 
 
@@ -52,3 +52,23 @@ def test_files_adapter_existence_is_declared(tmp_path: Path) -> None:
 
 def test_files_adapter_missing_is_broken(tmp_path: Path) -> None:
     assert FilesAdapter(root=tmp_path).resolve("gone.py").state is ProofState.BROKEN
+
+
+def _frontmatter(tmp_path: Path) -> FrontmatterAdapter:
+    (tmp_path / "issues").mkdir()
+    (tmp_path / "issues" / "reg.md").write_text(
+        "# A-1 Partida doble\n\nbody\n\n## A-6 Factura electrónica\n", encoding="utf-8"
+    )
+    return FrontmatterAdapter(root=tmp_path, paths=["issues/*.md"])
+
+
+def test_frontmatter_resolves_existing_heading(tmp_path: Path) -> None:
+    a = _frontmatter(tmp_path)
+    assert a.resolve("reg.md#A-1").ok
+    assert a.resolve("reg.md#A-6").ok  # matches "## A-6 Factura electrónica"
+
+
+def test_frontmatter_dangling_anchor_or_no_anchor(tmp_path: Path) -> None:
+    a = _frontmatter(tmp_path)
+    assert not a.resolve("reg.md#A-9").ok  # no such heading
+    assert not a.resolve("reg.md#").ok  # no anchor at all

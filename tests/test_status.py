@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
-from prodc.adapters import ProofResult
-from prodc.model import Need, NeedState, ProofState
+from prodc.adapters import FrontmatterAdapter, ProofResult, SourceAdapter
+from prodc.model import Need, NeedState, ProofState, Source, SourceKind
 from prodc.status import resolve
 
 
@@ -62,3 +63,20 @@ def test_solution_verb_warns() -> None:
     need = Need(id="A-1", text="implement a dashboard", proofs=())
     (r,) = resolve([need], {})
     assert any("solution in disguise" in w for w in r.warnings)
+
+
+def test_dangling_source_warns_distinct_from_opinion(tmp_path: Path) -> None:
+    (tmp_path / "issues").mkdir()
+    (tmp_path / "issues" / "reg.md").write_text("# A-1 ok\n", encoding="utf-8")
+    sources: dict[str, SourceAdapter] = {
+        "issues": FrontmatterAdapter(root=tmp_path, paths=["issues/*.md"])
+    }
+    good = Need(id="N-1", text="t",
+                sources=(Source(kind=SourceKind.ARTIFACT, locator="issues:reg.md#A-1"),))
+    bad = Need(id="N-2", text="t",
+               sources=(Source(kind=SourceKind.ARTIFACT, locator="issues:reg.md#NOPE"),))
+    results = {r.need.id: r for r in resolve([good, bad], {}, sources)}
+    assert not any("BROKEN source" in w for w in results["N-1"].warnings)
+    assert any("BROKEN source" in w for w in results["N-2"].warnings)
+    # both are sourced, so neither is an opinion — BROKEN-source is a distinct signal
+    assert not results["N-2"].need.is_opinion

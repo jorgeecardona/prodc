@@ -7,7 +7,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
-from .adapters import Adapter, FilesAdapter, GherkinAdapter, PytestAdapter
+from .adapters import (
+    Adapter,
+    FilesAdapter,
+    FrontmatterAdapter,
+    GherkinAdapter,
+    PytestAdapter,
+    SourceAdapter,
+)
 
 
 class ConfigError(Exception):
@@ -34,6 +41,7 @@ class Config:
     root: Path
     need_globs: list[str]
     adapters: dict[str, Adapter] = field(default_factory=dict[str, Adapter])
+    source_adapters: dict[str, SourceAdapter] = field(default_factory=dict[str, SourceAdapter])
 
     @classmethod
     def load(cls, path: Path) -> Config:
@@ -77,4 +85,23 @@ class Config:
                 raise ConfigError(
                     f"[proofs.{name}]: unknown kind {kind!r} (gherkin|pytest|files)"
                 )
-        return cls(root=root, need_globs=need_globs, adapters=adapters)
+
+        source_adapters: dict[str, SourceAdapter] = {}
+        sources = _as_dict(raw.get("sources", {}), "[sources]")
+        for name, body in sources.items():
+            tbl = _as_dict(body, f"[sources.{name}]")
+            kind = tbl.get("kind")
+            if kind == "frontmatter":
+                source_adapters[name] = FrontmatterAdapter(
+                    root=root,
+                    paths=_as_str_list(tbl.get("paths", []), f"[sources.{name}].paths"),
+                )
+            else:
+                raise ConfigError(f"[sources.{name}]: unknown kind {kind!r} (frontmatter)")
+
+        return cls(
+            root=root,
+            need_globs=need_globs,
+            adapters=adapters,
+            source_adapters=source_adapters,
+        )

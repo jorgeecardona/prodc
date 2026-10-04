@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .adapters import Adapter, Enumerable, ProofResult
+from .adapters import Adapter, Enumerable, ProofResult, SourceAdapter
 from .model import (
     SOLUTION_VERBS,
     Need,
@@ -36,10 +36,36 @@ def _resolve_proof(locator: str, adapters: dict[str, Adapter]) -> ProofResult:
     return adapter.resolve(payload)
 
 
+def _source_warnings(need: Need, source_adapters: dict[str, SourceAdapter]) -> list[str]:
+    """Flag a Source.locator that names a configured source adapter but does not resolve.
+
+    This is a dangling (BROKEN) *source* — distinct from OPINION (no source at all). A
+    free-text locator with no matching adapter is left unchecked, not flagged.
+    """
+    out: list[str] = []
+    for s in need.sources:
+        if not s.locator:
+            continue
+        name, sep, payload = s.locator.partition(":")
+        adapter = source_adapters.get(name)
+        if not sep or adapter is None:
+            continue
+        res = adapter.resolve(payload)
+        if not res.ok:
+            out.append(f"BROKEN source '{s.locator}' ({res.detail})")
+    return out
+
+
 class Resolver:
-    def __init__(self, needs: list[Need], adapters: dict[str, Adapter]) -> None:
+    def __init__(
+        self,
+        needs: list[Need],
+        adapters: dict[str, Adapter],
+        source_adapters: dict[str, SourceAdapter] | None = None,
+    ) -> None:
         self._by_id = {n.id: n for n in needs}
         self._adapters = adapters
+        self._source_adapters = source_adapters or {}
         self._cache: dict[str, NeedResult] = {}
         self._visiting: set[str] = set()
 
@@ -55,7 +81,11 @@ class Resolver:
         self._visiting.add(need_id)
         result = self._compute(need)
         self._visiting.discard(need_id)
-        result.warnings = _text_warnings(need) + result.warnings
+        result.warnings = (
+            _text_warnings(need)
+            + _source_warnings(need, self._source_adapters)
+            + result.warnings
+        )
         self._cache[need_id] = result
         return result
 
@@ -105,9 +135,13 @@ class Resolver:
         return NeedResult(need, state, delivered, total, declared, detail, warnings)
 
 
-def resolve(needs: list[Need], adapters: dict[str, Adapter]) -> list[NeedResult]:
+def resolve(
+    needs: list[Need],
+    adapters: dict[str, Adapter],
+    source_adapters: dict[str, SourceAdapter] | None = None,
+) -> list[NeedResult]:
     """Resolve every need to a :class:`NeedResult`."""
-    return Resolver(needs, adapters).resolve_all()
+    return Resolver(needs, adapters, source_adapters).resolve_all()
 
 
 @dataclass(frozen=True)

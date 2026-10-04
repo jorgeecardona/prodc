@@ -243,3 +243,60 @@ class FilesAdapter:
         if not fp.exists():
             return ProofResult(ProofState.BROKEN, False, f"no file '{payload}'")
         return ProofResult(ProofState.DELIVERED, True, "script exists")
+
+
+@dataclass(frozen=True)
+class SourceResult:
+    """Whether a Source.locator resolves. Verifies provenance *exists*, not that it is good."""
+
+    ok: bool
+    detail: str
+
+
+class SourceAdapter(Protocol):
+    def resolve(self, payload: str) -> SourceResult: ...
+
+
+def _slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+
+
+class FrontmatterAdapter:
+    """Resolves ``file#anchor`` against markdown files (e.g. docs/issues/*.md).
+
+    Confirms a heading matching the anchor exists, so a Source citing a ticket/section
+    that is absent or renamed surfaces as a dangling (BROKEN) source — the provenance-side
+    analogue of a BROKEN proof.
+    """
+
+    def __init__(self, root: Path, paths: list[str]) -> None:
+        self._root = root
+        self._paths = paths
+        self._headings: list[tuple[str, str]] | None = None  # (file name, heading text)
+
+    def _load(self) -> list[tuple[str, str]]:
+        if self._headings is not None:
+            return self._headings
+        found: list[tuple[str, str]] = []
+        heading_re = re.compile(r"^#{1,6}\s+(.*?)\s*$")
+        for pattern in self._paths:
+            for fp in sorted(self._root.glob(pattern)):
+                for line in fp.read_text(encoding="utf-8").splitlines():
+                    m = heading_re.match(line)
+                    if m:
+                        found.append((fp.name, m.group(1)))
+        self._headings = found
+        return found
+
+    def resolve(self, payload: str) -> SourceResult:
+        file_part, _, anchor = payload.partition("#")
+        if not anchor:
+            return SourceResult(False, f"no anchor in '{payload}'")
+        want = _slug(anchor)
+        for fname, heading in self._load():
+            if file_part and fname != file_part and not fname.endswith("/" + file_part):
+                continue
+            hslug = _slug(heading)
+            if hslug == want or hslug.startswith(want + "-") or anchor.lower() in heading.lower():
+                return SourceResult(True, f"{fname}: '{heading}'")
+        return SourceResult(False, f"no heading matches '{payload}'")
