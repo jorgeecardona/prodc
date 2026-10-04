@@ -18,8 +18,34 @@ The lineage is Toulmin's argument model (claim + grounds + warrant): a feature i
 its evidence is the grounds, its assumptions are the warrant. The same shape safety
 engineering uses for a "safety case", pointed at product decisions.
 
-> Status: v0, early. The data model and the first cross-repo adapter are still being shaped
-> (see `docs/issues/`). Not yet on PyPI.
+## What it's for
+
+prodc does not replace the human conversation with a client — it is scaffolding around it.
+Going in, the board already shows what is still unknown for that client: needs with no
+evidence (opinions) and needs with no proof (HOLEs), so the meeting is spent closing real
+gaps instead of re-deriving them. Coming out, what was learned is captured as evidence on
+the need, so the next decision is planned from the repo rather than from memory. The board
+answers "where are we" and "what's blocking" between meetings, without a standup.
+
+## Prior art
+
+prodc draws on, and tries to credit, several existing lines of work:
+
+- **Continuous discovery / opportunity framing** — Teresa Torres (opportunity = need; the
+  interview > artifact > internal evidence ladder; "solutions in disguise").
+- **The argument/assurance model** — Toulmin (claim · grounds · warrant) and the safety-case
+  / GSN tradition it informs.
+- **Spec-driven development** — product/requirements modelled as plain JSON/YAML in git
+  (the ThoughtWorks / Fowler SDD writing).
+- **Structured requirements** — EARS (Easy Approach to Requirements Syntax), the NASA
+  requirement-writing guidance, and the SysML lineage.
+- **Requirements-as-code tooling** — Doorstop and StrictDoc (plain-text, git-tracked, linked
+  IDs), which prodc follows in form but points at product artifacts rather than "shall"
+  statements.
+
+> Status: v0.3, on PyPI (`pip install prodc`). The model (Need · Source · Proof), the proof
+> and source adapters, and the status / show / diff / portfolio commands are in; see
+> `docs/issues/` for what's still open.
 
 ## Install
 
