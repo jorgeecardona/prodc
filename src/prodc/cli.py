@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -53,6 +54,18 @@ def _warrant(need: Need) -> str:
     return strongest.value
 
 
+def _provenance_line(results: list[NeedResult]) -> str:
+    """Per-persona provenance mix — makes internal-only ('0 OPINION' but unvalidated) visible.
+
+    OPINION (no source) stays distinct from a weak INTERNAL source; the headline a PM
+    wants is how many needs trace to a real user (interview), not just 'has any source'.
+    """
+    counts = {"interview": 0, "artifact": 0, "internal": 0, "opinion": 0}
+    for r in results:
+        counts[_warrant(r.need).split(":", 1)[0]] += 1
+    return "provenance: " + "  ·  ".join(f"{counts[k]} {k}" for k in counts)
+
+
 def _summary_line(s: Summary) -> str:
     """The leading gap-count line: what needs attention, and overall coverage."""
     parts: list[str] = []
@@ -75,10 +88,18 @@ def _render(results: list[NeedResult]) -> str:
     for r in results:
         groups.setdefault(r.need.who or "(unassigned)", []).append(r)
 
+    # Size the need column to the terminal; ~54 cols go to the fixed id/state/nm
+    # prefix and the warrant suffix. Falls back to 100 cols when there is no tty.
+    width = max(30, shutil.get_terminal_size(fallback=(100, 24)).columns - 54)
+
     out: list[str] = []
     # The Toulmin split: GROUNDS (does a test prove it?) vs WARRANT (user signal it
     # matters?). A need can be green on one and empty on the other — that gap is the point.
-    out.append(f"  {'':2} {'id':<9} {'GROUNDS':<10}{'':5} {'need':<48}  WARRANT")
+    out.append(f"  {'':2} {'id':<9} {'GROUNDS':<10}{'':5} {'need':<{width}}  WARRANT")
+    out.append(
+        "  legend: * declared (no results artifact)  ·  !! must  ·  "
+        "GROUNDS = test proof  ·  WARRANT = evidence source"
+    )
     for who in sorted(groups):
         rs = sorted(groups[who], key=_priority)
         label = next((x.need.label for x in rs if x.need.label), None)
@@ -86,13 +107,14 @@ def _render(results: list[NeedResult]) -> str:
         head = "  ·  ".join(f"{counts[s]} {_LABEL[s]}" for s in NeedState if counts[s])
         title = f"{who}" + (f" ({label})" if label else "")
         out.append(f"\n{title}    {head}")
+        out.append(f"    {_provenance_line(rs)}")
         for r in rs:
             bang = "!!" if r.need.must else "  "
             star = "*" if r.declared and r.state is NeedState.DELIVERED else " "
             nm = f"{r.delivered}/{r.total}" if r.total else ""
             out.append(
                 f"  {bang} {r.need.id:<9} {_LABEL[r.state]:<9}{star} {nm:<5} "
-                f"{r.need.text[:48]:<48}  {_warrant(r.need)}"
+                f"{r.need.text[:width]:<{width}}  {_warrant(r.need)}"
             )
             for w in r.warnings:
                 out.append(f"       ⚠ {w}")

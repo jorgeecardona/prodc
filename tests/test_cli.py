@@ -70,6 +70,9 @@ def test_board_shows_summary_and_warrant(tmp_path: Path, capsys: pytest.CaptureF
     assert "WARRANT" in out  # the warrant column header (#3)
     assert "interview:John" in out  # strongest warrant for D-1
     assert "opinion" in out  # O-1's warrant
+    assert "legend:" in out  # glyph legend (#10)
+    # provenance mix (#11): 1 interview, 1 artifact, 0 internal, 1 opinion
+    assert "provenance:" in out and "1 interview" in out and "1 artifact" in out
 
 
 def test_json_has_summary_and_grounds_warrant(
