@@ -16,7 +16,7 @@ from . import __version__
 from .config import Config, ConfigError
 from .loader import LoaderError, load_needs
 from .model import Need, NeedResult, NeedState, SourceKind
-from .status import Summary, resolve, summarize
+from .status import Summary, orphans, resolve, summarize
 
 _LABEL = {
     NeedState.DELIVERED: "DELIVERED",
@@ -99,7 +99,17 @@ def _render(results: list[NeedResult]) -> str:
     return "\n".join(out)
 
 
-def _to_json(results: list[NeedResult], summary: Summary) -> str:
+def _render_orphans(orphan_map: dict[str, list[str]]) -> str:
+    """The reverse report: proof units that no need references."""
+    total = sum(len(v) for v in orphan_map.values())
+    out = [f"\norphan proofs (claimed by no need): {total}"]
+    for name in sorted(orphan_map):
+        for sid in orphan_map[name]:
+            out.append(f"     {name}:{sid}")
+    return "\n".join(out)
+
+
+def _to_json(results: list[NeedResult], summary: Summary, orphan_map: dict[str, list[str]]) -> str:
     payload = {
         "summary": {
             "total": summary.total,
@@ -110,7 +120,9 @@ def _to_json(results: list[NeedResult], summary: Summary) -> str:
             "broken": summary.broken,
             "opinion": summary.opinion,
             "coverage": round(summary.coverage, 4),
+            "orphans": sum(len(v) for v in orphan_map.values()),
         },
+        "orphans": orphan_map,
         "needs": [
             {
                 "id": r.need.id,
@@ -147,23 +159,27 @@ def _cmd_status(args: argparse.Namespace) -> int:
         return 2
     results = resolve(needs, cfg.adapters)
     summary = summarize(results)
+    orphan_map = orphans(needs, cfg.adapters)
 
     if args.json:
-        print(_to_json(results, summary))
+        print(_to_json(results, summary, orphan_map))
     else:
         commit = _git_rev(cfg.root)
         print(f"prodc status — {cfg.root.name}{f' @ {commit}' if commit else ''}")
         print(_summary_line(summary))
         print(_render(results))
+        if orphan_map:
+            print(_render_orphans(orphan_map))
 
-    return _exit_code(args, summary)
+    return _exit_code(args, summary, sum(len(v) for v in orphan_map.values()))
 
 
-def _exit_code(args: argparse.Namespace, summary: Summary) -> int:
+def _exit_code(args: argparse.Namespace, summary: Summary, orphan_total: int) -> int:
     """Gate: 0 unless a threshold is crossed; HOLE never fails.
 
     Default fails on any BROKEN; ``--max-dangling N`` tolerates N; ``--min-coverage F``
-    fails when delivered/total < F; ``--strict`` fails on any opinion.
+    fails when delivered/total < F; ``--max-orphans N`` fails above N unclaimed proofs;
+    ``--strict`` fails on any opinion.
     """
     if args.max_dangling is not None:
         if summary.broken > args.max_dangling:
@@ -171,6 +187,8 @@ def _exit_code(args: argparse.Namespace, summary: Summary) -> int:
     elif summary.broken:
         return 1
     if args.min_coverage is not None and summary.coverage < args.min_coverage:
+        return 1
+    if args.max_orphans is not None and orphan_total > args.max_orphans:
         return 1
     if args.strict and summary.opinion:
         return 1
@@ -213,6 +231,13 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         metavar="N",
         help="gate: tolerate up to N broken locators instead of failing on any",
+    )
+    st.add_argument(
+        "--max-orphans",
+        type=int,
+        default=None,
+        metavar="N",
+        help="gate: exit 1 if more than N proof scenarios are claimed by no need",
     )
     st.set_defaults(func=_cmd_status)
 

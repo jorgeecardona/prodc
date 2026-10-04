@@ -46,6 +46,10 @@ Feature: orders
   Scenario: Done
     Given a thing
     Then it works
+
+  Scenario: Unclaimed extra
+    Given another thing
+    Then no need references me
 """
 
 
@@ -91,3 +95,31 @@ def test_strict_fails_on_opinion(tmp_path: Path, capsys: pytest.CaptureFixture[s
     code = main(["status", "--config", str(_project(tmp_path)), "--strict"])
     capsys.readouterr()
     assert code == 1  # O-1 has no source
+
+
+def test_orphan_report_lists_unclaimed_scenarios(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = main(["status", "--config", str(_project(tmp_path))])
+    out = capsys.readouterr().out
+    assert code == 0  # orphans alone don't fail without a gate
+    assert "orphan proofs (claimed by no need): 1" in out
+    assert "web:orders.feature#Unclaimed extra" in out
+    assert "web:orders.feature#Done" not in out.split("orphan proofs")[1]  # Done is claimed
+
+
+def test_max_orphans_gate(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    p = str(_project(tmp_path))
+    assert main(["status", "--config", p, "--max-orphans", "0"]) == 1  # 1 orphan > 0
+    capsys.readouterr()
+    assert main(["status", "--config", p, "--max-orphans", "1"]) == 0  # 1 orphan <= 1
+    capsys.readouterr()
+
+
+def test_orphans_in_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    import json
+
+    main(["status", "--config", str(_project(tmp_path)), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["summary"]["orphans"] == 1
+    assert payload["orphans"]["web"] == ["orders.feature#Unclaimed extra"]

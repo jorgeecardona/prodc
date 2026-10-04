@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .adapters import Adapter, ProofResult
+from .adapters import Adapter, Enumerable, ProofResult
 from .model import (
     SOLUTION_VERBS,
     Need,
@@ -140,3 +140,31 @@ def summarize(results: list[NeedResult]) -> Summary:
         broken=by_state[NeedState.BROKEN],
         opinion=sum(1 for r in results if r.need.is_opinion),
     )
+
+
+def orphans(needs: list[Need], adapters: dict[str, Adapter]) -> dict[str, list[str]]:
+    """Proof units claimed by no need, per enumerable adapter — the reverse of the board.
+
+    The board walks need → proof; this walks proof → need, surfacing scenarios that
+    exist in the suite but no need references ("does every feature tie to a need?").
+    Only adapters that can enumerate their universe (:class:`~prodc.adapters.Enumerable`,
+    e.g. gherkin) participate.
+    """
+    referenced: dict[str, set[str]] = {}
+    for need in needs:
+        for locator in need.proofs:
+            name, sep, payload = locator.partition(":")
+            if sep:
+                referenced.setdefault(name, set()).add(payload)
+
+    out: dict[str, list[str]] = {}
+    for name, adapter in adapters.items():
+        if not isinstance(adapter, Enumerable):
+            continue
+        claimed: set[str] = set()
+        for payload in referenced.get(name, set()):
+            claimed.update(adapter.covers(payload))
+        unclaimed = sorted(set(adapter.inventory()) - claimed)
+        if unclaimed:
+            out[name] = unclaimed
+    return out

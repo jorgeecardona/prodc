@@ -12,7 +12,7 @@ import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Protocol, cast, runtime_checkable
 
 from .model import ProofState
 
@@ -41,6 +41,18 @@ class ProofResult:
 
 class Adapter(Protocol):
     def resolve(self, payload: str) -> ProofResult: ...
+
+
+@runtime_checkable
+class Enumerable(Protocol):
+    """An adapter that can list every proof unit it knows and which a payload claims.
+
+    Needed for the orphan report (proofs referenced by no need). Adapters that can't
+    enumerate their universe (e.g. pytest, which resolves by existence) don't implement it.
+    """
+
+    def inventory(self) -> list[str]: ...  # canonical ids of every proof unit
+    def covers(self, payload: str) -> list[str]: ...  # canonical ids a payload claims
 
 
 @dataclass(frozen=True)
@@ -119,16 +131,29 @@ class GherkinAdapter:
         self._results = out
         return out
 
-    def resolve(self, payload: str) -> ProofResult:
+    @staticmethod
+    def _id(s: _Scenario) -> str:
+        return f"{s.file}#{s.title}"
+
+    def _match(self, payload: str) -> list[_Scenario]:
+        """The scenarios a locator payload refers to (``tag:@X`` or ``file#title``)."""
         scenarios = self._load()
         if payload.startswith("tag:"):
             want = payload[4:]
-            matches = [s for s in scenarios if want in s.tags]
-        else:
-            file_part, _, title = payload.partition("#")
-            matches = [
-                s for s in scenarios if s.title == title and (not file_part or s.file == file_part)
-            ]
+            return [s for s in scenarios if want in s.tags]
+        file_part, _, title = payload.partition("#")
+        return [s for s in scenarios if s.title == title and (not file_part or s.file == file_part)]
+
+    def inventory(self) -> list[str]:
+        """Every scenario, as ``file#title`` — the universe the orphan report diffs against."""
+        return sorted({self._id(s) for s in self._load()})
+
+    def covers(self, payload: str) -> list[str]:
+        """The scenarios (as ``file#title``) a referenced payload claims."""
+        return sorted({self._id(s) for s in self._match(payload)})
+
+    def resolve(self, payload: str) -> ProofResult:
+        matches = self._match(payload)
         if not matches:
             return ProofResult(ProofState.BROKEN, False, f"no scenario matches '{payload}'")
 
