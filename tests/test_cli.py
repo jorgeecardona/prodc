@@ -219,3 +219,62 @@ def test_proxy_source_kind_warrant(tmp_path: Path, capsys: pytest.CaptureFixture
     assert p["needs"][0]["warrant"] == "proxy"  # interview > artifact > proxy > internal
     main(["status", "--config", toml])
     assert "1 proxy" in capsys.readouterr().out  # provenance line counts proxy
+
+
+_BRIEF_TOML = """
+[prodc]
+needs = ["needs/*.yaml"]
+"""
+
+_BRIEF_NEEDS = """
+needs:
+  - id: B-1
+    text: shared baseline, proven nowhere
+  - id: B-2
+    text: shared baseline acme overrides
+  - id: B-2@acme
+    text: acme wants it their way
+    client: acme
+    variant_of: B-2
+    sources:
+      - kind: interview
+        who: Ana
+        quote: "we need this"
+        date: 2026-02-01
+    proofs: []
+  - id: A-1
+    text: acme-only opinion
+    client: acme
+  - id: X-1
+    text: other client's need
+    client: globex
+"""
+
+
+def _brief_project(tmp_path: Path) -> Path:
+    (tmp_path / "needs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "prodc.toml").write_text(_BRIEF_TOML, encoding="utf-8")
+    (tmp_path / "needs" / "b.yaml").write_text(_BRIEF_NEEDS, encoding="utf-8")
+    return tmp_path / "prodc.toml"
+
+
+def test_brief_scopes_to_client_opinions_and_holes(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import json
+
+    code = main(["brief", "acme", "--config", str(_brief_project(tmp_path)), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    ids = {o["id"] for o in payload["open"]}
+    # acme sees: B-1 (shared baseline, HOLE), B-2@acme (its variant, HOLE), A-1 (its opinion).
+    # B-2 baseline is overridden by B-2@acme, and X-1 belongs to globex — both excluded.
+    assert ids == {"B-1", "B-2@acme", "A-1"}
+    a1 = next(o for o in payload["open"] if o["id"] == "A-1")
+    assert a1["opinion"] is True
+
+
+def test_brief_unknown_client_errors(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(["brief", "nobody", "--config", str(_brief_project(tmp_path))])
+    assert code == 2
+    assert "no needs for client 'nobody'" in capsys.readouterr().err

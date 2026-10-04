@@ -224,6 +224,25 @@ def recurrence(needs: list[Need]) -> list[Recurrence]:
     return out
 
 
+def applicable_needs(needs: list[Need], client: str) -> list[Need]:
+    """The needs in force for one client: its own variants, plus every shared baseline
+    it has not specialised.
+
+    A baseline (``variant_of is None`` and ``client is None``) applies to all clients
+    unless this client carries a variant of it — in which case the variant overrides the
+    baseline and the baseline is dropped. Standalone needs tied to a different client are
+    excluded.
+    """
+    overridden = {n.variant_of for n in needs if n.client == client and n.variant_of}
+    out: list[Need] = []
+    for n in needs:
+        if n.client == client:
+            out.append(n)  # this client's own needs/variants
+        elif n.client is None and n.variant_of is None and n.id not in overridden:
+            out.append(n)  # a shared baseline this client hasn't specialised
+    return out
+
+
 def orphans(needs: list[Need], adapters: dict[str, Adapter]) -> dict[str, list[str]]:
     """Proof units claimed by no need, per enumerable adapter — the reverse of the board.
 

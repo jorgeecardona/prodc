@@ -19,7 +19,15 @@ from . import __version__
 from .config import Config, ConfigError
 from .loader import LoaderError, load_needs
 from .model import Need, NeedResult, NeedState, SourceKind
-from .status import Recurrence, Summary, orphans, recurrence, resolve, summarize
+from .status import (
+    Recurrence,
+    Summary,
+    applicable_needs,
+    orphans,
+    recurrence,
+    resolve,
+    summarize,
+)
 
 _LABEL = {
     NeedState.DELIVERED: "DELIVERED",
@@ -352,6 +360,67 @@ def _cmd_show(args: argparse.Namespace) -> int:
     return 0
 
 
+def _brief_open(results: list[NeedResult]) -> list[NeedResult]:
+    """The meeting agenda: needs that are opinions (no evidence) or HOLEs (no proof),
+    must-haves first, then by id."""
+    open_ = [r for r in results if r.need.is_opinion or r.state is NeedState.HOLE]
+    open_.sort(key=lambda r: (not r.need.must, r.need.id))
+    return open_
+
+
+def _render_brief(client: str, results: list[NeedResult]) -> str:
+    open_ = _brief_open(results)
+    out = [f"brief — {client}: {len(open_)} open question{'s' if len(open_) != 1 else ''}"]
+    if not open_:
+        out.append("  (nothing open — every applicable need has evidence and a proof)")
+    for r in open_:
+        bang = "!!" if r.need.must else "  "
+        gaps = " · ".join(
+            g for g in ("opinion" if r.need.is_opinion else "",
+                        "HOLE" if r.state is NeedState.HOLE else "") if g
+        )
+        out.append(f"  {bang} {r.need.id:<12} [{gaps}]  {r.need.text}")
+    return "\n".join(out)
+
+
+def _brief_json(client: str, results: list[NeedResult]) -> str:
+    open_ = _brief_open(results)
+    return json.dumps(
+        {
+            "client": client,
+            "open": [
+                {
+                    "id": r.need.id,
+                    "text": r.need.text,
+                    "must": r.need.must,
+                    "opinion": r.need.is_opinion,
+                    "hole": r.state is NeedState.HOLE,
+                    "warrant": _warrant(r.need),
+                }
+                for r in open_
+            ],
+        },
+        indent=2,
+    )
+
+
+def _cmd_brief(args: argparse.Namespace) -> int:
+    """Pre-meeting agenda for one client: its applicable needs that lack evidence or proof."""
+    loaded = _load_or_report(args)
+    if loaded is None:
+        return 2
+    cfg, needs = loaded
+    if not any(n.client == args.client for n in needs):
+        # shared baselines apply to everyone, so an unknown client would otherwise
+        # silently return a baselines-only brief — guard the likely typo instead.
+        print(f"prodc: no needs for client '{args.client}'", file=sys.stderr)
+        return 2
+    scoped = applicable_needs(needs, args.client)
+    results = resolve(scoped, cfg.adapters, cfg.source_adapters)
+    print(_brief_json(args.client, results) if args.json else _render_brief(args.client, results))
+    return 0
+
+
 @dataclass(frozen=True)
 class _RepoRow:
     """One repo's line in the portfolio roll-up."""
@@ -508,6 +577,12 @@ def main(argv: list[str] | None = None) -> int:
     sh.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     sh.add_argument("--json", action="store_true", help="machine-readable output")
     sh.set_defaults(func=_cmd_show)
+
+    br = sub.add_parser("brief", help="pre-meeting agenda for one client: open opinions and HOLEs")
+    br.add_argument("client", help="the client/variant id to brief, e.g. acme")
+    br.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    br.add_argument("--json", action="store_true", help="machine-readable output")
+    br.set_defaults(func=_cmd_brief)
 
     pf = sub.add_parser("portfolio", help="roll up many repos into one scoreboard")
     pf.add_argument("configs", nargs="+", metavar="PRODC_TOML", help="one or more prodc.toml paths")
