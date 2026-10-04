@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=https://moonrepo.dev/schemas/project.json
+#
+# prodc — product management as code. Single project at the repo root.
+# Every task runs as a system command via `uv run` (see .moon/toolchain.yml for why
+# moon's Python toolchain is not used). CI runs one `moon run :ci` (or `:release` on
+# main); moon owns all task ordering instead of hand-wired GitLab stages/needs.
+id: 'prodc'
+layer: 'library'
+language: 'python'
+
+tasks:
+  lint:
+    command: 'uv run ruff check src tests examples'
+    inputs: ['src/**/*.py', 'tests/**/*.py', 'examples/**/*.py', 'pyproject.toml']
+
+  format-check:
+    command: 'uv run ruff format --check src tests examples'
+    inputs: ['src/**/*.py', 'tests/**/*.py', 'examples/**/*.py', 'pyproject.toml']
+
+  typecheck:
+    command: 'uv run pyright'
+    inputs: ['src/**/*.py', 'tests/**/*.py', 'examples/**/*.py', 'pyproject.toml']
+
+  test:
+    command: 'uv run pytest -q'
+    inputs: ['src/**/*.py', 'tests/**/*.py', 'pyproject.toml']
+
+  build:
+    command: 'uv build --out-dir dist'
+    deps: ['~:test']
+    inputs: ['src/**/*.py', 'pyproject.toml', 'README.md', 'CHANGELOG.md', 'LICENSE']
+    outputs: ['dist']
+
+  docs:
+    command: 'uv run --extra docs mkdocs build --strict'
+    inputs: ['docs/**/*', 'mkdocs.yml', 'src/**/*.py']
+    outputs: ['site']
+
+  # CI-side enforcement of "a src/ change carries a version bump" (the non-bypassable
+  # counterpart to the pre-commit auto-bump). Reads the diff base from CI env, so it is
+  # git-state dependent, not file-input dependent -> not cacheable.
+  version-guard:
+    command: 'sh scripts/ci-version-guard'
+    options:
+      cache: false
+
+  # The single aggregate gate: the whole CI check graph in one target.
+  # NOTE: format-check is intentionally NOT in this gate -- the codebase isn't
+  # ruff-format-clean yet (17 files) and this migration preserves today's gates
+  # (lint/typecheck/test/build/docs). Run `moon run :format-check` (or `make format`)
+  # and add it here once the tree is clean.
+  ci:
+    command: 'noop'
+    deps:
+      - '~:lint'
+      - '~:typecheck'
+      - '~:test'
+      - '~:build'
+      - '~:docs'
+      - '~:version-guard'
+
+  # Mint a PyPI OIDC token and upload dist/*. Invoked by release (or by hand).
+  publish:
+    command: 'sh scripts/pypi-publish'
+    deps: ['~:build']
+    options:
+      cache: false
+      runInCI: false
+
+  # main-only: no-op if pyproject's version is already on PyPI; else publish.
+  # Invoked explicitly by the CI job on the default branch (`moon run :release`), so it
+  # MUST be runnable in CI -- do NOT set runInCI:false here (that makes `:release` resolve
+  # to "no tasks found" under CI). It is never part of `:ci`, so it only runs when targeted.
+  release:
+    command: 'sh scripts/release'
+    deps: ['~:ci']
+    options:
+      cache: false

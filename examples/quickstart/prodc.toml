@@ -1,0 +1,13 @@
+# A minimal, runnable prodc project. From this directory:
+#   uv run prodc status
+# N-1 shows DELIVERED (a tagged scenario proves it), N-2 is a sourced HOLE
+# (evidence exists, no test yet), N-3 is an opinion with a solution-in-disguise warning.
+
+[prodc]
+needs = ["needs/*.yaml"]
+
+[proofs.web]
+kind = "gherkin"
+paths = ["features/*.feature"]
+delivered = ["@implemented"]
+pending = ["@pending"]

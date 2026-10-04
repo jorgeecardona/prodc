@@ -1,0 +1,24 @@
+who: jordan
+label: "design partner"
+needs:
+  - id: N-1
+    text: "see which orders are past due at a glance"
+    must: true
+    sources:
+      - kind: interview
+        who: Jordan
+        date: 2026-09-20
+        quote: "I lose the past-due ones in the list"
+    proofs:
+      - "web:orders.feature#Past due orders are highlighted"
+
+  - id: N-2
+    text: "export the day's delivery run sheet"
+    sources:
+      - kind: artifact
+        locator: issues.md#N-2
+        date: 2026-09-21
+    proofs: []  # sourced HOLE: the need is evidenced, but no test proves it yet
+
+  - id: N-3
+    text: "implement a settings page"  # opinion (no source) + solution-in-disguise warning

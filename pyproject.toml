@@ -1,0 +1,67 @@
+[project]
+name = "prodc"
+version = "0.1.0"
+description = "Product management as code: personas, flows, and features traced to evidence."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Jorge Cardona", email = "jorgeecardona@gmail.com" }]
+keywords = []
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Scientific/Engineering",
+    "Typing :: Typed",
+]
+dependencies = ["pyyaml>=6"]
+
+[project.optional-dependencies]
+# docs are an *extra* (not a uv dependency-group) so Read the Docs can install them via pip
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.27",
+]
+
+[project.urls]
+Homepage = "https://gitlab.com/jorgeecardona/prodc"
+Repository = "https://gitlab.com/jorgeecardona/prodc"
+Changelog = "https://gitlab.com/jorgeecardona/prodc/-/blob/main/CHANGELOG.md"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/prodc"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "examples", "README.md", "CHANGELOG.md", "LICENSE"]
+
+[dependency-groups]
+dev = ["ruff>=0.6", "pyright>=1.1.390", "pytest>=8", "types-pyyaml>=6"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["prodc"]
+
+[tool.pyright]
+include = ["src", "tests", "examples"]
+extraPaths = ["src"]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"

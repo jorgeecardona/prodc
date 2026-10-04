@@ -1,0 +1,115 @@
+"""Loader: YAML need files → Need objects, with the v0.1 schema rules."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from prodc.config import Config
+from prodc.loader import LoaderError, load_needs
+from prodc.model import SourceKind
+
+
+def _config(tmp_path: Path, *files: tuple[str, str]) -> Config:
+    needs_dir = tmp_path / "product" / "needs"
+    needs_dir.mkdir(parents=True)
+    for name, body in files:
+        (needs_dir / name).write_text(body, encoding="utf-8")
+    return Config(root=tmp_path, need_globs=["product/needs/*.yaml"])
+
+
+def test_file_level_who_and_label_default_each_need(tmp_path: Path) -> None:
+    cfg = _config(
+        tmp_path,
+        (
+            "john.yaml",
+            """
+            who: john
+            label: "design partner, Sincerely"
+            needs:
+              - id: J-1
+                text: "multi-location per customer"
+              - id: J-2
+                text: "own voice"
+                who: jane
+            """,
+        ),
+    )
+    needs = {n.id: n for n in load_needs(cfg)}
+    assert needs["J-1"].who == "john"
+    assert needs["J-1"].label == "design partner, Sincerely"
+    assert needs["J-2"].who == "jane"  # per-need override wins
+    assert needs["J-2"].label == "design partner, Sincerely"  # label still inherited
+
+
+def test_source_kind_defaults_to_internal(tmp_path: Path) -> None:
+    cfg = _config(
+        tmp_path,
+        (
+            "a.yaml",
+            """
+            needs:
+              - id: A-1
+                text: "a need"
+                sources:
+                  - who: Jorge
+                    date: 2026-08-02
+                  - kind: interview
+                    who: John
+                    date: 2026-08-02
+                    quote: "I need this"
+            """,
+        ),
+    )
+    (need,) = load_needs(cfg)
+    assert need.sources[0].kind is SourceKind.INTERNAL
+    assert need.sources[0].date == "2026-08-02"  # bare YAML date coerced to string
+    assert need.sources[1].kind is SourceKind.INTERVIEW
+    assert not need.is_opinion
+
+
+def test_no_source_is_opinion(tmp_path: Path) -> None:
+    cfg = _config(tmp_path, ("a.yaml", "needs:\n  - id: A-1\n    text: t\n"))
+    (need,) = load_needs(cfg)
+    assert need.is_opinion
+
+
+def test_duplicate_id_across_files_raises(tmp_path: Path) -> None:
+    cfg = _config(
+        tmp_path,
+        ("a.yaml", "needs:\n  - id: X-1\n    text: a\n"),
+        ("b.yaml", "needs:\n  - id: X-1\n    text: b\n"),
+    )
+    with pytest.raises(LoaderError, match="duplicate need id 'X-1'"):
+        load_needs(cfg)
+
+
+def test_flow_with_proofs_raises(tmp_path: Path) -> None:
+    cfg = _config(
+        tmp_path,
+        (
+            "a.yaml",
+            """
+            needs:
+              - id: F-1
+                text: a flow
+                children: [C-1]
+                proofs: ["web:x#y"]
+            """,
+        ),
+    )
+    with pytest.raises(LoaderError, match="must not carry proofs"):
+        load_needs(cfg)
+
+
+def test_unknown_source_kind_raises(tmp_path: Path) -> None:
+    cfg = _config(
+        tmp_path,
+        (
+            "a.yaml",
+            "needs:\n  - id: A-1\n    text: t\n    sources:\n      - kind: rumor\n",
+        ),
+    )
+    with pytest.raises(LoaderError, match="unknown kind 'rumor'"):
+        load_needs(cfg)
