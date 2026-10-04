@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import cast
 
 from .adapters import (
+    AcceptAdapter,
     Adapter,
     FilesAdapter,
     FrontmatterAdapter,
@@ -81,9 +82,11 @@ class Config:
             elif kind == "files":
                 sub = tbl.get("root", ".")
                 adapters[name] = FilesAdapter(root=root / (sub if isinstance(sub, str) else "."))
+            elif kind == "accept":
+                adapters[name] = AcceptAdapter()
             else:
                 raise ConfigError(
-                    f"[proofs.{name}]: unknown kind {kind!r} (gherkin|pytest|files)"
+                    f"[proofs.{name}]: unknown kind {kind!r} (gherkin|pytest|files|accept)"
                 )
 
         source_adapters: dict[str, SourceAdapter] = {}

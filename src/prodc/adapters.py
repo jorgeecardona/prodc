@@ -245,6 +245,20 @@ class FilesAdapter:
         return ProofResult(ProofState.DELIVERED, True, "script exists")
 
 
+class AcceptAdapter:
+    """Resolves ``who@date`` to a human sign-off — a functional acceptance, not a test.
+
+    Some needs are accepted by a person, not proven by an automated test. This records
+    that as a *declared* DELIVERED (``*``), visibly distinct from a machine-checked proof;
+    it never goes BROKEN, because it is an assertion, like a tag.
+    """
+
+    def resolve(self, payload: str) -> ProofResult:
+        who, _, date = payload.partition("@")
+        detail = "accepted" + (f" by {who}" if who else "") + (f" on {date}" if date else "")
+        return ProofResult(ProofState.DELIVERED, True, detail)
+
+
 @dataclass(frozen=True)
 class SourceResult:
     """Whether a Source.locator resolves. Verifies provenance *exists*, not that it is good."""

@@ -17,6 +17,7 @@ class SourceKind(StrEnum):
 
     INTERVIEW = "interview"  # behavioural evidence: a named customer, a date, a verbatim quote
     ARTIFACT = "artifact"  # documentary: a ticket, doc or email locator
+    PROXY = "proxy"  # the author is a plausible user of this product, guessing as that user
     INTERNAL = "internal"  # a team member's own assertion — provenance, but not a customer's
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from prodc.adapters import FilesAdapter, FrontmatterAdapter, PytestAdapter
+from prodc.adapters import AcceptAdapter, FilesAdapter, FrontmatterAdapter, PytestAdapter
 from prodc.model import ProofState
 
 
@@ -72,3 +72,9 @@ def test_frontmatter_dangling_anchor_or_no_anchor(tmp_path: Path) -> None:
     a = _frontmatter(tmp_path)
     assert not a.resolve("reg.md#A-9").ok  # no such heading
     assert not a.resolve("reg.md#").ok  # no anchor at all
+
+
+def test_accept_adapter_is_declared_delivered() -> None:
+    r = AcceptAdapter().resolve("jane@2026-09-20")
+    assert r.state is ProofState.DELIVERED and r.declared  # a human sign-off, not a test
+    assert "accepted by jane" in r.detail and "2026-09-20" in r.detail

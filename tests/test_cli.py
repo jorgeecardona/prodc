@@ -177,3 +177,21 @@ def test_portfolio_bad_config_exits_2(tmp_path: Path, capsys: pytest.CaptureFixt
     code = main(["portfolio", str(tmp_path / "nope.toml")])
     capsys.readouterr()
     assert code == 2
+
+
+def test_proxy_source_kind_warrant(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    import json
+
+    (tmp_path / "needs").mkdir()
+    (tmp_path / "prodc.toml").write_text('[prodc]\nneeds = ["needs/*.yaml"]\n', encoding="utf-8")
+    (tmp_path / "needs" / "a.yaml").write_text(
+        "who: me\nneeds:\n  - id: P-1\n    text: a proxy-sourced need\n"
+        "    sources:\n      - kind: proxy\n        who: me\n        date: 2026-01-01\n",
+        encoding="utf-8",
+    )
+    toml = str(tmp_path / "prodc.toml")
+    main(["status", "--config", toml, "--json"])
+    p = json.loads(capsys.readouterr().out)
+    assert p["needs"][0]["warrant"] == "proxy"  # interview > artifact > proxy > internal
+    main(["status", "--config", toml])
+    assert "1 proxy" in capsys.readouterr().out  # provenance line counts proxy

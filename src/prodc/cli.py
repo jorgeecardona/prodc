@@ -39,8 +39,15 @@ def _priority(r: NeedResult) -> int:
     }[r.state]
 
 
-# Warrant strength, strongest first: interview > artifact > internal (Torres).
-_WARRANT_ORDER = (SourceKind.INTERVIEW, SourceKind.ARTIFACT, SourceKind.INTERNAL)
+# Warrant strength, strongest first: interview > artifact > proxy > internal (Torres).
+# proxy = the author is a plausible user guessing as that user — weaker than a document,
+# stronger than a bare internal assertion.
+_WARRANT_ORDER = (
+    SourceKind.INTERVIEW,
+    SourceKind.ARTIFACT,
+    SourceKind.PROXY,
+    SourceKind.INTERNAL,
+)
 
 
 def _warrant(need: Need) -> str:
@@ -57,7 +64,7 @@ def _warrant(need: Need) -> str:
 
 def _provenance_counts(results: list[NeedResult]) -> dict[str, int]:
     """How many needs carry each warrant strength (interview/artifact/internal/opinion)."""
-    counts = {"interview": 0, "artifact": 0, "internal": 0, "opinion": 0}
+    counts = {"interview": 0, "artifact": 0, "proxy": 0, "internal": 0, "opinion": 0}
     for r in results:
         counts[_warrant(r.need).split(":", 1)[0]] += 1
     return counts
@@ -344,13 +351,13 @@ def _repo_row(config_path: str) -> _RepoRow:
 
 
 def _render_portfolio(rows: list[_RepoRow]) -> str:
-    out = [f"  {'repo':<18} {'cov':>4}  {'must-HOLE':>9}  {'BROKEN':>6}   prov intv/art/int/op"]
+    out = [f"  {'repo':<18} {'cov':>4}  {'must-HOLE':>9}  {'BROKEN':>6}   prov intv/art/prx/int/op"]
     for row in rows:
         if row.error is not None:
             out.append(f"  {row.repo:<18} error: {row.error}")
             continue
         p = row.provenance
-        prov = f"{p['interview']}/{p['artifact']}/{p['internal']}/{p['opinion']}"
+        prov = f"{p['interview']}/{p['artifact']}/{p['proxy']}/{p['internal']}/{p['opinion']}"
         cov = f"{round(row.coverage * 100)}%"
         out.append(
             f"  {row.repo:<18} {cov:>4}  {row.must_hole:>9}  {row.broken:>6}   {prov}"
