@@ -14,7 +14,7 @@ from typing import cast
 import yaml
 
 from .config import Config
-from .model import Need, Source, SourceKind
+from .model import Attestation, Need, Source, SourceKind
 
 
 class LoaderError(Exception):
@@ -67,6 +67,17 @@ def _as_bool(value: object, where: str) -> bool:
     return value
 
 
+def _attestation(raw: object, where: str) -> Attestation | None:
+    if raw is None:
+        return None
+    tbl = _as_mapping(raw, where)
+    who = _opt_str(tbl.get("who"), f"{where}.who")
+    date = _opt_str(tbl.get("date"), f"{where}.date")
+    if not who or not date:
+        raise LoaderError(f"{where}: an attestation needs both 'who' and 'date'")
+    return Attestation(who=who, date=date)
+
+
 def _source(raw: object, where: str) -> Source:
     tbl = _as_mapping(raw, where)
     kind_name = _opt_str(tbl.get("kind"), f"{where}.kind") or SourceKind.INTERNAL.value
@@ -100,6 +111,8 @@ def _need(
     client = _opt_str(tbl.get("client"), f"{where}.client") or file_client
     variant_of = _opt_str(tbl.get("variant_of"), f"{where}.variant_of")
     importance = _opt_importance(tbl.get("importance"), f"{where}.importance")
+    claim = _opt_str(tbl.get("claim"), f"{where}.claim")
+    attestation = _attestation(tbl.get("attested"), f"{where}.attested")
 
     sources = tuple(
         _source(s, f"{where}.sources[{i}]")
@@ -128,6 +141,8 @@ def _need(
         client=client,
         variant_of=variant_of,
         importance=importance,
+        claim=claim,
+        attestation=attestation,
     )
 
 

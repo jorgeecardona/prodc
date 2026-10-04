@@ -57,6 +57,20 @@ def _source_warnings(need: Need, source_adapters: dict[str, SourceAdapter]) -> l
     return out
 
 
+def _warrant_warnings(need: Need, result: NeedResult) -> list[str]:
+    """Flag a leaf that is green on its proofs but whose link no human has attested (#13).
+
+    prodc reads that the proof passes, not that it establishes *this* need. A DELIVERED
+    leaf with no :class:`~prodc.model.Attestation` is trusted blindly — surface that so a
+    reviewer can confirm the link, without the tool pretending to prove semantic fit.
+    """
+    if need.children or not need.proofs:
+        return []
+    if result.state is NeedState.DELIVERED and need.attestation is None:
+        return ["DELIVERED on an unattested proof link — warrant not human-reviewed (#13)"]
+    return []
+
+
 class Resolver:
     def __init__(
         self,
@@ -85,6 +99,7 @@ class Resolver:
         result.warnings = (
             _text_warnings(need)
             + _source_warnings(need, self._source_adapters)
+            + _warrant_warnings(need, result)
             + result.warnings
         )
         self._cache[need_id] = result

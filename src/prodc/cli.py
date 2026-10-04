@@ -295,6 +295,12 @@ def _render_show(r: NeedResult) -> str:
         f"  who: {who}",
         f"  grounds: {_LABEL[r.state]}{nm}    warrant: {_warrant(need)}",
     ]
+    if need.claim:
+        lines.append(f"  claim: {need.claim}")
+    if need.attestation:
+        lines.append(f"  attested: {need.attestation.who} ({need.attestation.date})")
+    elif need.proofs and r.state is NeedState.DELIVERED:
+        lines.append("  attested: (none — proof link not human-reviewed, #13)")
     if need.sources:
         lines.append("  sources:")
         for s in need.sources:
@@ -333,6 +339,12 @@ def _show_json(r: NeedResult) -> str:
             "declared": r.declared,
             "opinion": need.is_opinion,
             "only_internal": need.only_internal,
+            "claim": need.claim,
+            "attested": (
+                {"who": need.attestation.who, "date": need.attestation.date}
+                if need.attestation
+                else None
+            ),
             "sources": [
                 {"kind": s.kind.value, "who": s.who, "date": s.date,
                  "quote": s.quote, "locator": s.locator}

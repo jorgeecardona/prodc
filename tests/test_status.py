@@ -144,3 +144,20 @@ def test_rank_orders_by_must_state_then_evidence_then_importance() -> None:
     # within internal-backed HOLEs, higher importance comes first
     assert order.index("H-imp") < order.index("H-internal")
     assert order[-1] == "D-1"  # delivered last
+
+
+def test_delivered_without_attestation_warns_warrant_unreviewed() -> None:
+    from prodc.model import Attestation
+
+    unattested = Need(id="U-1", text="delivered, link unreviewed", proofs=("x:1",))
+    attested = Need(id="A-1", text="delivered, link reviewed", proofs=("x:1",),
+                    attestation=Attestation(who="Jorge", date="2026-02-01"))
+    results = {r.need.id: r for r in resolve([unattested, attested], {"x": _delivered()})}
+    assert any("warrant not human-reviewed" in w for w in results["U-1"].warnings)
+    assert not any("warrant not human-reviewed" in w for w in results["A-1"].warnings)
+
+
+def test_hole_does_not_warn_about_attestation() -> None:
+    # a HOLE has no green proof to over-trust, so there is nothing to attest
+    (r,) = resolve([Need(id="H-1", text="no proof")], {})
+    assert not any("warrant not human-reviewed" in w for w in r.warnings)

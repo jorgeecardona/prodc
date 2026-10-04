@@ -65,6 +65,19 @@ class Source:
 
 
 @dataclass(frozen=True)
+class Attestation:
+    """A human's sign-off that a need's proofs actually establish its claim (#13).
+
+    prodc can read that a proof resolves and passes, but not that it proves *this* need.
+    An attestation records who reviewed that link and when — it does not prove fit, it
+    makes the human link visible and dated so an unreviewed one is distinguishable.
+    """
+
+    who: str
+    date: str
+
+
+@dataclass(frozen=True)
 class Need:
     """What a named person wants, with its provenance and its proofs."""
 
@@ -79,6 +92,8 @@ class Need:
     client: str | None = None  # which client this instance is for; None = shared baseline
     variant_of: str | None = None  # id of the baseline need this specialises; None = standalone
     importance: int | None = None  # author-supplied ordinal (higher = more); refines ranking
+    claim: str | None = None  # what delivering this need would establish — the warrant to review
+    attestation: Attestation | None = None  # human sign-off that the proofs establish the claim
 
     @property
     def is_variant(self) -> bool:
