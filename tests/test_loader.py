@@ -103,6 +103,61 @@ def test_flow_with_proofs_raises(tmp_path: Path) -> None:
         load_needs(cfg)
 
 
+def test_variant_scope_shared_baseline_across_clients(tmp_path: Path) -> None:
+    cfg = _config(
+        tmp_path,
+        (
+            "base.yaml",
+            "needs:\n  - id: N-1\n    text: multi-location per customer\n",
+        ),
+        (
+            "acme.yaml",
+            """
+            client: acme
+            needs:
+              - id: N-1@acme
+                text: multi-location per customer
+                variant_of: N-1
+            """,
+        ),
+    )
+    needs = {n.id: n for n in load_needs(cfg)}
+    assert needs["N-1"].client is None and not needs["N-1"].is_variant  # shared baseline
+    assert needs["N-1@acme"].client == "acme"  # file-level client default
+    assert needs["N-1@acme"].is_variant and needs["N-1@acme"].variant_of == "N-1"
+
+
+def test_variant_of_unknown_baseline_raises(tmp_path: Path) -> None:
+    cfg = _config(
+        tmp_path,
+        ("a.yaml", "needs:\n  - id: A-1\n    text: t\n    variant_of: NOPE\n"),
+    )
+    with pytest.raises(LoaderError, match="variant_of 'NOPE' is not a known need id"):
+        load_needs(cfg)
+
+
+def test_variant_cannot_chain(tmp_path: Path) -> None:
+    cfg = _config(
+        tmp_path,
+        (
+            "a.yaml",
+            """
+            needs:
+              - id: B-1
+                text: base
+              - id: B-1@x
+                text: variant
+                variant_of: B-1
+              - id: B-1@x@y
+                text: variant of a variant
+                variant_of: B-1@x
+            """,
+        ),
+    )
+    with pytest.raises(LoaderError, match="is itself a variant"):
+        load_needs(cfg)
+
+
 def test_unknown_source_kind_raises(tmp_path: Path) -> None:
     cfg = _config(
         tmp_path,

@@ -76,6 +76,13 @@ class Need:
     proofs: tuple[str, ...] = ()  # locators, "<adapter>:<payload>"
     children: tuple[str, ...] = ()  # ids of sub-needs (a flow is a Need with children)
     label: str | None = None  # free text for the `who`, e.g. "design partner, Sincerely"
+    client: str | None = None  # which client this instance is for; None = shared baseline
+    variant_of: str | None = None  # id of the baseline need this specialises; None = standalone
+
+    @property
+    def is_variant(self) -> bool:
+        """A client-specific specialisation of a baseline need."""
+        return self.variant_of is not None
 
     @property
     def is_opinion(self) -> bool:

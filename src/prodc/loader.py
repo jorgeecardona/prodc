@@ -73,13 +73,21 @@ def _source(raw: object, where: str) -> Source:
     )
 
 
-def _need(raw: object, where: str, file_who: str | None, file_label: str | None) -> Need:
+def _need(
+    raw: object,
+    where: str,
+    file_who: str | None,
+    file_label: str | None,
+    file_client: str | None,
+) -> Need:
     tbl = _as_mapping(raw, where)
     nid = _as_str(tbl.get("id"), f"{where}.id")
     text = _as_str(tbl.get("text"), f"{where}.text")
     must = _as_bool(tbl["must"], f"{where}.must") if "must" in tbl else False
     who = _opt_str(tbl.get("who"), f"{where}.who") or file_who
     label = _opt_str(tbl.get("label"), f"{where}.label") or file_label
+    client = _opt_str(tbl.get("client"), f"{where}.client") or file_client
+    variant_of = _opt_str(tbl.get("variant_of"), f"{where}.variant_of")
 
     sources = tuple(
         _source(s, f"{where}.sources[{i}]")
@@ -105,6 +113,8 @@ def _need(raw: object, where: str, file_who: str | None, file_label: str | None)
         proofs=proofs,
         children=children,
         label=label,
+        client=client,
+        variant_of=variant_of,
     )
 
 
@@ -119,10 +129,11 @@ def _load_file(path: Path, seen: dict[str, Path]) -> list[Need]:
     tbl = _as_mapping(doc, where)
     file_who = _opt_str(tbl.get("who"), f"{where}.who")
     file_label = _opt_str(tbl.get("label"), f"{where}.label")
+    file_client = _opt_str(tbl.get("client"), f"{where}.client")
 
     out: list[Need] = []
     for i, raw in enumerate(_as_list(tbl.get("needs"), f"{where}.needs")):
-        need = _need(raw, f"{where}.needs[{i}]", file_who, file_label)
+        need = _need(raw, f"{where}.needs[{i}]", file_who, file_label, file_client)
         prior = seen.get(need.id)
         if prior is not None:
             raise LoaderError(f"duplicate need id {need.id!r} in {where} and {prior.name}")
@@ -138,4 +149,23 @@ def load_needs(config: Config) -> list[Need]:
     for pattern in config.need_globs:
         for path in sorted(config.root.glob(pattern)):
             needs.extend(_load_file(path, seen))
+    _check_variants(needs)
     return needs
+
+
+def _check_variants(needs: list[Need]) -> None:
+    """Every ``variant_of`` must point at a known baseline need (one that is not itself a variant)."""
+    by_id = {n.id: n for n in needs}
+    for need in needs:
+        if need.variant_of is None:
+            continue
+        base = by_id.get(need.variant_of)
+        if base is None:
+            raise LoaderError(
+                f"need {need.id!r}: variant_of {need.variant_of!r} is not a known need id"
+            )
+        if base.is_variant:
+            raise LoaderError(
+                f"need {need.id!r}: variant_of {need.variant_of!r} is itself a variant "
+                "(variants cannot chain)"
+            )
