@@ -8,8 +8,13 @@ present; otherwise it reports a *declared* state (from tags or existence) and sa
 from __future__ import annotations
 
 import json
+import os
 import re
+import urllib.error
+import urllib.parse
+import urllib.request
 import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, cast, runtime_checkable
@@ -522,3 +527,92 @@ class FrontmatterAdapter:
             if hslug == want or hslug.startswith(want + "-") or anchor.lower() in heading.lower():
                 return SourceResult(True, f"{fname}: '{heading}'")
         return SourceResult(False, f"no heading matches '{payload}'")
+
+
+# ---------------------------------------------------------------------------
+# GitLab source adapter
+# ---------------------------------------------------------------------------
+
+#: Callable type for the HTTP fetcher injected into :class:`GitLabSource`.
+#: Takes (url, token) and returns (http_status, parsed_json_body).
+_GitLabFetcher = Callable[[str, str], tuple[int, object]]
+
+
+def _gitlab_fetch(url: str, token: str) -> tuple[int, object]:
+    """Real HTTP fetcher: GET *url* with a ``PRIVATE-TOKEN`` header."""
+    req = urllib.request.Request(url, headers={"PRIVATE-TOKEN": token})
+    try:
+        with urllib.request.urlopen(req) as resp:  # type: ignore[assignment]
+            return int(resp.status), json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        try:
+            body: object = json.loads(exc.read())
+        except Exception:
+            body = {}
+        return exc.code, body
+
+
+class GitLabSource:
+    """Resolves a GitLab issue locator against the GitLab REST API.
+
+    Payload formats accepted:
+    - ``#123``              — issue iid in the adapter's configured project
+    - ``group/project#123`` — issue iid with an inline project path override
+
+    Resolution outcomes:
+    - ``ok=True``  with title/author/date — the issue exists and was read
+    - ``ok=False`` with "not found" detail — the issue does not exist (BROKEN source)
+    - ``ok=True``  with "unverified: …" detail — token absent, auth failed, or host
+      unreachable; the source is *not* flagged BROKEN because we could not check it
+
+    The token is never stored here; only the name of the env var that holds it.
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        project: str,
+        token_env: str,
+        _fetcher: _GitLabFetcher | None = None,
+    ) -> None:
+        self._base_url = base_url.rstrip("/")
+        self._project = project
+        self._token_env = token_env
+        self._fetch: _GitLabFetcher = _fetcher or _gitlab_fetch
+
+    def resolve(self, payload: str) -> SourceResult:
+        # Parse the payload into a (project, iid) pair.
+        if "#" not in payload:
+            return SourceResult(False, f"invalid gitlab locator '{payload}': expected '#<iid>'")
+        project_part, _, iid_s = payload.partition("#")
+        project = project_part.strip() or self._project
+        if not iid_s.isdigit():
+            return SourceResult(False, f"invalid issue iid in '{payload}'")
+
+        # Secrets never leave env-vars.
+        token = os.environ.get(self._token_env)
+        if not token:
+            return SourceResult(True, f"unverified: {self._token_env} not set")
+
+        encoded_project = urllib.parse.quote(project, safe="")
+        url = f"{self._base_url}/api/v4/projects/{encoded_project}/issues/{iid_s}"
+
+        try:
+            status, data = self._fetch(url, token)
+        except OSError as exc:
+            return SourceResult(True, f"unverified: host unreachable ({exc})")
+
+        if status == 200 and isinstance(data, dict):
+            d = cast("dict[str, object]", data)
+            title = d.get("title", "")
+            author = d.get("author")
+            author_name = (
+                cast("dict[str, object]", author).get("username", "") if isinstance(author, dict) else ""
+            )
+            created_at = str(d.get("created_at", ""))[:10]
+            return SourceResult(True, f"#{iid_s} '{title}' by {author_name} at {created_at}")
+        if status == 404:
+            return SourceResult(False, f"#{iid_s} not found in {project}")
+        if status in (401, 403):
+            return SourceResult(True, f"unverified: auth failed (check {self._token_env})")
+        return SourceResult(True, f"unverified: unexpected status {status} from GitLab")

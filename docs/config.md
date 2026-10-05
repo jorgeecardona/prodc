@@ -50,6 +50,7 @@ Any adapter takes `repo = "../sibling"` to resolve against a sibling checkout; a
 | `kind` | checks | keys |
 |---|---|---|
 | `frontmatter` | a source `locator` of `file.md#heading` exists | `paths` |
+| `gitlab` | a source `locator` of `#123` (or `group/project#123`) is a real GitLab issue — read-only, token from `token_env`; missing token/offline → unverified, 404 → broken | `base_url`, `project`, `token_env` |
 
 ## `[importance]`
 

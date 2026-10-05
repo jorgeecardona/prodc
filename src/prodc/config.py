@@ -16,6 +16,7 @@ from .adapters import (
     FilesAdapter,
     FrontmatterAdapter,
     GherkinAdapter,
+    GitLabSource,
     OutcomeAdapter,
     PrototypeAdapter,
     PytestAdapter,
@@ -160,8 +161,25 @@ class Config:
                     root=root,
                     paths=_as_str_list(tbl.get("paths", []), f"[sources.{name}].paths"),
                 )
+            elif kind == "gitlab":
+                base_url = tbl.get("base_url", "https://gitlab.com")
+                project = tbl.get("project", "")
+                token_env = tbl.get("token_env", "GITLAB_TOKEN")
+                if not isinstance(base_url, str):
+                    raise ConfigError(f"[sources.{name}].base_url must be a string")
+                if not isinstance(project, str):
+                    raise ConfigError(f"[sources.{name}].project must be a string")
+                if not isinstance(token_env, str):
+                    raise ConfigError(f"[sources.{name}].token_env must be a string")
+                source_adapters[name] = GitLabSource(
+                    base_url=base_url,
+                    project=project,
+                    token_env=token_env,
+                )
             else:
-                raise ConfigError(f"[sources.{name}]: unknown kind {kind!r} (frontmatter)")
+                raise ConfigError(
+                    f"[sources.{name}]: unknown kind {kind!r} (frontmatter|gitlab)"
+                )
 
         lint_tbl = _as_dict(raw.get("lint", {}), "[lint]")
         dup = lint_tbl.get("duplicate_threshold", 0.8)
