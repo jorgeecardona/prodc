@@ -55,7 +55,8 @@ point any command at another project without passing `--config` paths.
 
 
 - `prodc status` — the board: needs vs what the suite proves, with gaps, coverage, and
-  per-goal / per-release / cross-client roll-ups.
+  per-goal / per-release / cross-client roll-ups. `--wide` never truncates the need text;
+  non-product needs (`product: false`) are listed out-of-scope, not counted in coverage.
 - `prodc show <id>` — one need as a citable answer (grounds, warrant, sources, proofs).
 - `prodc brief <client>` — a pre-meeting agenda for one client: its applicable needs that
   are opinions (no evidence) or HOLEs (no proof), must-haves first.
@@ -71,6 +72,7 @@ model via the loader before keeping the change, shows the diff, and supports `--
 
 - `prodc set <id> key=value` (or `key+=value` for proofs/children) — edit one field.
 - `prodc capture <id> --kind … [--who --date --quote --locator]` — append a source (evidence).
+- `prodc accept <id> --who … --date … [--revoke]` — record a human acceptance pass.
 - `prodc add need <id> --text … --who … --file …` — create a need with agent provenance.
 
 ## Model
