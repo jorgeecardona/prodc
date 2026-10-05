@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import sys
 from dataclasses import asdict, dataclass
@@ -796,6 +797,13 @@ def _git_rev(root: Path) -> str | None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="prodc", description="Product management as code.")
     parser.add_argument("--version", action="version", version=f"prodc {__version__}")
+    parser.add_argument(
+        "-C",
+        "--chdir",
+        metavar="DIR",
+        default=None,
+        help="run as if prodc was started in DIR (like `terraform -chdir`); must precede the command",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
     st = sub.add_parser("status", help="show the needs board")
     st.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
@@ -932,6 +940,12 @@ def main(argv: list[str] | None = None) -> int:
     df.set_defaults(func=_cmd_diff)
 
     args = parser.parse_args(argv)
+    if args.chdir is not None:
+        try:
+            os.chdir(args.chdir)
+        except OSError as exc:
+            print(f"prodc: cannot chdir to {args.chdir}: {exc}", file=sys.stderr)
+            return 2
     return int(args.func(args))
 
 

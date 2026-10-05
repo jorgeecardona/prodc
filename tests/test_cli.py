@@ -327,3 +327,27 @@ def test_status_shows_goals_section(tmp_path: Path, capsys: pytest.CaptureFixtur
     assert payload["goals"][0]["id"] == "G-1" and payload["ungoaled"] == ["N-2"]
     n1 = next(n for n in payload["needs"] if n["id"] == "N-1")
     assert n1["goal"] == "G-1"  # goal now in the board JSON (was drifting before)
+
+
+def test_chdir_runs_from_dir(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    import os
+
+    _project(tmp_path)  # writes prodc.toml + needs + features under tmp_path
+    cwd = os.getcwd()
+    try:
+        code = main(["-C", str(tmp_path), "status"])
+    finally:
+        os.chdir(cwd)
+    out = capsys.readouterr().out
+    assert code == 0 and "coverage 1/3" in out  # found prodc.toml via -C, no --config
+
+
+def test_chdir_bad_dir_errors(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    import os
+
+    cwd = os.getcwd()
+    try:
+        code = main(["-C", str(tmp_path / "nope"), "status"])
+    finally:
+        os.chdir(cwd)
+    assert code == 2 and "cannot chdir" in capsys.readouterr().err

@@ -50,6 +50,10 @@ prodc draws on, and tries to credit, several existing lines of work:
 
 ## Commands
 
+`prodc -C DIR <command>` runs as if started in `DIR` (like `terraform -chdir`), so you can
+point any command at another project without passing `--config` paths.
+
+
 - `prodc status` — the board: needs vs what the suite proves, with gaps, coverage, and
   per-goal / per-release / cross-client roll-ups.
 - `prodc show <id>` — one need as a citable answer (grounds, warrant, sources, proofs).
