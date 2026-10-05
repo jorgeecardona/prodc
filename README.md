@@ -62,6 +62,13 @@ prodc draws on, and tries to credit, several existing lines of work:
 - `prodc diff <snapshot>` — what changed since a saved `status --json`.
 - `prodc portfolio <toml>…` — many repos rolled into one scoreboard.
 
+Write-back (the agent records decisions, not just reads them) — each validates the whole
+model via the loader before keeping the change, shows the diff, and supports `--dry-run`:
+
+- `prodc set <id> key=value` (or `key+=value` for proofs/children) — edit one field.
+- `prodc capture <id> --kind … [--who --date --quote --locator]` — append a source (evidence).
+- `prodc add need <id> --text … --who … --file …` — create a need with agent provenance.
+
 ## Model
 
 Everything loads into one `Model` from the prodc files (`[prodc].needs` glob; any file may

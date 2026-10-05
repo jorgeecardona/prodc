@@ -33,7 +33,7 @@ from .status import (
     state_priority,
     summarize,
 )
-from .writer import Edit, WriteError, add_need, set_field
+from .writer import Edit, WriteError, add_need, capture_source, set_field
 
 _LABEL = {
     NeedState.DELIVERED: "DELIVERED",
@@ -636,6 +636,31 @@ def _cmd_add(args: argparse.Namespace) -> int:
     return _emit_edit(edit, args.dry_run, args.json)
 
 
+def _cmd_capture(args: argparse.Namespace) -> int:
+    """Append a Source to an existing need (capture evidence)."""
+    cfg_path = Path(args.config)
+    if not cfg_path.exists():
+        print(f"prodc: no config at {cfg_path}", file=sys.stderr)
+        return 2
+    try:
+        cfg = Config.load(cfg_path)
+        edit = capture_source(
+            cfg,
+            args.need_id,
+            kind=args.kind,
+            who=args.who,
+            date=args.date,
+            quote=args.quote,
+            locator=args.locator,
+            expect_sha=args.expect_sha,
+            dry_run=args.dry_run,
+        )
+    except (ConfigError, WriteError) as exc:
+        print(f"prodc: {exc}", file=sys.stderr)
+        return 2
+    return _emit_edit(edit, args.dry_run, args.json)
+
+
 def _cmd_argument(args: argparse.Namespace) -> int:
     """Show the GSN assurance graph and its defects (unsupported claim, dangling assumption)."""
     loaded = _load_or_report(args)
@@ -867,6 +892,31 @@ def main(argv: list[str] | None = None) -> int:
         help="refuse if the file's content hash differs (optimistic lock)",
     )
     ad.set_defaults(func=_cmd_add)
+
+    cp = sub.add_parser("capture", help="append a source (evidence) to an existing need")
+    cp.add_argument("need_id", help="the need id to add evidence to")
+    cp.add_argument(
+        "--kind",
+        required=True,
+        choices=["interview", "artifact", "proxy", "internal"],
+        help="source kind (strongest first: interview > artifact > proxy > internal)",
+    )
+    cp.add_argument("--who", default=None, help="the person the evidence came from")
+    cp.add_argument("--date", default=None, help="when (ISO, e.g. 2026-10-05)")
+    cp.add_argument("--quote", default=None, help="a verbatim quote (for an interview)")
+    cp.add_argument("--locator", default=None, help="a source locator (for an artifact)")
+    cp.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    cp.add_argument("--json", action="store_true", help="machine-readable output")
+    cp.add_argument(
+        "--dry-run", action="store_true", help="validate and show the diff, don't write"
+    )
+    cp.add_argument(
+        "--expect-sha",
+        default=None,
+        metavar="SHA256",
+        help="refuse if the file's content hash differs (optimistic lock)",
+    )
+    cp.set_defaults(func=_cmd_capture)
 
     pf = sub.add_parser("portfolio", help="roll up many repos into one scoreboard")
     pf.add_argument("configs", nargs="+", metavar="PRODC_TOML", help="one or more prodc.toml paths")

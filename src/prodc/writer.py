@@ -189,6 +189,47 @@ def set_field(
     return _validated(config, path, old_text, _dump(doc), dry_run)
 
 
+def capture_source(
+    config: Config,
+    need_id: str,
+    *,
+    kind: str,
+    who: str | None,
+    date: str | None,
+    quote: str | None,
+    locator: str | None,
+    expect_sha: str | None,
+    dry_run: bool,
+) -> Edit:
+    """Append a Source to an existing need — the near-zero-friction capture of #24.
+
+    Records evidence as given; the loader's soft hygiene checks (interview needs a quote and a
+    who, artifact needs a locator) still apply on the next read.
+    """
+    valid = {"interview", "artifact", "proxy", "internal"}
+    if kind not in valid:
+        raise WriteError(f"source kind must be one of {', '.join(sorted(valid))}, not {kind!r}")
+    path, _ = _locate(config, need_id)
+    doc, old_text = _read_doc(path)
+    if expect_sha is not None and _sha256(old_text) != expect_sha:
+        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
+    source: dict[str, object] = {"kind": kind}
+    for key, value in (("who", who), ("date", date), ("quote", quote), ("locator", locator)):
+        if value is not None:
+            source[key] = value
+    for raw in _need_list(doc, path):
+        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
+            need = cast("dict[str, object]", raw)
+            current = need.get("sources", [])
+            if not isinstance(current, list):
+                raise WriteError(f"{path.name}: 'sources' is not a list")
+            sources = cast("list[object]", current)
+            sources.append(source)
+            need["sources"] = sources
+            break
+    return _validated(config, path, old_text, _dump(doc), dry_run)
+
+
 def add_need(
     config: Config,
     need_id: str,

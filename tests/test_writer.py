@@ -9,7 +9,7 @@ import pytest
 
 from prodc.config import Config
 from prodc.loader import load
-from prodc.writer import WriteError, add_need, set_field
+from prodc.writer import WriteError, add_need, capture_source, set_field
 
 
 def _proj(tmp_path: Path, body: str) -> Config:
@@ -127,6 +127,41 @@ def test_add_need_outside_glob_rejected(tmp_path: Path) -> None:
             who="agent",
             kind="internal",
             file="outside.yaml",
+            expect_sha=None,
+            dry_run=False,
+        )
+
+
+def test_capture_appends_source_turns_opinion_into_sourced(tmp_path: Path) -> None:
+    cfg = _proj(tmp_path, "needs:\n  - id: N-1\n    text: t\n")  # opinion (no source)
+    assert load(cfg).needs[0].is_opinion
+    capture_source(
+        cfg,
+        "N-1",
+        kind="interview",
+        who="Ana",
+        date="2026-10-05",
+        quote="we need this",
+        locator=None,
+        expect_sha=None,
+        dry_run=False,
+    )
+    need = load(cfg).needs[0]
+    assert not need.is_opinion
+    assert need.sources[0].who == "Ana" and need.sources[0].quote == "we need this"
+
+
+def test_capture_bad_kind_rejected(tmp_path: Path) -> None:
+    cfg = _proj(tmp_path, "needs:\n  - id: N-1\n    text: t\n")
+    with pytest.raises(WriteError, match="source kind must be"):
+        capture_source(
+            cfg,
+            "N-1",
+            kind="rumor",
+            who=None,
+            date=None,
+            quote=None,
+            locator=None,
             expect_sha=None,
             dry_run=False,
         )
