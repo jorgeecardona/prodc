@@ -8,13 +8,15 @@ IDs are globally unique (children reference ids across files), so a duplicate is
 from __future__ import annotations
 
 import datetime
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
 import yaml
 
 from .config import Config
-from .model import Attestation, Goal, Model, Need, Source, SourceKind
+from .model import Attestation, Goal, Model, Need, Release, Source, SourceKind
 
 
 class LoaderError(Exception):
@@ -114,6 +116,7 @@ def _need(
     claim = _opt_str(tbl.get("claim"), f"{where}.claim")
     attestation = _attestation(tbl.get("attested"), f"{where}.attested")
     goal = _opt_str(tbl.get("goal"), f"{where}.goal")
+    release = _opt_str(tbl.get("release"), f"{where}.release")
 
     sources = tuple(
         _source(s, f"{where}.sources[{i}]")
@@ -145,6 +148,7 @@ def _need(
         claim=claim,
         attestation=attestation,
         goal=goal,
+        release=release,
     )
 
 
@@ -157,62 +161,82 @@ def _goal(raw: object, where: str) -> Goal:
     )
 
 
-def _load_file(
-    path: Path, need_seen: dict[str, Path], goal_seen: dict[str, Path]
-) -> tuple[list[Need], list[Goal]]:
-    """Parse one prodc file for every noun list it carries (``needs:``, ``goals:``)."""
+def _release(raw: object, where: str) -> Release:
+    tbl = _as_mapping(raw, where)
+    return Release(
+        id=_as_str(tbl.get("id"), f"{where}.id"),
+        text=_opt_str(tbl.get("text"), f"{where}.text"),
+    )
+
+
+@dataclass
+class _Loaded:
+    """One file's nouns, accumulated across the glob into the final :class:`Model`."""
+
+    needs: list[Need] = field(default_factory=list[Need])
+    goals: list[Goal] = field(default_factory=list[Goal])
+    releases: list[Release] = field(default_factory=list[Release])
+
+
+def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
+    """Parse one prodc file for every noun list it carries (``needs:``/``goals:``/``releases:``)."""
     where = path.name
     try:
         doc = yaml.safe_load(path.read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:
         raise LoaderError(f"{where}: invalid YAML: {exc}") from exc
+    out = _Loaded()
     if doc is None:
-        return [], []
+        return out
     tbl = _as_mapping(doc, where)
     file_who = _opt_str(tbl.get("who"), f"{where}.who")
     file_label = _opt_str(tbl.get("label"), f"{where}.label")
     file_client = _opt_str(tbl.get("client"), f"{where}.client")
 
-    needs: list[Need] = []
+    def _unique(kind: str, nid: str) -> None:
+        prior = seen[kind].get(nid)
+        if prior is not None:
+            raise LoaderError(f"duplicate {kind} id {nid!r} in {where} and {prior.name}")
+        seen[kind][nid] = path
+
     for i, raw in enumerate(_as_list(tbl.get("needs"), f"{where}.needs")):
         need = _need(raw, f"{where}.needs[{i}]", file_who, file_label, file_client)
-        prior = need_seen.get(need.id)
-        if prior is not None:
-            raise LoaderError(f"duplicate need id {need.id!r} in {where} and {prior.name}")
-        need_seen[need.id] = path
-        needs.append(need)
-
-    goals: list[Goal] = []
+        _unique("need", need.id)
+        out.needs.append(need)
     for i, raw in enumerate(_as_list(tbl.get("goals"), f"{where}.goals")):
         goal = _goal(raw, f"{where}.goals[{i}]")
-        prior = goal_seen.get(goal.id)
-        if prior is not None:
-            raise LoaderError(f"duplicate goal id {goal.id!r} in {where} and {prior.name}")
-        goal_seen[goal.id] = path
-        goals.append(goal)
-    return needs, goals
+        _unique("goal", goal.id)
+        out.goals.append(goal)
+    for i, raw in enumerate(_as_list(tbl.get("releases"), f"{where}.releases")):
+        release = _release(raw, f"{where}.releases[{i}]")
+        _unique("release", release.id)
+        out.releases.append(release)
+    return out
 
 
 def load(config: Config) -> Model:
     """Read every prodc file once into a :class:`~prodc.model.Model`, then validate cross-refs.
 
     One loader for every noun: ids are unique within their kind, and each string reference
-    (``variant_of``, ``children``, ``goal``) is checked here as a hard error — a dangling
-    reference to something declared in these files is a typo you own, not a runtime unknown.
+    (``variant_of``, ``children``, ``goal``, ``release``) is checked here as a hard error — a
+    dangling reference to something declared in these files is a typo you own, not a runtime
+    unknown.
     """
-    needs: list[Need] = []
-    goals: list[Goal] = []
-    need_seen: dict[str, Path] = {}
-    goal_seen: dict[str, Path] = {}
+    acc = _Loaded()
+    seen: dict[str, dict[str, Path]] = {"need": {}, "goal": {}, "release": {}}
     for pattern in config.need_globs:
         for path in sorted(config.root.glob(pattern)):
-            file_needs, file_goals = _load_file(path, need_seen, goal_seen)
-            needs.extend(file_needs)
-            goals.extend(file_goals)
-    _check_variants(needs)
-    _check_children(needs)
-    _check_goal_refs(needs, goals)
-    return Model(needs=tuple(needs), goals=tuple(goals))
+            f = _load_file(path, seen)
+            acc.needs.extend(f.needs)
+            acc.goals.extend(f.goals)
+            acc.releases.extend(f.releases)
+    _check_variants(acc.needs)
+    _check_children(acc.needs)
+    _check_ref(acc.needs, "goal", lambda n: n.goal, {g.id for g in acc.goals})
+    _check_ref(acc.needs, "release", lambda n: n.release, {r.id for r in acc.releases})
+    return Model(
+        needs=tuple(acc.needs), goals=tuple(acc.goals), releases=tuple(acc.releases)
+    )
 
 
 def load_needs(config: Config) -> list[Need]:
@@ -220,12 +244,14 @@ def load_needs(config: Config) -> list[Need]:
     return list(load(config).needs)
 
 
-def _check_goal_refs(needs: list[Need], goals: list[Goal]) -> None:
-    """Every ``need.goal`` must name a known goal id."""
-    known = {g.id for g in goals}
+def _check_ref(
+    needs: list[Need], role: str, pick: Callable[[Need], str | None], known: set[str]
+) -> None:
+    """Every ``need.<role>`` that is set must name a declared id of that kind."""
     for need in needs:
-        if need.goal is not None and need.goal not in known:
-            raise LoaderError(f"need {need.id!r}: goal {need.goal!r} is not a known goal id")
+        ref = pick(need)
+        if ref is not None and ref not in known:
+            raise LoaderError(f"need {need.id!r}: {role} {ref!r} is not a known {role} id")
 
 
 def _check_children(needs: list[Need]) -> None:

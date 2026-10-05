@@ -202,3 +202,18 @@ def test_goal_report_rolls_up_and_flags_ungoaled() -> None:
     (goal, gsum) = coverage[0]
     assert goal.id == "G-1" and gsum.total == 2 and gsum.delivered == 1
     assert [r.need.id for r in ungoaled] == ["N-3"]
+
+
+def test_release_report_in_ship_order() -> None:
+    from prodc.model import Release
+    from prodc.status import release_report
+
+    releases = [Release(id="R-1", text="skeleton"), Release(id="R-2", text="delight")]
+    needs = [
+        Need(id="N-1", text="done in R-1", proofs=("x:1",), release="R-1"),
+        Need(id="N-2", text="hole in R-2", release="R-2"),
+    ]
+    results = resolve(needs, {"x": _delivered()})
+    rep = release_report(results, releases)
+    assert [rel.id for rel, _ in rep] == ["R-1", "R-2"]  # preserves declared order
+    assert rep[0][1].delivered == 1 and rep[1][1].delivered == 0

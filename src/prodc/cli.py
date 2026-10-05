@@ -18,7 +18,7 @@ from typing import cast
 from . import __version__
 from .config import Config, ConfigError
 from .loader import LoaderError, load
-from .model import Goal, Model, Need, NeedResult, NeedState, SourceKind, ears_shape
+from .model import Goal, Model, Need, NeedResult, NeedState, Release, SourceKind, ears_shape
 from .status import (
     Recurrence,
     Summary,
@@ -27,6 +27,7 @@ from .status import (
     orphans,
     rank,
     recurrence,
+    release_report,
     resolve,
     summarize,
 )
@@ -173,6 +174,16 @@ def _render_goals(goal_cov: list[tuple[Goal, Summary]], ungoaled: list[NeedResul
     return "\n".join(out)
 
 
+def _render_releases(rel_cov: list[tuple[Release, Summary]]) -> str:
+    """Per-release coverage, in ship order (#30)."""
+    out = ["\nreleases (ship order):"]
+    for rel, rsum in rel_cov:
+        pct = round(rsum.coverage * 100)
+        title = f"  {rel.text}" if rel.text else ""
+        out.append(f"  {rel.id:<12} {rsum.delivered}/{rsum.total} ({pct}%){title}")
+    return "\n".join(out)
+
+
 def _render_recurrence(recs: list[Recurrence]) -> str:
     """Baselines shared across clients, most-shared first — the #32 recurrence view."""
     out = [f"\nrecurrence (needs shared across clients): {len(recs)}"]
@@ -215,6 +226,7 @@ def _need_payload(r: NeedResult) -> dict[str, object]:
         "client": need.client,
         "variant_of": need.variant_of,
         "goal": need.goal,
+        "release": need.release,
         "importance": need.importance,
         "claim": need.claim,
         "attested": (
@@ -239,10 +251,21 @@ def _to_json(
     recs: list[Recurrence],
     goal_cov: list[tuple[Goal, Summary]],
     ungoaled: list[NeedResult],
+    rel_cov: list[tuple[Release, Summary]],
 ) -> str:
     payload = {
         "summary": _summary_payload(summary, orphan_map),
         "orphans": orphan_map,
+        "releases": [
+            {
+                "id": rel.id,
+                "text": rel.text,
+                "coverage": round(rsum.coverage, 4),
+                "delivered": rsum.delivered,
+                "total": rsum.total,
+            }
+            for rel, rsum in rel_cov
+        ],
         "recurrence": [
             {
                 "baseline": rec.baseline.id,
@@ -294,9 +317,10 @@ def _cmd_status(args: argparse.Namespace) -> int:
     orphan_map = orphans(needs, cfg.adapters)
     recs = recurrence(needs)
     goal_cov, ungoaled = goal_report(results, list(model.goals))
+    rel_cov = release_report(results, list(model.releases))
 
     if args.json:
-        print(_to_json(results, summary, orphan_map, recs, goal_cov, ungoaled))
+        print(_to_json(results, summary, orphan_map, recs, goal_cov, ungoaled, rel_cov))
     else:
         commit = _git_rev(cfg.root)
         print(f"prodc status — {cfg.root.name}{f' @ {commit}' if commit else ''}")
@@ -304,6 +328,8 @@ def _cmd_status(args: argparse.Namespace) -> int:
         print(_render(results))
         if model.goals:
             print(_render_goals(goal_cov, ungoaled))
+        if model.releases:
+            print(_render_releases(rel_cov))
         if recs:
             print(_render_recurrence(recs))
         if orphan_map:
@@ -346,6 +372,8 @@ def _render_show(r: NeedResult) -> str:
     ]
     if need.goal:
         lines.append(f"  goal: {need.goal}")
+    if need.release:
+        lines.append(f"  release: {need.release}")
     if need.claim:
         lines.append(f"  claim: {need.claim}")
     if need.attestation:

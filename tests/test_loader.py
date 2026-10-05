@@ -259,3 +259,34 @@ def test_duplicate_goal_id_raises(tmp_path: Path) -> None:
     )
     with pytest.raises(LoaderError, match="duplicate goal id 'G-1'"):
         load_needs(cfg)
+
+
+def test_releases_loaded_and_need_slotted(tmp_path: Path) -> None:
+    from prodc.loader import load
+
+    cfg = _config(
+        tmp_path,
+        (
+            "map.yaml",
+            """
+            releases:
+              - id: R-1
+                text: walking skeleton
+              - id: R-2
+                text: delight
+            needs:
+              - id: N-1
+                text: the owner can sign in
+                release: R-1
+            """,
+        ),
+    )
+    model = load(cfg)
+    assert [r.id for r in model.releases] == ["R-1", "R-2"]  # declared order = ship order
+    assert model.needs[0].release == "R-1"
+
+
+def test_need_release_unknown_raises(tmp_path: Path) -> None:
+    cfg = _config(tmp_path, ("a.yaml", "needs:\n  - id: N-1\n    text: t\n    release: NOPE\n"))
+    with pytest.raises(LoaderError, match="release 'NOPE' is not a known release id"):
+        load_needs(cfg)

@@ -16,6 +16,7 @@ from .model import (
     NeedResult,
     NeedState,
     ProofState,
+    Release,
     SourceKind,
     ears_warnings,
 )
@@ -292,6 +293,21 @@ def goal_report(
             by_goal[r.need.goal].append(r)
     coverage = [(g, summarize(by_goal[g.id])) for g in goals]
     return coverage, ungoaled
+
+
+def release_report(
+    results: list[NeedResult], releases: list[Release]
+) -> list[tuple[Release, Summary]]:
+    """Coverage per release slice, in declared (ship) order — the story-map release view (#30).
+
+    Like :func:`goal_report`, each slice's coverage is just :func:`summarize` over the needs
+    that name it, so "what does this release look like" reads the same as the whole board.
+    """
+    by_release: dict[str, list[NeedResult]] = {r.id: [] for r in releases}
+    for res in results:
+        if res.need.release in by_release:
+            by_release[res.need.release].append(res)
+    return [(rel, summarize(by_release[rel.id])) for rel in releases]
 
 
 def applicable_needs(needs: list[Need], client: str) -> list[Need]:

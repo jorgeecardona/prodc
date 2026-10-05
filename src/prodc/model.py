@@ -78,6 +78,19 @@ class Goal:
 
 
 @dataclass(frozen=True)
+class Release:
+    """A releasable slice of a journey (User Story Mapping, Patton).
+
+    Declared in an ordered ``releases:`` list — position is the ship order. A need names
+    the release it belongs to, so the board can show what a coherent release looks like,
+    which a flow's flat ``children`` cannot express on its own.
+    """
+
+    id: str
+    text: str | None = None
+
+
+@dataclass(frozen=True)
 class Attestation:
     """A human's sign-off that a need's proofs actually establish its claim (#13).
 
@@ -108,6 +121,7 @@ class Need:
     claim: str | None = None  # what delivering this need would establish — the warrant to review
     attestation: Attestation | None = None  # human sign-off that the proofs establish the claim
     goal: str | None = None  # id of the Goal this need serves; None = no objective (flagged)
+    release: str | None = None  # id of the Release slice this need ships in; None = unslotted
 
     @property
     def is_variant(self) -> bool:
@@ -143,6 +157,7 @@ class Model:
 
     needs: tuple[Need, ...] = ()
     goals: tuple[Goal, ...] = ()
+    releases: tuple[Release, ...] = ()  # in declared order = ship sequence
 
 
 # A leading verb that usually signals a solution-in-disguise, not a need (Torres, Ch. 6).
