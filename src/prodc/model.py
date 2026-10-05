@@ -137,6 +137,7 @@ class Need:
     release: str | None = None  # id of the Release slice this need ships in; None = unslotted
     product: bool = True  # False = infra/NFR/internal, excluded from product coverage (#48)
     not_duplicate_of: tuple[str, ...] = ()  # ids this need is confirmed NOT a duplicate of (#55)
+    not_variant_of: tuple[str, ...] = ()  # ids this need is confirmed NOT a shared variant of (#56)
 
     @property
     def is_variant(self) -> bool:

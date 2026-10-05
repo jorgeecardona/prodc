@@ -20,7 +20,7 @@ from typing import cast
 
 from . import __version__
 from .config import Config, ConfigError
-from .dedup import DupPair, duplicate_pairs, matches_for
+from .dedup import DupPair, VariantGroup, duplicate_pairs, matches_for, variant_suggestions
 from .loader import LoaderError, load
 from .model import Goal, Model, Need, NeedResult, NeedState, Release, SourceKind, ears_shape
 from .status import (
@@ -426,6 +426,15 @@ def _cmd_lint(args: argparse.Namespace) -> int:
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
     _annotate_board_warnings(results, needs)
     _annotate_duplicate_warnings(results, needs, cfg.duplicate_threshold)
+    by_id = {r.need.id: r for r in results}
+    for g in variant_suggestions(needs, cfg.duplicate_threshold):
+        others = ", ".join(m.id for m in g.members)
+        for m in g.members:
+            if m.id in by_id:
+                by_id[m.id].warnings.append(
+                    f"unlinked cross-client recurrence with {others} — set variant_of or "
+                    f"not_variant_of ({g.score:.2f}) — #56"
+                )
     if cfg.stale_after_days is not None:
         today = date.today()
         for r in results:
@@ -1050,6 +1059,47 @@ def _git_rev(root: Path) -> str | None:
     return ref[:7]
 
 
+def _cmd_recurrence(args: argparse.Namespace) -> int:
+    """Show baselines shared across clients; `--suggest` proposes unlinked variant groups (#56)."""
+    loaded = _load_or_report(args)
+    if loaded is None:
+        return 2
+    cfg, model = loaded
+    needs = list(model.needs)
+    if args.suggest:
+        threshold = args.threshold if args.threshold is not None else cfg.duplicate_threshold
+        groups = variant_suggestions(needs, threshold)
+        if args.json:
+            print(json.dumps([_variant_payload(g) for g in groups], indent=2))
+        else:
+            for g in groups:
+                clients = ", ".join(sorted({m.client for m in g.members if m.client}))
+                print(f"  {g.score:.2f}  {len(g.members)} needs across {clients}")
+                for m in g.members:
+                    print(f"        {m.id} ({m.client}): {m.text}")
+            print(f"suggest: {len(groups)} unlinked variant group(s) at threshold {threshold:.2f}")
+        return 0
+    recs = recurrence(needs)
+    if args.json:
+        print(json.dumps(
+            [{"baseline": r.baseline.id, "text": r.baseline.text,
+              "count": r.count, "clients": list(r.clients)} for r in recs],
+            indent=2,
+        ))
+    else:
+        for r in recs:
+            print(f"  {r.count}x  {r.baseline.id}: {r.baseline.text}  [{', '.join(r.clients)}]")
+        print(f"recurrence: {len(recs)} shared baseline(s)")
+    return 0
+
+
+def _variant_payload(g: VariantGroup) -> dict[str, object]:
+    return {
+        "score": round(g.score, 4),
+        "members": [{"id": m.id, "client": m.client, "text": m.text} for m in g.members],
+    }
+
+
 def _cmd_dupes(args: argparse.Namespace) -> int:
     """List candidate duplicate need pairs, ranked by text similarity (#55)."""
     loaded = _load_or_report(args)
@@ -1282,6 +1332,25 @@ def main(argv: list[str] | None = None) -> int:
     pf.add_argument("configs", nargs="+", metavar="PRODC_TOML", help="one or more prodc.toml paths")
     pf.add_argument("--json", action="store_true", help="machine-readable output")
     pf.set_defaults(func=_cmd_portfolio)
+
+    rc = sub.add_parser(
+        "recurrence", help="baselines shared across clients; --suggest proposes unlinked groups"
+    )
+    rc.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    rc.add_argument("--json", action="store_true", help="machine-readable output")
+    rc.add_argument(
+        "--suggest",
+        action="store_true",
+        help="propose unlinked cross-client needs that could share a baseline (#56)",
+    )
+    rc.add_argument(
+        "--threshold",
+        type=float,
+        default=None,
+        metavar="FRAC",
+        help="similarity for --suggest (0..1); overrides [lint].duplicate_threshold",
+    )
+    rc.set_defaults(func=_cmd_recurrence)
 
     du = sub.add_parser("dupes", help="list candidate duplicate need pairs by text similarity")
     du.add_argument("--config", default="prodc.toml", help="path to prodc.toml")

@@ -163,6 +163,10 @@ def _need(
         _as_str(d, f"{where}.not_duplicate_of[{i}]")
         for i, d in enumerate(_as_list(tbl.get("not_duplicate_of"), f"{where}.not_duplicate_of"))
     )
+    not_variant_of = tuple(
+        _as_str(d, f"{where}.not_variant_of[{i}]")
+        for i, d in enumerate(_as_list(tbl.get("not_variant_of"), f"{where}.not_variant_of"))
+    )
     if children and proofs:
         raise LoaderError(
             f"{where} ({nid}): a flow (need with children) proves its steps via the "
@@ -190,6 +194,7 @@ def _need(
         release=release,
         product=product,
         not_duplicate_of=not_duplicate_of,
+        not_variant_of=not_variant_of,
     )
 
 
