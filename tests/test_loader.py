@@ -342,3 +342,41 @@ def test_product_flag_defaults_true_and_parses(tmp_path: Path) -> None:
     )
     by_id = {n.id: n for n in load_needs(cfg)}
     assert by_id["N-1"].product is True and by_id["N-2"].product is False
+
+
+def test_ai_attestation_parsed(tmp_path: Path) -> None:
+    from prodc.model import AttestationKind
+
+    cfg = _config(
+        tmp_path,
+        (
+            "a.yaml",
+            """
+            needs:
+              - id: N-1
+                text: the owner can export a statement
+                attestation:
+                  who: claude-opus-4-8
+                  date: 2026-10-05
+                  kind: ai
+                  verdict: pass
+                  comment: the smoke proof exercises the export path end to end
+            """,
+        ),
+    )
+    (need,) = load_needs(cfg)
+    a = need.attestation
+    assert a is not None and a.kind is AttestationKind.AI
+    assert a.who == "claude-opus-4-8" and a.verdict == "pass"
+    assert a.comment and "end to end" in a.comment
+
+
+def test_attestation_defaults_human(tmp_path: Path) -> None:
+    from prodc.model import AttestationKind
+
+    cfg = _config(
+        tmp_path,
+        ("a.yaml", "needs:\n  - id: N-1\n    text: t\n    attestation:\n      who: Jorge\n      date: 2026-10-05\n"),
+    )
+    (need,) = load_needs(cfg)
+    assert need.attestation is not None and need.attestation.kind is AttestationKind.HUMAN

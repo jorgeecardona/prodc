@@ -20,6 +20,7 @@ from .model import (
     ArgKind,
     ArgNode,
     Attestation,
+    AttestationKind,
     Goal,
     Model,
     Need,
@@ -87,7 +88,19 @@ def _attestation(raw: object, where: str) -> Attestation | None:
     date = _opt_str(tbl.get("date"), f"{where}.date")
     if not who or not date:
         raise LoaderError(f"{where}: an attestation needs both 'who' and 'date'")
-    return Attestation(who=who, date=date)
+    kind_name = _opt_str(tbl.get("kind"), f"{where}.kind") or AttestationKind.HUMAN.value
+    try:
+        kind = AttestationKind(kind_name)
+    except ValueError:
+        kinds = "|".join(k.value for k in AttestationKind)
+        raise LoaderError(f"{where}.kind: unknown kind {kind_name!r} ({kinds})") from None
+    return Attestation(
+        who=who,
+        date=date,
+        kind=kind,
+        verdict=_opt_str(tbl.get("verdict"), f"{where}.verdict"),
+        comment=_opt_str(tbl.get("comment"), f"{where}.comment"),
+    )
 
 
 def _source(raw: object, where: str) -> Source:

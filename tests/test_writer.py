@@ -186,3 +186,24 @@ def test_accept_revoke_removes(tmp_path: Path) -> None:
     accept(cfg, "N-1", who="jorge", date="2026-10-05", revoke=True,
            expect_sha=None, dry_run=False)
     assert load(cfg).needs[0].proofs == ()
+
+
+def test_attest_ai_records_model_verdict_comment(tmp_path: Path) -> None:
+    from prodc.model import AttestationKind
+    from prodc.writer import attest
+
+    cfg = _proj(tmp_path, "needs:\n  - id: N-1\n    text: t\n    proofs: [web:x#y]\n")
+    attest(cfg, "N-1", who="claude-opus-4-8", date="2026-10-05", kind="ai",
+           verdict="pass", comment="looks right", expect_sha=None, dry_run=False)
+    a = load(cfg).needs[0].attestation
+    assert a is not None and a.kind is AttestationKind.AI and a.who == "claude-opus-4-8"
+    assert a.verdict == "pass" and a.comment == "looks right"
+
+
+def test_attest_bad_kind_rejected(tmp_path: Path) -> None:
+    from prodc.writer import attest
+
+    cfg = _proj(tmp_path, "needs:\n  - id: N-1\n    text: t\n")
+    with pytest.raises(WriteError, match="human or ai"):
+        attest(cfg, "N-1", who="x", date="2026-10-05", kind="robot",
+               verdict=None, comment=None, expect_sha=None, dry_run=False)

@@ -231,6 +231,41 @@ def capture_source(
     return _validated(config, path, old_text, _dump(doc), dry_run)
 
 
+def attest(
+    config: Config,
+    need_id: str,
+    *,
+    who: str,
+    date: str,
+    kind: str,
+    verdict: str | None,
+    comment: str | None,
+    expect_sha: str | None,
+    dry_run: bool,
+) -> Edit:
+    """Record a human or AI review that a need's proofs establish its claim (#13).
+
+    ``who`` is a person's name or a model id; ``kind`` is ``human`` or ``ai``. The verdict and
+    comment are kept on the need as the review's register. Replaces any existing attestation.
+    """
+    if kind not in ("human", "ai"):
+        raise WriteError(f"attestation kind must be human or ai, not {kind!r}")
+    att: dict[str, object] = {"who": who, "date": date, "kind": kind}
+    if verdict is not None:
+        att["verdict"] = verdict
+    if comment is not None:
+        att["comment"] = comment
+    path, _ = _locate(config, need_id)
+    doc, old_text = _read_doc(path)
+    if expect_sha is not None and _sha256(old_text) != expect_sha:
+        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
+    for raw in _need_list(doc, path):
+        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
+            cast("dict[str, object]", raw)["attestation"] = att
+            break
+    return _validated(config, path, old_text, _dump(doc), dry_run)
+
+
 def accept(
     config: Config,
     need_id: str,

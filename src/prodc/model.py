@@ -90,17 +90,28 @@ class Release:
     text: str  # a release has a name, like a Goal
 
 
+class AttestationKind(StrEnum):
+    """Who reviewed the warrant — a ladder of strength, human strongest (cf. SourceKind)."""
+
+    HUMAN = "human"  # a person judged that the proofs establish the need
+    AI = "ai"  # a model reviewed it — weaker than a human, stronger than nothing
+
+
 @dataclass(frozen=True)
 class Attestation:
-    """A human's sign-off that a need's proofs actually establish its claim (#13).
+    """A sign-off that a need's proofs actually establish its claim (#13).
 
-    prodc can read that a proof resolves and passes, but not that it proves *this* need.
-    An attestation records who reviewed that link and when — it does not prove fit, it
-    makes the human link visible and dated so an unreviewed one is distinguishable.
+    prodc can read that a proof resolves and passes, but not that it proves *this* need. An
+    attestation records who reviewed that link and when — it does not prove fit, it makes the
+    review visible and dated. A review can be a human's or an AI model's (``kind``); an AI
+    review carries the model as ``who`` and keeps its verdict and comment for the register.
     """
 
-    who: str
+    who: str  # a person's name, or the model id for an AI review
     date: str
+    kind: AttestationKind = AttestationKind.HUMAN
+    verdict: str | None = None  # the reviewer's conclusion, e.g. "pass" / "concerns" / "fail"
+    comment: str | None = None  # the review's feedback / rationale, kept on the record
 
 
 @dataclass(frozen=True)

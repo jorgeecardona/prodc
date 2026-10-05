@@ -161,14 +161,14 @@ def test_delivered_without_attestation_warns_warrant_unreviewed() -> None:
         attestation=Attestation(who="Jorge", date="2026-02-01"),
     )
     results = {r.need.id: r for r in resolve([unattested, attested], {"x": _delivered()})}
-    assert any("warrant not human-reviewed" in w for w in results["U-1"].warnings)
-    assert not any("warrant not human-reviewed" in w for w in results["A-1"].warnings)
+    assert any("warrant not reviewed" in w for w in results["U-1"].warnings)
+    assert not any("warrant not reviewed" in w for w in results["A-1"].warnings)
 
 
 def test_hole_does_not_warn_about_attestation() -> None:
     # a HOLE has no green proof to over-trust, so there is nothing to attest
     (r,) = resolve([Need(id="H-1", text="no proof")], {})
-    assert not any("warrant not human-reviewed" in w for w in r.warnings)
+    assert not any("warrant not reviewed" in w for w in r.warnings)
 
 
 def test_ears_shape_classification() -> None:
@@ -321,3 +321,15 @@ def test_flow_orphan_silent_without_flows() -> None:
 
     needs = [Need(id="A", text="a"), Need(id="B", text="b")]
     assert flow_orphan_warnings(needs) == set()  # no flows → no seam to miss
+
+
+def test_ai_attestation_is_middle_rung_warning() -> None:
+    from prodc.model import Attestation, AttestationKind
+
+    ai = Need(id="N-1", text="t", proofs=("x:1",),
+              attestation=Attestation(who="opus", date="2026-10-05", kind=AttestationKind.AI))
+    human = Need(id="N-2", text="t", proofs=("x:1",),
+                 attestation=Attestation(who="Jorge", date="2026-10-05"))
+    by_id = {r.need.id: r for r in resolve([ai, human], {"x": _delivered()})}
+    assert any("(AI) — not a human" in w for w in by_id["N-1"].warnings)
+    assert not any("#13" in w for w in by_id["N-2"].warnings)  # human review: no warning

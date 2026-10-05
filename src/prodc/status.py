@@ -13,6 +13,7 @@ from .model import (
     SOLUTION_VERBS,
     ArgKind,
     ArgNode,
+    AttestationKind,
     Goal,
     Need,
     NeedResult,
@@ -71,10 +72,14 @@ def _warrant_warnings(need: Need, result: NeedResult) -> list[str]:
     leaf with no :class:`~prodc.model.Attestation` is trusted blindly — surface that so a
     reviewer can confirm the link, without the tool pretending to prove semantic fit.
     """
-    if need.children or not need.proofs:
+    if need.children or not need.proofs or result.state is not NeedState.DELIVERED:
         return []
-    if result.state is NeedState.DELIVERED and need.attestation is None:
-        return ["DELIVERED on an unattested proof link — warrant not human-reviewed (#13)"]
+    att = need.attestation
+    if att is None:
+        return ["DELIVERED on an unattested proof link — warrant not reviewed (#13)"]
+    if att.kind is AttestationKind.AI:
+        # an AI review is a middle rung: better than nothing, weaker than a human sign-off
+        return [f"DELIVERED, warrant reviewed by {att.who} (AI) — not a human (#13)"]
     return []
 
 

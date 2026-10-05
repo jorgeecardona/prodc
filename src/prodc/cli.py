@@ -37,7 +37,7 @@ from .status import (
     state_priority,
     summarize,
 )
-from .writer import Edit, WriteError, accept, add_need, capture_source, set_field
+from .writer import Edit, WriteError, accept, add_need, attest, capture_source, set_field
 
 _LABEL = {
     NeedState.DELIVERED: "DELIVERED",
@@ -271,7 +271,13 @@ def _need_payload(r: NeedResult) -> dict[str, object]:
         "importance": need.importance,
         "claim": need.claim,
         "attestation": (
-            {"who": need.attestation.who, "date": need.attestation.date}
+            {
+                "who": need.attestation.who,
+                "date": need.attestation.date,
+                "kind": need.attestation.kind.value,
+                "verdict": need.attestation.verdict,
+                "comment": need.attestation.comment,
+            }
             if need.attestation
             else None
         ),
@@ -494,9 +500,14 @@ def _render_show(r: NeedResult) -> str:
     if need.claim:
         lines.append(f"  claim: {need.claim}")
     if need.attestation:
-        lines.append(f"  attested: {need.attestation.who} ({need.attestation.date})")
+        a = need.attestation
+        tag = " (AI)" if a.kind.value == "ai" else ""
+        verdict = f" — {a.verdict}" if a.verdict else ""
+        lines.append(f"  attested: {a.who}{tag} ({a.date}){verdict}")
+        if a.comment:
+            lines.append(f"    ↳ {a.comment}")
     elif need.proofs and r.state is NeedState.DELIVERED:
-        lines.append("  attested: (none — proof link not human-reviewed, #13)")
+        lines.append("  attested: (none — proof link not reviewed, #13)")
     if need.sources:
         lines.append("  sources:")
         for s in need.sources:
@@ -773,6 +784,25 @@ def _cmd_add(args: argparse.Namespace) -> int:
             file=args.file,
             expect_sha=args.expect_sha,
             dry_run=args.dry_run,
+        )
+    except (ConfigError, WriteError) as exc:
+        print(f"prodc: {exc}", file=sys.stderr)
+        return 2
+    return _emit_edit(edit, args.dry_run, args.json)
+
+
+def _cmd_attest(args: argparse.Namespace) -> int:
+    """Record a human or AI review that a need's proofs establish its claim."""
+    cfg_path = Path(args.config)
+    if not cfg_path.exists():
+        print(f"prodc: no config at {cfg_path}", file=sys.stderr)
+        return 2
+    try:
+        cfg = Config.load(cfg_path)
+        edit = attest(
+            cfg, args.need_id, who=args.by, date=args.date,
+            kind="ai" if args.ai else "human", verdict=args.verdict, comment=args.comment,
+            expect_sha=args.expect_sha, dry_run=args.dry_run,
         )
     except (ConfigError, WriteError) as exc:
         print(f"prodc: {exc}", file=sys.stderr)
@@ -1101,6 +1131,20 @@ def main(argv: list[str] | None = None) -> int:
         help="refuse if the file's content hash differs (optimistic lock)",
     )
     cp.set_defaults(func=_cmd_capture)
+
+    at = sub.add_parser("attest", help="record a human or AI review of a need's warrant (#13)")
+    at.add_argument("need_id", help="the need id being attested")
+    at.add_argument("--by", required=True, help="who reviewed it — a person's name or a model id")
+    at.add_argument("--date", required=True, help="when (ISO, e.g. 2026-10-05)")
+    at.add_argument("--ai", action="store_true", help="the reviewer is an AI model, not a human")
+    at.add_argument("--verdict", default=None, help="the reviewer's conclusion, e.g. pass/concerns/fail")
+    at.add_argument("--comment", default=None, help="the review's feedback, kept on the record")
+    at.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    at.add_argument("--json", action="store_true", help="machine-readable output")
+    at.add_argument("--dry-run", action="store_true", help="validate and show the diff, don't write")
+    at.add_argument("--expect-sha", default=None, metavar="SHA256",
+                    help="refuse if the file's content hash differs (optimistic lock)")
+    at.set_defaults(func=_cmd_attest)
 
     ac = sub.add_parser("accept", help="record a human acceptance pass (accept proof) on a need")
     ac.add_argument("need_id", help="the need id that was accepted")
