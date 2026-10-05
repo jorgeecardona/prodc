@@ -137,6 +137,7 @@ class Need:
     goal: str | None = None  # id of the Goal this need serves; None = no objective (flagged)
     release: str | None = None  # id of the Release slice this need ships in; None = unslotted
     product: bool = True  # False = infra/NFR/internal, excluded from product coverage (#48)
+    draft: bool = False  # True = staged, not yet counted on the board until promoted (#60)
     not_duplicate_of: tuple[str, ...] = ()  # ids this need is confirmed NOT a duplicate of (#55)
     not_variant_of: tuple[str, ...] = ()  # ids this need is confirmed NOT a shared variant of (#56)
 

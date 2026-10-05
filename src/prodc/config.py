@@ -53,6 +53,7 @@ class Config:
         default_factory=dict[int, tuple[str, str]]
     )  # [importance].levels — ordinal → (label, meaning); empty = no rubric declared (#59)
     importance_revisit_days: int | None = None  # [lint].importance_revisit_days (#59)
+    default_draft: bool = False  # [add].default_draft — `add` stages as draft by default (#60)
 
     def importance_label(self, level: int | None) -> str | None:
         """The declared label for an importance level, or None if unset/undeclared (#59)."""
@@ -185,6 +186,11 @@ class Config:
                 )
             importance_levels[row[0]] = (row[1], row[2])
 
+        add_tbl = _as_dict(raw.get("add", {}), "[add]")
+        default_draft = add_tbl.get("default_draft", False)
+        if not isinstance(default_draft, bool):
+            raise ConfigError("[add].default_draft must be true or false")
+
         return cls(
             root=root,
             need_globs=need_globs,
@@ -194,4 +200,5 @@ class Config:
             stale_after_days=stale,
             importance_levels=importance_levels,
             importance_revisit_days=revisit,
+            default_draft=default_draft,
         )

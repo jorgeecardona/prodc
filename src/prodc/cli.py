@@ -298,6 +298,7 @@ def _need_payload(r: NeedResult) -> dict[str, object]:
         "goal": need.goal,
         "release": need.release,
         "product": need.product,
+        "draft": need.draft,
         "importance": need.importance,
         "importance_set_at": need.importance_set_at,
         "claim": need.claim,
@@ -501,6 +502,11 @@ def _cmd_status(args: argparse.Namespace) -> int:
         return 2
     cfg, model = loaded
     needs = list(model.needs)
+    # Draft needs (#60) are staged: kept off the counted board (and coverage, recurrence,
+    # orphans) until promoted with `set <id> draft=false`, unless --include-drafts is passed.
+    draft_count = sum(1 for n in needs if n.draft)
+    if not args.include_drafts:
+        needs = [n for n in needs if not n.draft]
     # Scoped coverage (#49): restrict the board + coverage to a subset, so the number people
     # act on (this client, this goal) isn't diluted by the whole mixed board.
     if args.client:
@@ -534,6 +540,8 @@ def _cmd_status(args: argparse.Namespace) -> int:
         commit = _git_rev(cfg.root)
         print(f"prodc status — {cfg.root.name}{f' @ {commit}' if commit else ''}")
         print(_summary_line(summary))
+        if draft_count and not args.include_drafts:
+            print(f"drafts: {draft_count} staged (hidden — --include-drafts to show) (#60)")
         visible = [r for r in results if r.need.product]
         if args.only_must:
             visible = [r for r in visible if r.need.must]
@@ -583,7 +591,7 @@ def _render_show(r: NeedResult, importance_label: str | None = None) -> str:
     who = (need.who + (f" ({need.label})" if need.label else "")) if need.who else "(unassigned)"
     nm = f"  {r.delivered}/{r.total}" if r.total else ""
     lines = [
-        f"{need.id}{'  !!' if need.must else ''}  {need.text}",
+        f"{need.id}{'  !!' if need.must else ''}{'  (draft)' if need.draft else ''}  {need.text}",
         f"  who: {who}",
         f"  grounds: {_LABEL[r.state]}{nm}    warrant: {_warrant(need)}",
         f"  shape: {ears_shape(need.text).value}",
@@ -798,6 +806,8 @@ def _cmd_plan(args: argparse.Namespace) -> int:
         return 2
     cfg, model = loaded
     needs = list(model.needs)
+    if not args.include_drafts:
+        needs = [n for n in needs if not n.draft]  # drafts aren't backlog until promoted (#60)
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
     recurrence_counts = {rec.baseline.id: rec.count for rec in recurrence(needs)}
     print(
@@ -906,6 +916,7 @@ def _cmd_add(args: argparse.Namespace) -> int:
             who=args.who,
             kind=args.kind,
             file=args.file,
+            draft=args.draft or cfg.default_draft,
             expect_sha=args.expect_sha,
             dry_run=args.dry_run,
         )
@@ -1210,6 +1221,11 @@ def main(argv: list[str] | None = None) -> int:
                     help="flat table of just these columns, e.g. id,state,text,warrant")
     st.add_argument("--only-must", action="store_true", help="show only must-have needs")
     st.add_argument(
+        "--include-drafts",
+        action="store_true",
+        help="include draft (staged) needs in the board and coverage (#60)",
+    )
+    st.add_argument(
         "--stale",
         type=int,
         default=None,
@@ -1260,6 +1276,9 @@ def main(argv: list[str] | None = None) -> int:
     pl = sub.add_parser("plan", help="ranked backlog from must + state + evidence (+ importance)")
     pl.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     pl.add_argument("--json", action="store_true", help="machine-readable output")
+    pl.add_argument(
+        "--include-drafts", action="store_true", help="include draft (staged) needs (#60)"
+    )
     pl.set_defaults(func=_cmd_plan)
 
     ar = sub.add_parser("argument", help="show the GSN assurance graph and its defects")
@@ -1310,6 +1329,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     ad.add_argument(
         "--no-dupe-check", action="store_true", help="skip the duplicate check entirely (#55)"
+    )
+    ad.add_argument(
+        "--draft",
+        action="store_true",
+        help="stage as a draft: loads but stays off the counted board until promoted (#60)",
     )
     ad.add_argument(
         "--dry-run", action="store_true", help="validate and show the diff, don't write"

@@ -35,6 +35,7 @@ _SCALAR_FIELDS = frozenset(
         "variant_of",
         "client",
         "product",
+        "draft",
     }
 )
 _LIST_FIELDS = frozenset({"proofs", "children"})
@@ -336,13 +337,15 @@ def add_need(
     who: str,
     kind: str,
     file: str,
+    draft: bool = False,
     expect_sha: str | None,
     dry_run: bool,
 ) -> Edit:
     """Create a new need in ``file`` with an agent-provenance source (never a silent opinion).
 
     An agent-authored need must carry a source — and never ``interview``, which only a real
-    user signal earns. ``kind`` is restricted to ``proxy``/``internal`` for that reason.
+    user signal earns. ``kind`` is restricted to ``proxy``/``internal`` for that reason. A
+    ``draft`` need is staged: it loads but is kept off the counted board until promoted (#60).
     """
     if kind not in ("proxy", "internal"):
         raise WriteError(f"agent-authored need source must be proxy or internal, not {kind!r}")
@@ -359,11 +362,12 @@ def add_need(
     ):
         raise WriteError(f"need {need_id!r} already exists in {target.name}")
     today = datetime.date.today().isoformat()
-    needs.append(
-        {
-            "id": need_id,
-            "text": text,
-            "sources": [{"kind": kind, "who": who, "date": today}],
-        }
-    )
+    new_need: dict[str, object] = {
+        "id": need_id,
+        "text": text,
+        "sources": [{"kind": kind, "who": who, "date": today}],
+    }
+    if draft:
+        new_need["draft"] = True
+    needs.append(new_need)
     return _validated(config, target, old_text, _dump(doc), dry_run)

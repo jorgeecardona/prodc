@@ -143,6 +143,7 @@ def _need(
     goal = _opt_str(tbl.get("goal"), f"{where}.goal")
     release = _opt_str(tbl.get("release"), f"{where}.release")
     product = _as_bool(tbl["product"], f"{where}.product") if "product" in tbl else True
+    draft = _as_bool(tbl["draft"], f"{where}.draft") if "draft" in tbl else False
 
     sources = tuple(
         _source(s, f"{where}.sources[{i}]")
@@ -197,6 +198,7 @@ def _need(
         not_duplicate_of=not_duplicate_of,
         not_variant_of=not_variant_of,
         importance_set_at=importance_set_at,
+        draft=draft,
     )
 
 
