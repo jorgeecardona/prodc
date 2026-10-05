@@ -199,13 +199,15 @@ def capture_source(
     date: str | None,
     quote: str | None,
     locator: str | None,
+    observed_at: str | None = None,
     expect_sha: str | None,
     dry_run: bool,
 ) -> Edit:
     """Append a Source to an existing need — the near-zero-friction capture of #24.
 
     Records evidence as given; the loader's soft hygiene checks (interview needs a quote and a
-    who, artifact needs a locator) still apply on the next read.
+    who, artifact needs a locator) still apply on the next read. ``observed_at`` dates when the
+    evidence was recorded, so the board can flag stale needs (#58).
     """
     valid = {"interview", "artifact", "proxy", "internal"}
     if kind not in valid:
@@ -215,7 +217,10 @@ def capture_source(
     if expect_sha is not None and _sha256(old_text) != expect_sha:
         raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
     source: dict[str, object] = {"kind": kind}
-    for key, value in (("who", who), ("date", date), ("quote", quote), ("locator", locator)):
+    for key, value in (
+        ("who", who), ("date", date), ("quote", quote),
+        ("locator", locator), ("observed_at", observed_at),
+    ):
         if value is not None:
             source[key] = value
     for raw in _need_list(doc, path):

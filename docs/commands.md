@@ -23,6 +23,7 @@ Every command takes `--config prodc.toml` (default) and `--json`. `prodc -C DIR 
 | `--wide` | never clip need text |
 | `--columns id,state,text,…` | flat table of just those columns (`id state grounds text who warrant declared must opinion goal release client`) |
 | `--only-must` | must-haves only |
+| `--stale DAYS` | only needs whose newest `observed_at` is older than DAYS (`[lint].stale_after_days` makes it a lint warning) |
 | `--client ID` / `--goal ID` | scope board and coverage to one client / goal |
 | `--strict` | also exit 1 on any opinion |
 | `--min-coverage 0.8` | exit 1 below that delivered/total |
@@ -38,7 +39,7 @@ Each rewrites one YAML file, re-loads the whole model as validation, reverts on 
 | Command | Does | Example |
 |---|---|---|
 | `set <id> key=value` | set one field; `key+=value` appends to `proofs`/`children` | `prodc set N-2 proofs+=web:orders.feature#Export` |
-| `capture <id> --kind K` | append a source; `--who --date --quote --locator` | `prodc capture N-3 --kind interview --who Ana --date 2026-10-05 --quote "…"` |
+| `capture <id> --kind K` | append a source; `--who --date --quote --locator --observed-at` (observed-at defaults to today, for staleness) | `prodc capture N-3 --kind interview --who Ana --date 2026-10-05 --quote "…"` |
 | `accept <id> --who W --date D` | add an `accept:W@D` proof; `--revoke` removes it | `prodc accept N-2 --who jorge --date 2026-10-05` |
 | `attest <id> --by X --date D` | record a review that the proofs establish the need; `--ai --verdict --comment` | `prodc attest N-1 --by claude-fable-5-1 --ai --date 2026-10-05 --verdict pass` |
 | `add need <id> --text T --who W --file F` | new need with agent provenance; `--kind internal\|proxy` (never interview); warns on a possible duplicate, `--strict-dupes` refuses, `--no-dupe-check` skips | `prodc add need N-9 --text "…" --who bot --file needs/bot.yaml` |

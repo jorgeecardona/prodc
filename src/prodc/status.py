@@ -6,7 +6,9 @@ sub-needs. ``HOLE`` (no proof) is deliberately not a failure — it is an honest
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass
+from datetime import date
 
 from .adapters import Adapter, Enumerable, ProofResult, SourceAdapter
 from .model import (
@@ -35,6 +37,28 @@ def _text_warnings(need: Need) -> list[str]:
     for src in need.sources:
         out.extend(src.warnings())
     return out
+
+
+def _observed_dates(need: Need) -> list[date]:
+    """The parseable ISO ``observed_at`` dates across a need's sources (#58)."""
+    out: list[date] = []
+    for s in need.sources:
+        if s.observed_at:
+            with contextlib.suppress(ValueError):  # a malformed date is not counted, never a crash
+                out.append(date.fromisoformat(s.observed_at))
+    return out
+
+
+def last_observed(need: Need) -> str | None:
+    """The most recent ``observed_at`` across a need's sources, or None when unknown (#58)."""
+    dates = _observed_dates(need)
+    return max(dates).isoformat() if dates else None
+
+
+def evidence_age_days(need: Need, today: date) -> int | None:
+    """Days since the newest ``observed_at``; None when no source carries one (#58)."""
+    dates = _observed_dates(need)
+    return (today - max(dates)).days if dates else None
 
 
 def _resolve_proof(locator: str, adapters: dict[str, Adapter]) -> ProofResult:

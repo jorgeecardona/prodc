@@ -48,6 +48,7 @@ class Config:
     adapters: dict[str, Adapter] = field(default_factory=dict[str, Adapter])
     source_adapters: dict[str, SourceAdapter] = field(default_factory=dict[str, SourceAdapter])
     duplicate_threshold: float = 0.8  # [lint].duplicate_threshold — dupe score to flag (#55)
+    stale_after_days: int | None = None  # [lint].stale_after_days — flag older evidence (#58)
 
     @classmethod
     def load(cls, path: Path) -> Config:
@@ -127,6 +128,9 @@ class Config:
         dup = lint_tbl.get("duplicate_threshold", 0.8)
         if not isinstance(dup, (int, float)) or isinstance(dup, bool) or not 0 < dup <= 1:
             raise ConfigError("[lint].duplicate_threshold must be a number in (0, 1]")
+        stale = lint_tbl.get("stale_after_days")
+        if stale is not None and (not isinstance(stale, int) or isinstance(stale, bool) or stale < 1):
+            raise ConfigError("[lint].stale_after_days must be a positive integer")
 
         return cls(
             root=root,
@@ -134,4 +138,5 @@ class Config:
             adapters=adapters,
             source_adapters=source_adapters,
             duplicate_threshold=float(dup),
+            stale_after_days=stale,
         )

@@ -49,6 +49,7 @@ class Source:
     date: str | None = None
     quote: str | None = None
     locator: str | None = None
+    observed_at: str | None = None  # ISO date this evidence was recorded/refreshed (#58)
 
     def warnings(self) -> list[str]:
         """Soft, Torres-derived hygiene checks — never fail the build."""

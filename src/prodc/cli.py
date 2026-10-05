@@ -14,6 +14,7 @@ import shutil
 import sys
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
+from datetime import date
 from pathlib import Path
 from typing import cast
 
@@ -27,8 +28,10 @@ from .status import (
     Summary,
     applicable_needs,
     argument_defects,
+    evidence_age_days,
     flow_orphan_warnings,
     goal_report,
+    last_observed,
     orphans,
     rank,
     recurrence,
@@ -304,6 +307,8 @@ def _need_payload(r: NeedResult) -> dict[str, object]:
         "declared": r.declared,
         "opinion": need.is_opinion,
         "only_internal": need.only_internal,
+        "evidence_age": evidence_age_days(need, date.today()),
+        "last_observed_at": last_observed(need),
         "detail": r.detail,
         "warnings": r.warnings,
     }
@@ -421,6 +426,12 @@ def _cmd_lint(args: argparse.Namespace) -> int:
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
     _annotate_board_warnings(results, needs)
     _annotate_duplicate_warnings(results, needs, cfg.duplicate_threshold)
+    if cfg.stale_after_days is not None:
+        today = date.today()
+        for r in results:
+            age = evidence_age_days(r.need, today)
+            if age is not None and age > cfg.stale_after_days:
+                r.warnings.append(f"evidence is {age}d old (> {cfg.stale_after_days}d) — #58")
     errors = _lint_errors(results)
     warnings = [(r.need.id, w) for r in sorted(results, key=lambda x: x.need.id) for w in r.warnings]
     if args.json:
@@ -451,6 +462,12 @@ def _cmd_status(args: argparse.Namespace) -> int:
         needs = applicable_needs(needs, args.client)
     if args.goal:
         needs = [n for n in needs if n.goal == args.goal]
+    if args.stale is not None:
+        today = date.today()
+        needs = [
+            n for n in needs
+            if (age := evidence_age_days(n, today)) is not None and age > args.stale
+        ]
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
     _annotate_board_warnings(results, needs)
     summary = summarize(results)
@@ -891,6 +908,7 @@ def _cmd_capture(args: argparse.Namespace) -> int:
             date=args.date,
             quote=args.quote,
             locator=args.locator,
+            observed_at=args.observed_at or date.today().isoformat(),
             expect_sha=args.expect_sha,
             dry_run=args.dry_run,
         )
@@ -1091,6 +1109,13 @@ def main(argv: list[str] | None = None) -> int:
                     help="flat table of just these columns, e.g. id,state,text,warrant")
     st.add_argument("--only-must", action="store_true", help="show only must-have needs")
     st.add_argument(
+        "--stale",
+        type=int,
+        default=None,
+        metavar="DAYS",
+        help="show only needs whose newest evidence (observed_at) is older than DAYS (#58)",
+    )
+    st.add_argument(
         "--min-coverage",
         type=float,
         default=None,
@@ -1208,6 +1233,12 @@ def main(argv: list[str] | None = None) -> int:
     cp.add_argument("--date", default=None, help="when (ISO, e.g. 2026-10-05)")
     cp.add_argument("--quote", default=None, help="a verbatim quote (for an interview)")
     cp.add_argument("--locator", default=None, help="a source locator (for an artifact)")
+    cp.add_argument(
+        "--observed-at",
+        default=None,
+        metavar="ISO",
+        help="when this evidence was recorded/refreshed (default: today) (#58)",
+    )
     cp.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     cp.add_argument("--json", action="store_true", help="machine-readable output")
     cp.add_argument(

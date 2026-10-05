@@ -117,6 +117,7 @@ def _source(raw: object, where: str) -> Source:
         date=_opt_str(tbl.get("date"), f"{where}.date"),
         quote=_opt_str(tbl.get("quote"), f"{where}.quote"),
         locator=_opt_str(tbl.get("locator"), f"{where}.locator"),
+        observed_at=_opt_str(tbl.get("observed_at"), f"{where}.observed_at"),
     )
 
 
