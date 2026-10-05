@@ -135,6 +135,7 @@ class Need:
     goal: str | None = None  # id of the Goal this need serves; None = no objective (flagged)
     release: str | None = None  # id of the Release slice this need ships in; None = unslotted
     product: bool = True  # False = infra/NFR/internal, excluded from product coverage (#48)
+    not_duplicate_of: tuple[str, ...] = ()  # ids this need is confirmed NOT a duplicate of (#55)
 
     @property
     def is_variant(self) -> bool:

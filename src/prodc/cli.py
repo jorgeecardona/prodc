@@ -19,6 +19,7 @@ from typing import cast
 
 from . import __version__
 from .config import Config, ConfigError
+from .dedup import DupPair, duplicate_pairs, matches_for
 from .loader import LoaderError, load
 from .model import Goal, Model, Need, NeedResult, NeedState, Release, SourceKind, ears_shape
 from .status import (
@@ -381,6 +382,20 @@ def _annotate_board_warnings(results: list[NeedResult], needs: list[Need]) -> No
             r.warnings.append("belongs to no flow — seam not covered (#44)")
 
 
+def _annotate_duplicate_warnings(
+    results: list[NeedResult], needs: list[Need], threshold: float
+) -> None:
+    """Append a `possible duplicate of <id>` warning to each need in a candidate pair (#55)."""
+    by_id = {r.need.id: r for r in results}
+    for pair in duplicate_pairs(needs, threshold):
+        msg_a = f"possible duplicate of {pair.b.id} ({pair.score:.2f}) — #55"
+        msg_b = f"possible duplicate of {pair.a.id} ({pair.score:.2f}) — #55"
+        if pair.a.id in by_id:
+            by_id[pair.a.id].warnings.append(msg_a)
+        if pair.b.id in by_id:
+            by_id[pair.b.id].warnings.append(msg_b)
+
+
 def _lint_errors(results: list[NeedResult]) -> list[str]:
     """Hard problems a lint gate fails on: a dangling proof, or a must-have with no evidence."""
     errors: list[str] = []
@@ -405,6 +420,7 @@ def _cmd_lint(args: argparse.Namespace) -> int:
     needs = list(model.needs)
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
     _annotate_board_warnings(results, needs)
+    _annotate_duplicate_warnings(results, needs, cfg.duplicate_threshold)
     errors = _lint_errors(results)
     warnings = [(r.need.id, w) for r in sorted(results, key=lambda x: x.need.id) for w in r.warnings]
     if args.json:
@@ -795,6 +811,17 @@ def _cmd_add(args: argparse.Namespace) -> int:
         return 2
     try:
         cfg = Config.load(cfg_path)
+        if not args.no_dupe_check:
+            hits = matches_for(
+                args.text, list(load(cfg).needs), cfg.duplicate_threshold, exclude_id=args.need_id
+            )
+            for need, score in hits:
+                print(f"prodc: possible duplicate of {need.id} ({score:.2f}): {need.text}",
+                      file=sys.stderr)
+            if hits and args.strict_dupes:
+                print("prodc: refusing to add — --strict-dupes and a possible duplicate exists",
+                      file=sys.stderr)
+                return 2
         edit = add_need(
             cfg,
             args.need_id,
@@ -805,7 +832,7 @@ def _cmd_add(args: argparse.Namespace) -> int:
             expect_sha=args.expect_sha,
             dry_run=args.dry_run,
         )
-    except (ConfigError, WriteError) as exc:
+    except (ConfigError, LoaderError, WriteError) as exc:
         print(f"prodc: {exc}", file=sys.stderr)
         return 2
     return _emit_edit(edit, args.dry_run, args.json)
@@ -1005,6 +1032,40 @@ def _git_rev(root: Path) -> str | None:
     return ref[:7]
 
 
+def _cmd_dupes(args: argparse.Namespace) -> int:
+    """List candidate duplicate need pairs, ranked by text similarity (#55)."""
+    loaded = _load_or_report(args)
+    if loaded is None:
+        return 2
+    cfg, model = loaded
+    threshold = args.threshold if args.threshold is not None else cfg.duplicate_threshold
+    pairs = duplicate_pairs(list(model.needs), threshold)
+    if args.json:
+        print(json.dumps(
+            [_dup_payload(p) for p in pairs],
+            indent=2,
+        ))
+    else:
+        for p in pairs:
+            scope = " [same client+goal]" if p.same_scope else ""
+            print(f"  {p.score:.2f}  {p.a.id} ~ {p.b.id}{scope}")
+            print(f"        {p.a.id}: {p.a.text}")
+            print(f"        {p.b.id}: {p.b.text}")
+        print(f"dupes: {len(pairs)} candidate pair(s) at threshold {threshold:.2f}")
+    return 0
+
+
+def _dup_payload(p: DupPair) -> dict[str, object]:
+    return {
+        "a": p.a.id,
+        "b": p.b.id,
+        "score": round(p.score, 4),
+        "same_scope": p.same_scope,
+        "a_text": p.a.text,
+        "b_text": p.b.text,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="prodc", description="Product management as code.")
     parser.add_argument("--version", action="version", version=f"prodc {__version__}")
@@ -1117,6 +1178,14 @@ def main(argv: list[str] | None = None) -> int:
     ad.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     ad.add_argument("--json", action="store_true", help="machine-readable output")
     ad.add_argument(
+        "--strict-dupes",
+        action="store_true",
+        help="refuse to add if a possible duplicate exists (#55)",
+    )
+    ad.add_argument(
+        "--no-dupe-check", action="store_true", help="skip the duplicate check entirely (#55)"
+    )
+    ad.add_argument(
         "--dry-run", action="store_true", help="validate and show the diff, don't write"
     )
     ad.add_argument(
@@ -1182,6 +1251,18 @@ def main(argv: list[str] | None = None) -> int:
     pf.add_argument("configs", nargs="+", metavar="PRODC_TOML", help="one or more prodc.toml paths")
     pf.add_argument("--json", action="store_true", help="machine-readable output")
     pf.set_defaults(func=_cmd_portfolio)
+
+    du = sub.add_parser("dupes", help="list candidate duplicate need pairs by text similarity")
+    du.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    du.add_argument("--json", action="store_true", help="machine-readable output")
+    du.add_argument(
+        "--threshold",
+        type=float,
+        default=None,
+        metavar="FRAC",
+        help="similarity to flag (0..1); overrides [lint].duplicate_threshold",
+    )
+    du.set_defaults(func=_cmd_dupes)
 
     df = sub.add_parser(
         "diff", help="diff the current board against a prior status --json snapshot"

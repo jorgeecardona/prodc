@@ -47,6 +47,7 @@ class Config:
     need_globs: list[str]  # the prodc files; each may carry any noun list (needs:, goals:, …)
     adapters: dict[str, Adapter] = field(default_factory=dict[str, Adapter])
     source_adapters: dict[str, SourceAdapter] = field(default_factory=dict[str, SourceAdapter])
+    duplicate_threshold: float = 0.8  # [lint].duplicate_threshold — dupe score to flag (#55)
 
     @classmethod
     def load(cls, path: Path) -> Config:
@@ -122,9 +123,15 @@ class Config:
             else:
                 raise ConfigError(f"[sources.{name}]: unknown kind {kind!r} (frontmatter)")
 
+        lint_tbl = _as_dict(raw.get("lint", {}), "[lint]")
+        dup = lint_tbl.get("duplicate_threshold", 0.8)
+        if not isinstance(dup, (int, float)) or isinstance(dup, bool) or not 0 < dup <= 1:
+            raise ConfigError("[lint].duplicate_threshold must be a number in (0, 1]")
+
         return cls(
             root=root,
             need_globs=need_globs,
             adapters=adapters,
             source_adapters=source_adapters,
+            duplicate_threshold=float(dup),
         )
