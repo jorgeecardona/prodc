@@ -43,25 +43,43 @@ prodc draws on, and tries to credit, several existing lines of work:
   IDs), which prodc follows in form but points at product artifacts rather than "shall"
   statements.
 
-> Status: v0.3, on PyPI (`pip install prodc`). The model (Need · Source · Proof) with a
-> baseline/variant scope per client, the proof and source adapters, and the
-> `status` / `show` / `brief` / `plan` / `diff` / `portfolio` commands are in; see
-> `docs/issues/` for what's still open.
+> Status: v0.3, on PyPI (`pip install prodc`). The model grows from three nouns
+> (Need · Source · Proof) to Goal, Release and a GSN argument graph; with the proof/source
+> adapters and the `status` / `show` / `brief` / `plan` / `argument` / `diff` / `portfolio`
+> commands in. See `docs/issues/` for what's still open.
 
 ## Commands
 
-- `prodc status` — the board: needs vs what the suite proves, with gaps and coverage.
+- `prodc status` — the board: needs vs what the suite proves, with gaps, coverage, and
+  per-goal / per-release / cross-client roll-ups.
 - `prodc show <id>` — one need as a citable answer (grounds, warrant, sources, proofs).
 - `prodc brief <client>` — a pre-meeting agenda for one client: its applicable needs that
   are opinions (no evidence) or HOLEs (no proof), must-haves first.
 - `prodc plan` — a ranked backlog from recorded inputs only (must + state + evidence kind,
   refined by an optional `importance` ordinal); ordering, not a fabricated score.
+- `prodc argument` — the GSN assurance graph and its defects (unsupported claim, dangling
+  assumption); `--strict` exits 1 on any defect.
 - `prodc diff <snapshot>` — what changed since a saved `status --json`.
 - `prodc portfolio <toml>…` — many repos rolled into one scoreboard.
 
-A need can be a shared **baseline** or a per-client **variant** (`variant_of` + `client`);
-the board counts cross-client **recurrence**, and a DELIVERED proof link carries a human
-**attestation** (who/date) so an unreviewed warrant is visible rather than trusted blindly.
+## Model
+
+Everything loads into one `Model` from the prodc files (`[prodc].needs` glob; any file may
+carry a `needs:`, `goals:`, `releases:` or `argument:` list). The nouns:
+
+- **Need** — what a named person wants. A shared **baseline** or a per-client **variant**
+  (`variant_of` + `client`); the board counts cross-client **recurrence**. Carries an
+  optional **claim** and a human **attestation** (who/date), so a DELIVERED proof whose
+  warrant no one reviewed is flagged rather than trusted blindly.
+- **Source** — provenance (interview > artifact > proxy > internal); no source = opinion.
+- **Proof** — a locator resolved by an adapter to DELIVERED / PENDING / BROKEN / UNRESOLVED.
+- **Goal** — a measurable objective needs trace up to; a need with none is flagged.
+- **Release** — an ordered, releasable slice (`releases:` order = ship order).
+- **Argument** — a GSN graph (claim / strategy / evidence / context / assumption /
+  justification) that cites the nouns above by id, for a checkable assurance case.
+
+Cross-references (`variant_of`, `children`, `goal`, `release`, argument links) are string
+ids validated at load.
 
 ## Install
 
