@@ -55,8 +55,12 @@ point any command at another project without passing `--config` paths.
 
 
 - `prodc status` — the board: needs vs what the suite proves, with gaps, coverage, and
-  per-goal / per-release / cross-client roll-ups. `--wide` never truncates the need text;
-  non-product needs (`product: false`) are listed out-of-scope, not counted in coverage.
+  per-goal / per-release / cross-client roll-ups. Flags: `--wide` (never truncate text),
+  `--columns id,state,…` (flat table of chosen fields), `--only-must`, `--client X` / `--goal G`
+  (scope the board + coverage to a subset). Non-product needs (`product: false`) are listed
+  out-of-scope, not counted in coverage.
+- `prodc lint` — the red gate: exit 1 on a BROKEN proof or a must-have with no evidence; lists
+  every hygiene warning. `--strict` also fails on warnings. For CI.
 - `prodc show <id>` — one need as a citable answer (grounds, warrant, sources, proofs).
 - `prodc brief <client>` — a pre-meeting agenda for one client: its applicable needs that
   are opinions (no evidence) or HOLEs (no proof), must-haves first.
