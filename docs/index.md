@@ -16,4 +16,5 @@ prodc status
 |---|---|
 | [Quickstart](quickstart.md) | a working board in 60 seconds |
 | [Commands](commands.md) | every verb and flag |
-| [Model](model.md) | the nouns, the Need fields, the two ladders |
+| [Model](model.md) | the nouns, the Need and Source fields, the two ladders |
+| [Config](config.md) | every `prodc.toml` section |

@@ -7,7 +7,7 @@ Every command takes `--config prodc.toml` (default) and `--json`. `prodc -C DIR 
 | Command | Does | Example |
 |---|---|---|
 | `status` | The board: needs vs proofs, per persona, with goals/releases/recurrence/orphans | `prodc status --only-must` |
-| `lint` | CI gate: exit 1 on BROKEN proof or a must-have with no evidence; lists warnings | `prodc lint --strict` |
+| `lint` | CI gate: exit 1 on BROKEN proof or a must-have with no evidence; warns on dupes, unlinked recurrence, stale evidence, importance off-scale/unrevisited (see `[lint]`) | `prodc lint --strict` |
 | `show <id>` | One need as a citable answer: grounds, warrant, sources, proofs | `prodc show N-1` |
 | `brief <client>` | Pre-meeting agenda for one client: its opinions and HOLEs, must first | `prodc brief acme` |
 | `plan` | Ranked backlog: must + state + evidence + recurrence; `importance` refines | `prodc plan --json` |
@@ -15,7 +15,7 @@ Every command takes `--config prodc.toml` (default) and `--json`. `prodc -C DIR 
 | `diff <snapshot>` | State changes since a saved `status --json` | `prodc diff last.json` |
 | `portfolio <toml>…` | Many repos, one scoreboard | `prodc portfolio a/prodc.toml b/prodc.toml` |
 | `dupes` | Candidate duplicate need pairs by text similarity; `--threshold` overrides `[lint].duplicate_threshold` | `prodc dupes --threshold 0.7` |
-| `recurrence` | Baselines shared across clients; `--suggest` proposes unlinked cross-client needs that could share one (set `variant_of` or `not_variant_of`) | `prodc recurrence --suggest` |
+| `recurrence` | Baselines shared across clients; `--suggest` proposes unlinked cross-client needs that could share one (set `variant_of` or `not_variant_of`); `--threshold` overrides `[lint].duplicate_threshold` | `prodc recurrence --suggest` |
 | `suggest [id]` | Candidate proof locators for HOLE needs, ranked by text similarity to adapter inventories; `--min-score --top --kind` | `prodc suggest H-1 --min-score 0.4` |
 
 ### `status` flags
@@ -47,4 +47,4 @@ Each rewrites one YAML file, re-loads the whole model as validation, reverts on 
 | `attest <id> --by X --date D` | record a review that the proofs establish the need; `--ai --verdict --comment` | `prodc attest N-1 --by claude-fable-5-1 --ai --date 2026-10-05 --verdict pass` |
 | `add need <id> --text T --who W --file F` | new need with agent provenance; `--kind internal\|proxy` (never interview); warns on a possible duplicate, `--strict-dupes` refuses, `--no-dupe-check` skips; `--draft` stages it off the board (promote later with `set <id> draft=false`) | `prodc add need N-9 --text "…" --who bot --file needs/bot.yaml --draft` |
 
-`set` fields: `text who label must importance claim goal release variant_of client product`; lists: `proofs children`.
+`set` fields: `text who label must importance claim goal release variant_of client product draft`; lists: `proofs children`.

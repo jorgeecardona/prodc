@@ -26,11 +26,16 @@ File-level `who`, `label`, `client` default every need in that file.
 | `label` | free text for `who` |
 | `must` | must-have; a must with no proof tops the board |
 | `sources` | evidence list (see ladder) |
-| `proofs` | locators; a flow must not carry proofs |
+| `proofs` | locators (leaf needs only; a flow uses `seam`) |
 | `children` | sub-need ids; makes this a flow that rolls them up |
+| `seam` | end-to-end locators for a flow's between-steps behaviour; flow is DELIVERED only when every child *and* the seam are green |
 | `client` | this instance is for one client; absent = shared baseline |
 | `variant_of` | baseline id this specialises; variants cannot chain |
-| `importance` | positive int, refines `plan` ranking only |
+| `not_variant_of` | ids confirmed *not* a shared baseline; silences `recurrence --suggest` / lint for that pair |
+| `not_duplicate_of` | ids confirmed *not* a duplicate; silences `dupes` / lint for that pair |
+| `importance` | positive int, refines `plan` ranking only; must be on the `[importance]` rubric when one is declared |
+| `importance_set_at` | ISO date `importance` was last set; `set importance=` stamps it, lint flags it missing or older than `[lint].importance_revisit_days` |
+| `draft` | `true` = staged: loads, but hidden and uncounted until promoted (`set <id> draft=false`); `--include-drafts` shows it |
 | `claim` | what delivering this would establish |
 | `attestation` | `who`, `date`, `kind` human/ai, `verdict`, `comment` |
 | `goal` | Goal id; absent = flagged ungoaled |
@@ -46,6 +51,17 @@ File-level `who`, `label`, `client` default every need in that file.
 | HOLE | no proof — an honest gap | never |
 | BROKEN | a locator resolves to nothing | yes |
 | UNRESOLVED | a source could not be read (sibling absent) | no, excluded from coverage |
+
+## Source fields
+
+| Field | Means |
+|---|---|
+| `kind` | see ladder below |
+| `who` | the person (interview needs one) |
+| `date` | when it was said/written; missing = warned |
+| `quote` | verbatim (interview needs one) |
+| `locator` | ticket/doc ref (artifact needs one); `[sources.*]` adapters check it resolves |
+| `observed_at` | ISO date the evidence was recorded; `capture` stamps it. Newest across sources = the need's evidence age (`status --stale`, `[lint].stale_after_days`) |
 
 ## Ladders
 

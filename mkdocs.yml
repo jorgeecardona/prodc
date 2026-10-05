@@ -29,6 +29,7 @@ nav:
   - Quickstart: quickstart.md
   - Commands: commands.md
   - Model: model.md
+  - Config: config.md
 
 markdown_extensions:
   - admonition

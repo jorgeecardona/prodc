@@ -66,20 +66,4 @@ N-1 is DELIVERED (tagged scenario), N-2 is a HOLE, N-3 is an opinion. Exit 0; a 
 
 The same project is checked in at `examples/quickstart/`.
 
-## Proof adapters
-
-`[proofs.<name>]` in `prodc.toml`; a proof is `<name>:<payload>`.
-
-| kind | payload | DELIVERED when |
-|---|---|---|
-| `gherkin` | `file.feature#Scenario title` or `tag:@X` | results report passes, else a `delivered` tag |
-| `pytest` | `tests/test_x.py::test_y` | junit passes, else the test exists (declared) |
-| `files` | `path/to/script` | file exists (declared) |
-| `accept` | `who@date` | always (a human sign-off, declared) |
-| `prototype` | `ref@who@date` | always (validated with a user, declared) |
-| `coverage` | category | category is in `catalog` |
-| `field` | field name | field is `surfaced` in `schema` |
-
-Add `repo = "../sibling"` to resolve against a sibling checkout; absent sibling → UNRESOLVED, not BROKEN. `results = "report.json"` (cucumber-json) or junit XML turns declared states into real ones.
-
-Source locators: `[sources.<name>] kind = "frontmatter"` checks `file.md#heading` exists.
+Other proof kinds (`pytest`, `files`, `accept`, …) and every `prodc.toml` section: [Config](config.md).
