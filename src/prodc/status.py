@@ -155,17 +155,31 @@ class Resolver:
             declared = declared or cr.declared
         delivered = sum(1 for s in child_states if s is NeedState.DELIVERED)
         total = len(child_states)
-        if any(s is NeedState.BROKEN for s in child_states):
+        # The flow's own between-steps (seam) behaviour, if it declares one (#44).
+        seam_results = [_resolve_proof(p, self._adapters) for p in need.seam]
+        seam_states = [r.state for r in seam_results]
+        seam_green = all(s is ProofState.DELIVERED for s in seam_states)  # vacuously true if none
+        declared = declared or any(
+            r.declared for r in seam_results if r.state is ProofState.DELIVERED
+        )
+        detail = [f"{delivered} of {total} sub-needs delivered"]
+        detail += [
+            f"seam {p} → {r.state.value}{'*' if r.declared else ''} ({r.detail})"
+            for p, r in zip(need.seam, seam_results, strict=True)
+        ]
+        if any(s is NeedState.BROKEN for s in child_states) or ProofState.BROKEN in seam_states:
             state = NeedState.BROKEN
-        elif any(s is NeedState.UNRESOLVED for s in child_states):
+        elif any(s is NeedState.UNRESOLVED for s in child_states) or (
+            ProofState.UNRESOLVED in seam_states
+        ):
             state = NeedState.UNRESOLVED
-        elif total and delivered == total:
+        elif total and delivered == total and seam_green:
+            # a flow is DELIVERED only when every step is AND its seam proof is green
             state = NeedState.DELIVERED
-        elif not child_states or all(s is NeedState.HOLE for s in child_states):
+        elif not child_states or (all(s is NeedState.HOLE for s in child_states) and not need.seam):
             state = NeedState.HOLE
         else:
             state = NeedState.PENDING
-        detail = [f"{delivered} of {total} sub-needs delivered"]
         return NeedResult(need, state, delivered, total, declared, detail, warnings)
 
 

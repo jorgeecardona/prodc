@@ -540,6 +540,8 @@ def _render_show(r: NeedResult) -> str:
         lines.append("  sources: (none — opinion)")
     if need.children:
         lines.append(f"  children: {', '.join(need.children)}")
+    if need.seam:
+        lines.append(f"  seam: {', '.join(need.seam)}")
     if need.proofs:
         lines.append("  proofs:")
         lines += [f"    - {d}" for d in r.detail]
@@ -567,6 +569,7 @@ def _show_json(r: NeedResult) -> str:
             ],
             "proofs": list(need.proofs),
             "children": list(need.children),
+            "seam": list(need.seam),
         }
     )
     return json.dumps(payload, indent=2)

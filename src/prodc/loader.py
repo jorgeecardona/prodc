@@ -154,8 +154,17 @@ def _need(
         _as_str(c, f"{where}.children[{i}]")
         for i, c in enumerate(_as_list(tbl.get("children"), f"{where}.children"))
     )
+    seam = tuple(
+        _as_str(s, f"{where}.seam[{i}]")
+        for i, s in enumerate(_as_list(tbl.get("seam"), f"{where}.seam"))
+    )
     if children and proofs:
-        raise LoaderError(f"{where} ({nid}): a flow (need with children) must not carry proofs")
+        raise LoaderError(
+            f"{where} ({nid}): a flow (need with children) proves its steps via the "
+            "children's proofs and its between-steps behaviour via 'seam', not 'proofs'"
+        )
+    if seam and not children:
+        raise LoaderError(f"{where} ({nid}): 'seam' is for a flow; a leaf need uses 'proofs'")
 
     return Need(
         id=nid,
@@ -165,6 +174,7 @@ def _need(
         sources=sources,
         proofs=proofs,
         children=children,
+        seam=seam,
         label=label,
         client=client,
         variant_of=variant_of,

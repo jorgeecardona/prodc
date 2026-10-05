@@ -99,7 +99,7 @@ def test_flow_with_proofs_raises(tmp_path: Path) -> None:
             """,
         ),
     )
-    with pytest.raises(LoaderError, match="must not carry proofs"):
+    with pytest.raises(LoaderError, match="not 'proofs'"):
         load_needs(cfg)
 
 
@@ -380,3 +380,9 @@ def test_attestation_defaults_human(tmp_path: Path) -> None:
     )
     (need,) = load_needs(cfg)
     assert need.attestation is not None and need.attestation.kind is AttestationKind.HUMAN
+
+
+def test_seam_only_on_flows(tmp_path: Path) -> None:
+    cfg = _config(tmp_path, ("a.yaml", "needs:\n  - id: N-1\n    text: t\n    seam: [web:x#y]\n"))
+    with pytest.raises(LoaderError, match="'seam' is for a flow"):
+        load_needs(cfg)

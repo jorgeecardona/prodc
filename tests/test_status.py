@@ -333,3 +333,31 @@ def test_ai_attestation_is_middle_rung_warning() -> None:
     by_id = {r.need.id: r for r in resolve([ai, human], {"x": _delivered()})}
     assert any("(AI) — not a human" in w for w in by_id["N-1"].warnings)
     assert not any("#13" in w for w in by_id["N-2"].warnings)  # human review: no warning
+
+
+def test_flow_seam_proof_gates_delivered() -> None:
+    # all children delivered but the seam proof pending → flow is PENDING, not DELIVERED (#44)
+    from prodc.adapters import Adapter
+
+    flow = Need(id="F-1", text="roast day", children=("L-1", "L-2"), seam=("web:seam#E2E",))
+    children = [Need(id="L-1", text="a", proofs=("x:1",)), Need(id="L-2", text="b", proofs=("x:1",))]
+    adapters: dict[str, Adapter] = {
+        "x": _delivered(),
+        "web": StubAdapter(ProofResult(ProofState.PENDING, False, "not green")),
+    }
+    by_id = {r.need.id: r for r in resolve([flow, *children], adapters)}
+    assert by_id["F-1"].state is NeedState.PENDING  # seam not green holds the flow back
+
+
+def test_flow_seam_green_delivers() -> None:
+    flow = Need(id="F-1", text="roast day", children=("L-1",), seam=("web:seam#E2E",))
+    child = Need(id="L-1", text="a", proofs=("x:1",))
+    by_id = {r.need.id: r for r in resolve([flow, child], {"x": _delivered(), "web": _delivered()})}
+    assert by_id["F-1"].state is NeedState.DELIVERED
+
+
+def test_flow_seam_broken_breaks_flow() -> None:
+    flow = Need(id="F-1", text="roast day", children=("L-1",), seam=("nope:x",))
+    child = Need(id="L-1", text="a", proofs=("x:1",))
+    by_id = {r.need.id: r for r in resolve([flow, child], {"x": _delivered()})}
+    assert by_id["F-1"].state is NeedState.BROKEN  # no 'nope' adapter → seam BROKEN
