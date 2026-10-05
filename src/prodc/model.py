@@ -146,6 +146,34 @@ class Need:
         return next((k for k in order if k in kinds), None)
 
 
+class ArgKind(StrEnum):
+    """A node type in the assurance argument (GSN: Goal Structuring Notation)."""
+
+    CLAIM = "claim"  # GSN Goal: a proposition being argued (kept distinct from a prodc Goal)
+    STRATEGY = "strategy"  # GSN Strategy: how a claim is broken into sub-claims
+    EVIDENCE = "evidence"  # GSN Solution: what discharges a claim (often cites a proof)
+    CONTEXT = "context"  # GSN Context: the frame a claim is stated in
+    ASSUMPTION = "assumption"  # GSN Assumption: taken true without evidence
+    JUSTIFICATION = "justification"  # GSN Justification: why a strategy/claim is acceptable
+
+
+@dataclass(frozen=True)
+class ArgNode:
+    """One node of the argument graph (#28). Cites prodc nouns by id; never duplicates them.
+
+    ``supported_by`` are the ids of nodes that discharge this one (GSN SupportedBy, downward);
+    ``in_context_of`` are context/assumption/justification nodes attached to it (GSN InContextOf).
+    ``about`` points at a need id, goal id, or proof locator the node is grounded in.
+    """
+
+    id: str
+    kind: ArgKind
+    text: str
+    supported_by: tuple[str, ...] = ()
+    in_context_of: tuple[str, ...] = ()
+    about: str | None = None
+
+
 @dataclass(frozen=True)
 class Model:
     """Everything loaded from the prodc files: the nouns and their cross-references.
@@ -158,6 +186,7 @@ class Model:
     needs: tuple[Need, ...] = ()
     goals: tuple[Goal, ...] = ()
     releases: tuple[Release, ...] = ()  # in declared order = ship sequence
+    argument: tuple[ArgNode, ...] = ()  # the GSN assurance graph (#28)
 
 
 # A leading verb that usually signals a solution-in-disguise, not a need (Torres, Ch. 6).

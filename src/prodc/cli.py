@@ -23,6 +23,7 @@ from .status import (
     Recurrence,
     Summary,
     applicable_needs,
+    argument_defects,
     goal_report,
     orphans,
     rank,
@@ -560,6 +561,52 @@ def _cmd_plan(args: argparse.Namespace) -> int:
     return 0
 
 
+def _render_argument(model: Model, defects: list[str]) -> str:
+    out = [f"argument — GSN graph: {len(model.argument)} node(s), {len(defects)} defect(s)"]
+    for node in model.argument:
+        links = ""
+        if node.supported_by:
+            links += f"  ←{','.join(node.supported_by)}"
+        if node.in_context_of:
+            links += f"  ⊙{','.join(node.in_context_of)}"
+        about = f"  [{node.about}]" if node.about else ""
+        out.append(f"  {node.id:<12} {node.kind.value:<13} {node.text[:44]}{about}{links}")
+    for d in defects:
+        out.append(f"  ⚠ {d}")
+    return "\n".join(out)
+
+
+def _argument_json(model: Model, defects: list[str]) -> str:
+    return json.dumps(
+        {
+            "nodes": [
+                {
+                    "id": n.id,
+                    "kind": n.kind.value,
+                    "text": n.text,
+                    "supported_by": list(n.supported_by),
+                    "in_context_of": list(n.in_context_of),
+                    "about": n.about,
+                }
+                for n in model.argument
+            ],
+            "defects": defects,
+        },
+        indent=2,
+    )
+
+
+def _cmd_argument(args: argparse.Namespace) -> int:
+    """Show the GSN assurance graph and its defects (unsupported claim, dangling assumption)."""
+    loaded = _load_or_report(args)
+    if loaded is None:
+        return 2
+    _cfg, model = loaded
+    defects = argument_defects(list(model.argument))
+    print(_argument_json(model, defects) if args.json else _render_argument(model, defects))
+    return 1 if (args.strict and defects) else 0
+
+
 @dataclass(frozen=True)
 class _RepoRow:
     """One repo's line in the portfolio roll-up."""
@@ -728,6 +775,12 @@ def main(argv: list[str] | None = None) -> int:
     pl.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     pl.add_argument("--json", action="store_true", help="machine-readable output")
     pl.set_defaults(func=_cmd_plan)
+
+    ar = sub.add_parser("argument", help="show the GSN assurance graph and its defects")
+    ar.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    ar.add_argument("--json", action="store_true", help="machine-readable output")
+    ar.add_argument("--strict", action="store_true", help="exit 1 if the graph has any defect")
+    ar.set_defaults(func=_cmd_argument)
 
     pf = sub.add_parser("portfolio", help="roll up many repos into one scoreboard")
     pf.add_argument("configs", nargs="+", metavar="PRODC_TOML", help="one or more prodc.toml paths")

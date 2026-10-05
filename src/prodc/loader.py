@@ -16,7 +16,17 @@ from typing import cast
 import yaml
 
 from .config import Config
-from .model import Attestation, Goal, Model, Need, Release, Source, SourceKind
+from .model import (
+    ArgKind,
+    ArgNode,
+    Attestation,
+    Goal,
+    Model,
+    Need,
+    Release,
+    Source,
+    SourceKind,
+)
 
 
 class LoaderError(Exception):
@@ -169,6 +179,30 @@ def _release(raw: object, where: str) -> Release:
     )
 
 
+def _arg_node(raw: object, where: str) -> ArgNode:
+    tbl = _as_mapping(raw, where)
+    kind_name = _as_str(tbl.get("kind"), f"{where}.kind")
+    try:
+        kind = ArgKind(kind_name)
+    except ValueError:
+        kinds = "|".join(k.value for k in ArgKind)
+        raise LoaderError(f"{where}.kind: unknown kind {kind_name!r} ({kinds})") from None
+    return ArgNode(
+        id=_as_str(tbl.get("id"), f"{where}.id"),
+        kind=kind,
+        text=_as_str(tbl.get("text"), f"{where}.text"),
+        supported_by=tuple(
+            _as_str(x, f"{where}.supported_by[{i}]")
+            for i, x in enumerate(_as_list(tbl.get("supported_by"), f"{where}.supported_by"))
+        ),
+        in_context_of=tuple(
+            _as_str(x, f"{where}.in_context_of[{i}]")
+            for i, x in enumerate(_as_list(tbl.get("in_context_of"), f"{where}.in_context_of"))
+        ),
+        about=_opt_str(tbl.get("about"), f"{where}.about"),
+    )
+
+
 @dataclass
 class _Loaded:
     """One file's nouns, accumulated across the glob into the final :class:`Model`."""
@@ -176,6 +210,7 @@ class _Loaded:
     needs: list[Need] = field(default_factory=list[Need])
     goals: list[Goal] = field(default_factory=list[Goal])
     releases: list[Release] = field(default_factory=list[Release])
+    argument: list[ArgNode] = field(default_factory=list[ArgNode])
 
 
 def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
@@ -211,6 +246,10 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
         release = _release(raw, f"{where}.releases[{i}]")
         _unique("release", release.id)
         out.releases.append(release)
+    for i, raw in enumerate(_as_list(tbl.get("argument"), f"{where}.argument")):
+        node = _arg_node(raw, f"{where}.argument[{i}]")
+        _unique("argument node", node.id)
+        out.argument.append(node)
     return out
 
 
@@ -223,19 +262,26 @@ def load(config: Config) -> Model:
     unknown.
     """
     acc = _Loaded()
-    seen: dict[str, dict[str, Path]] = {"need": {}, "goal": {}, "release": {}}
+    seen: dict[str, dict[str, Path]] = {
+        "need": {}, "goal": {}, "release": {}, "argument node": {}
+    }
     for pattern in config.need_globs:
         for path in sorted(config.root.glob(pattern)):
             f = _load_file(path, seen)
             acc.needs.extend(f.needs)
             acc.goals.extend(f.goals)
             acc.releases.extend(f.releases)
+            acc.argument.extend(f.argument)
     _check_variants(acc.needs)
     _check_children(acc.needs)
     _check_ref(acc.needs, "goal", lambda n: n.goal, {g.id for g in acc.goals})
     _check_ref(acc.needs, "release", lambda n: n.release, {r.id for r in acc.releases})
+    _check_argument(acc.argument)
     return Model(
-        needs=tuple(acc.needs), goals=tuple(acc.goals), releases=tuple(acc.releases)
+        needs=tuple(acc.needs),
+        goals=tuple(acc.goals),
+        releases=tuple(acc.releases),
+        argument=tuple(acc.argument),
     )
 
 
@@ -252,6 +298,22 @@ def _check_ref(
         ref = pick(need)
         if ref is not None and ref not in known:
             raise LoaderError(f"need {need.id!r}: {role} {ref!r} is not a known {role} id")
+
+
+def _check_argument(argument: list[ArgNode]) -> None:
+    """Every ``supported_by``/``in_context_of`` link must name a known argument node.
+
+    Only the intra-graph links are hard errors here; ``about`` may cite a proof locator that
+    is not declared in these files, so it is left to resolve at status time. Soft defects (an
+    unsupported claim, a dangling assumption) are reported by :func:`~prodc.status.argument_defects`.
+    """
+    known = {n.id for n in argument}
+    for node in argument:
+        for ref in (*node.supported_by, *node.in_context_of):
+            if ref not in known:
+                raise LoaderError(
+                    f"argument node {node.id!r}: link {ref!r} is not a known argument node id"
+                )
 
 
 def _check_children(needs: list[Need]) -> None:
