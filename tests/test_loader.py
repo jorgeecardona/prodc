@@ -195,7 +195,7 @@ def test_claim_and_attestation_parsed(tmp_path: Path) -> None:
               - id: A-1
                 text: push to prod with no manual steps
                 claim: a push event triggers an automatic build and deploy
-                attested:
+                attestation:
                   who: Jorge
                   date: 2026-02-01
             """,
@@ -210,7 +210,7 @@ def test_claim_and_attestation_parsed(tmp_path: Path) -> None:
 def test_attestation_requires_who_and_date(tmp_path: Path) -> None:
     cfg = _config(
         tmp_path,
-        ("a.yaml", "needs:\n  - id: A-1\n    text: t\n    attested:\n      who: Jorge\n"),
+        ("a.yaml", "needs:\n  - id: A-1\n    text: t\n    attestation:\n      who: Jorge\n"),
     )
     with pytest.raises(LoaderError, match="needs both 'who' and 'date'"):
         load_needs(cfg)

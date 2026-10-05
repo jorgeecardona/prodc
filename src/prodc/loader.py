@@ -124,7 +124,7 @@ def _need(
     variant_of = _opt_str(tbl.get("variant_of"), f"{where}.variant_of")
     importance = _opt_importance(tbl.get("importance"), f"{where}.importance")
     claim = _opt_str(tbl.get("claim"), f"{where}.claim")
-    attestation = _attestation(tbl.get("attested"), f"{where}.attested")
+    attestation = _attestation(tbl.get("attestation"), f"{where}.attestation")
     goal = _opt_str(tbl.get("goal"), f"{where}.goal")
     release = _opt_str(tbl.get("release"), f"{where}.release")
 

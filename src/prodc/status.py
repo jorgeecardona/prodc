@@ -256,6 +256,16 @@ _STATE_RANK = {
 }
 
 
+def state_priority(r: NeedResult) -> int:
+    """Attention order for a need: must-HOLE first, then BROKEN … DELIVERED last.
+
+    The single source of truth for both the board sort and the backlog rank.
+    """
+    if r.need.must and r.state is NeedState.HOLE:
+        return 0
+    return _STATE_RANK[r.state]
+
+
 def _rank_key(r: NeedResult) -> tuple[int, int, int, str]:
     """Pure ordering over recorded inputs only — never a conjured score (#34).
 
@@ -265,7 +275,7 @@ def _rank_key(r: NeedResult) -> tuple[int, int, int, str]:
     3. `importance`: the author's optional ordinal, higher first; absent falls to the back
        of its tier, so it only refines (1)+(2) and never invents priority where none was set.
     """
-    state_rank = 0 if (r.need.must and r.state is NeedState.HOLE) else _STATE_RANK[r.state]
+    state_rank = state_priority(r)
     kind = r.need.strongest_kind
     kind_rank = list(SourceKind).index(kind) if kind is not None else len(SourceKind)
     importance_rank = -(r.need.importance or 0)

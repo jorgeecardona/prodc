@@ -1,6 +1,6 @@
 [project]
 name = "prodc"
-version = "0.3.19"
+version = "0.3.20"
 description = "Product management as code: personas, flows, and features traced to evidence."
 readme = "README.md"
 requires-python = ">=3.12"

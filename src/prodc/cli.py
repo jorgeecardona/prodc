@@ -30,6 +30,7 @@ from .status import (
     recurrence,
     release_report,
     resolve,
+    state_priority,
     summarize,
 )
 
@@ -42,35 +43,11 @@ _LABEL = {
 }
 
 
-def _priority(r: NeedResult) -> int:
-    if r.need.must and r.state is NeedState.HOLE:
-        return 0
-    return {
-        NeedState.BROKEN: 1,
-        NeedState.PENDING: 2,
-        NeedState.UNRESOLVED: 3,
-        NeedState.HOLE: 4,
-        NeedState.DELIVERED: 5,
-    }[r.state]
-
-
-# Warrant strength, strongest first: interview > artifact > proxy > internal (Torres).
-# proxy = the author is a plausible user guessing as that user — weaker than a document,
-# stronger than a bare internal assertion.
-_WARRANT_ORDER = (
-    SourceKind.INTERVIEW,
-    SourceKind.ARTIFACT,
-    SourceKind.PROXY,
-    SourceKind.INTERNAL,
-)
-
-
 def _warrant(need: Need) -> str:
     """The warrant column: the strongest source kind, or 'opinion' when unsourced."""
-    if need.is_opinion:
+    strongest = need.strongest_kind  # the one source-strength ranking lives on the model
+    if strongest is None:
         return "opinion"
-    kinds = {s.kind for s in need.sources}
-    strongest = next(k for k in _WARRANT_ORDER if k in kinds)
     if strongest is SourceKind.INTERVIEW:
         who = next((s.who for s in need.sources if s.kind is SourceKind.INTERVIEW and s.who), None)
         return f"interview:{who}" if who else "interview"
@@ -132,7 +109,7 @@ def _render(results: list[NeedResult]) -> str:
         "GROUNDS = test proof  ·  WARRANT = evidence source"
     )
     for who in sorted(groups):
-        rs = sorted(groups[who], key=_priority)
+        rs = sorted(groups[who], key=state_priority)
         label = next((x.need.label for x in rs if x.need.label), None)
         counts = {s: sum(1 for r in rs if r.state is s) for s in NeedState}
         head = "  ·  ".join(f"{counts[s]} {_LABEL[s]}" for s in NeedState if counts[s])
