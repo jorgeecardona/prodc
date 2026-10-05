@@ -214,3 +214,48 @@ def test_attestation_requires_who_and_date(tmp_path: Path) -> None:
     )
     with pytest.raises(LoaderError, match="needs both 'who' and 'date'"):
         load_needs(cfg)
+
+
+def test_goals_loaded_and_need_traces_up(tmp_path: Path) -> None:
+    from prodc.loader import load
+
+    cfg = _config(
+        tmp_path,
+        (
+            "goals.yaml",
+            "goals:\n  - id: G-1\n    text: reduce churn\n    metric: churn < 5%\n",
+        ),
+        (
+            "needs.yaml",
+            "needs:\n  - id: N-1\n    text: the owner can cancel in one step\n    goal: G-1\n",
+        ),
+    )
+    model = load(cfg)
+    assert [g.id for g in model.goals] == ["G-1"]
+    assert model.goals[0].metric == "churn < 5%"
+    assert model.needs[0].goal == "G-1"
+
+
+def test_need_goal_unknown_raises(tmp_path: Path) -> None:
+    cfg = _config(tmp_path, ("a.yaml", "needs:\n  - id: N-1\n    text: t\n    goal: NOPE\n"))
+    with pytest.raises(LoaderError, match="goal 'NOPE' is not a known goal id"):
+        load_needs(cfg)
+
+
+def test_unknown_child_raises(tmp_path: Path) -> None:
+    cfg = _config(
+        tmp_path,
+        ("a.yaml", "needs:\n  - id: F-1\n    text: a flow\n    children: [C-404]\n"),
+    )
+    with pytest.raises(LoaderError, match="child 'C-404' is not a known need id"):
+        load_needs(cfg)
+
+
+def test_duplicate_goal_id_raises(tmp_path: Path) -> None:
+    cfg = _config(
+        tmp_path,
+        ("a.yaml", "goals:\n  - id: G-1\n    text: a\n"),
+        ("b.yaml", "goals:\n  - id: G-1\n    text: b\n"),
+    )
+    with pytest.raises(LoaderError, match="duplicate goal id 'G-1'"):
+        load_needs(cfg)

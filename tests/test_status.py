@@ -185,3 +185,20 @@ def test_ears_does_not_double_flag_solution_verb() -> None:
     (r,) = resolve([Need(id="S-1", text="implement a dashboard")], {})
     assert any("solution in disguise" in w for w in r.warnings)
     assert not any("no observable outcome" in w for w in r.warnings)
+
+
+def test_goal_report_rolls_up_and_flags_ungoaled() -> None:
+    from prodc.model import Goal
+    from prodc.status import goal_report
+
+    goals = [Goal(id="G-1", text="reduce churn")]
+    needs = [
+        Need(id="N-1", text="delivered toward G-1", proofs=("x:1",), goal="G-1"),
+        Need(id="N-2", text="hole toward G-1", goal="G-1"),
+        Need(id="N-3", text="serves no goal"),
+    ]
+    results = resolve(needs, {"x": _delivered()})
+    coverage, ungoaled = goal_report(results, goals)
+    (goal, gsum) = coverage[0]
+    assert goal.id == "G-1" and gsum.total == 2 and gsum.delivered == 1
+    assert [r.need.id for r in ungoaled] == ["N-3"]

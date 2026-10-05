@@ -44,7 +44,7 @@ def _as_str_list(value: object, where: str) -> list[str]:
 @dataclass
 class Config:
     root: Path
-    need_globs: list[str]
+    need_globs: list[str]  # the prodc files; each may carry any noun list (needs:, goals:, …)
     adapters: dict[str, Adapter] = field(default_factory=dict[str, Adapter])
     source_adapters: dict[str, SourceAdapter] = field(default_factory=dict[str, SourceAdapter])
 

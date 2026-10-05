@@ -17,12 +17,13 @@ from typing import cast
 
 from . import __version__
 from .config import Config, ConfigError
-from .loader import LoaderError, load_needs
-from .model import Need, NeedResult, NeedState, SourceKind, ears_shape
+from .loader import LoaderError, load
+from .model import Goal, Model, Need, NeedResult, NeedState, SourceKind, ears_shape
 from .status import (
     Recurrence,
     Summary,
     applicable_needs,
+    goal_report,
     orphans,
     rank,
     recurrence,
@@ -159,6 +160,19 @@ def _render_orphans(orphan_map: dict[str, list[str]]) -> str:
     return "\n".join(out)
 
 
+def _render_goals(goal_cov: list[tuple[Goal, Summary]], ungoaled: list[NeedResult]) -> str:
+    """Per-goal coverage, plus the needs that serve no objective (#27)."""
+    out = ["\ngoals (objectives needs trace up to):"]
+    for goal, gsum in goal_cov:
+        metric = f"  [{goal.metric}]" if goal.metric else ""
+        pct = round(gsum.coverage * 100)
+        out.append(f"  {goal.id:<12} {gsum.delivered}/{gsum.total} ({pct}%){metric}  {goal.text}")
+    if ungoaled:
+        ids = ", ".join(r.need.id for r in ungoaled)
+        out.append(f"  ⚠ {len(ungoaled)} need(s) serve no goal: {ids}")
+    return "\n".join(out)
+
+
 def _render_recurrence(recs: list[Recurrence]) -> str:
     """Baselines shared across clients, most-shared first — the #32 recurrence view."""
     out = [f"\nrecurrence (needs shared across clients): {len(recs)}"]
@@ -171,25 +185,63 @@ def _render_recurrence(recs: list[Recurrence]) -> str:
     return "\n".join(out)
 
 
+def _summary_payload(summary: Summary, orphan_map: dict[str, list[str]]) -> dict[str, object]:
+    return {
+        "total": summary.total,
+        "delivered": summary.delivered,
+        "pending": summary.pending,
+        "hole": summary.hole,
+        "must_hole": summary.must_hole,
+        "broken": summary.broken,
+        "unresolved": summary.unresolved,
+        "opinion": summary.opinion,
+        "coverage": round(summary.coverage, 4),
+        "orphans": sum(len(v) for v in orphan_map.values()),
+    }
+
+
+def _need_payload(r: NeedResult) -> dict[str, object]:
+    """One need's common fields — shared by the board and `show` so the two never drift."""
+    need = r.need
+    return {
+        "id": need.id,
+        "who": need.who,
+        "text": need.text,
+        "must": need.must,
+        "state": r.state.value,
+        "grounds": r.state.value,
+        "warrant": _warrant(need),
+        "shape": ears_shape(need.text).value,
+        "client": need.client,
+        "variant_of": need.variant_of,
+        "goal": need.goal,
+        "importance": need.importance,
+        "claim": need.claim,
+        "attested": (
+            {"who": need.attestation.who, "date": need.attestation.date}
+            if need.attestation
+            else None
+        ),
+        "delivered": r.delivered,
+        "total": r.total,
+        "declared": r.declared,
+        "opinion": need.is_opinion,
+        "only_internal": need.only_internal,
+        "detail": r.detail,
+        "warnings": r.warnings,
+    }
+
+
 def _to_json(
     results: list[NeedResult],
     summary: Summary,
     orphan_map: dict[str, list[str]],
     recs: list[Recurrence],
+    goal_cov: list[tuple[Goal, Summary]],
+    ungoaled: list[NeedResult],
 ) -> str:
     payload = {
-        "summary": {
-            "total": summary.total,
-            "delivered": summary.delivered,
-            "pending": summary.pending,
-            "hole": summary.hole,
-            "must_hole": summary.must_hole,
-            "broken": summary.broken,
-            "unresolved": summary.unresolved,
-            "opinion": summary.opinion,
-            "coverage": round(summary.coverage, 4),
-            "orphans": sum(len(v) for v in orphan_map.values()),
-        },
+        "summary": _summary_payload(summary, orphan_map),
         "orphans": orphan_map,
         "recurrence": [
             {
@@ -200,40 +252,32 @@ def _to_json(
             }
             for rec in recs
         ],
-        "needs": [
+        "goals": [
             {
-                "id": r.need.id,
-                "who": r.need.who,
-                "text": r.need.text,
-                "must": r.need.must,
-                "state": r.state.value,
-                "grounds": r.state.value,
-                "warrant": _warrant(r.need),
-                "client": r.need.client,
-                "variant_of": r.need.variant_of,
-                "delivered": r.delivered,
-                "total": r.total,
-                "declared": r.declared,
-                "opinion": r.need.is_opinion,
-                "only_internal": r.need.only_internal,
-                "detail": r.detail,
-                "warnings": r.warnings,
+                "id": goal.id,
+                "text": goal.text,
+                "metric": goal.metric,
+                "coverage": round(gsum.coverage, 4),
+                "delivered": gsum.delivered,
+                "total": gsum.total,
             }
-            for r in results
+            for goal, gsum in goal_cov
         ],
+        "ungoaled": [r.need.id for r in ungoaled],
+        "needs": [_need_payload(r) for r in results],
     }
     return json.dumps(payload, indent=2)
 
 
-def _load_or_report(args: argparse.Namespace) -> tuple[Config, list[Need]] | None:
-    """Load config + needs, or print the error to stderr and return None."""
+def _load_or_report(args: argparse.Namespace) -> tuple[Config, Model] | None:
+    """Load config + the whole model, or print the error to stderr and return None."""
     cfg_path = Path(args.config)
     if not cfg_path.exists():
         print(f"prodc: no config at {cfg_path}", file=sys.stderr)
         return None
     try:
         cfg = Config.load(cfg_path)
-        return cfg, load_needs(cfg)
+        return cfg, load(cfg)
     except (ConfigError, LoaderError) as exc:
         print(f"prodc: {exc}", file=sys.stderr)
         return None
@@ -243,19 +287,23 @@ def _cmd_status(args: argparse.Namespace) -> int:
     loaded = _load_or_report(args)
     if loaded is None:
         return 2
-    cfg, needs = loaded
+    cfg, model = loaded
+    needs = list(model.needs)
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
     summary = summarize(results)
     orphan_map = orphans(needs, cfg.adapters)
     recs = recurrence(needs)
+    goal_cov, ungoaled = goal_report(results, list(model.goals))
 
     if args.json:
-        print(_to_json(results, summary, orphan_map, recs))
+        print(_to_json(results, summary, orphan_map, recs, goal_cov, ungoaled))
     else:
         commit = _git_rev(cfg.root)
         print(f"prodc status — {cfg.root.name}{f' @ {commit}' if commit else ''}")
         print(_summary_line(summary))
         print(_render(results))
+        if model.goals:
+            print(_render_goals(goal_cov, ungoaled))
         if recs:
             print(_render_recurrence(recs))
         if orphan_map:
@@ -296,6 +344,8 @@ def _render_show(r: NeedResult) -> str:
         f"  grounds: {_LABEL[r.state]}{nm}    warrant: {_warrant(need)}",
         f"  shape: {ears_shape(need.text).value}",
     ]
+    if need.goal:
+        lines.append(f"  goal: {need.goal}")
     if need.claim:
         lines.append(f"  claim: {need.claim}")
     if need.attestation:
@@ -325,28 +375,10 @@ def _render_show(r: NeedResult) -> str:
 
 def _show_json(r: NeedResult) -> str:
     need = r.need
-    return json.dumps(
+    payload = _need_payload(r)  # the shared core — never drifts from the board
+    payload.update(
         {
-            "id": need.id,
-            "text": need.text,
-            "who": need.who,
             "label": need.label,
-            "must": need.must,
-            "state": r.state.value,
-            "grounds": r.state.value,
-            "warrant": _warrant(need),
-            "shape": ears_shape(need.text).value,
-            "delivered": r.delivered,
-            "total": r.total,
-            "declared": r.declared,
-            "opinion": need.is_opinion,
-            "only_internal": need.only_internal,
-            "claim": need.claim,
-            "attested": (
-                {"who": need.attestation.who, "date": need.attestation.date}
-                if need.attestation
-                else None
-            ),
             "sources": [
                 {"kind": s.kind.value, "who": s.who, "date": s.date,
                  "quote": s.quote, "locator": s.locator}
@@ -354,18 +386,17 @@ def _show_json(r: NeedResult) -> str:
             ],
             "proofs": list(need.proofs),
             "children": list(need.children),
-            "detail": r.detail,
-            "warnings": r.warnings,
-        },
-        indent=2,
+        }
     )
+    return json.dumps(payload, indent=2)
 
 
 def _cmd_show(args: argparse.Namespace) -> int:
     loaded = _load_or_report(args)
     if loaded is None:
         return 2
-    cfg, needs = loaded
+    cfg, model = loaded
+    needs = list(model.needs)
     by_id = {r.need.id: r for r in resolve(needs, cfg.adapters, cfg.source_adapters)}
     r = by_id.get(args.need_id)
     if r is None:
@@ -424,7 +455,8 @@ def _cmd_brief(args: argparse.Namespace) -> int:
     loaded = _load_or_report(args)
     if loaded is None:
         return 2
-    cfg, needs = loaded
+    cfg, model = loaded
+    needs = list(model.needs)
     if not any(n.client == args.client for n in needs):
         # shared baselines apply to everyone, so an unknown client would otherwise
         # silently return a baselines-only brief — guard the likely typo instead.
@@ -493,7 +525,8 @@ def _cmd_plan(args: argparse.Namespace) -> int:
     loaded = _load_or_report(args)
     if loaded is None:
         return 2
-    cfg, needs = loaded
+    cfg, model = loaded
+    needs = list(model.needs)
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
     print(_plan_json(results) if args.json else _render_plan(results))
     return 0
@@ -518,7 +551,7 @@ def _repo_row(config_path: str) -> _RepoRow:
     name = p.parent.name or str(p)
     try:
         cfg = Config.load(p)
-        needs = load_needs(cfg)
+        needs = list(load(cfg).needs)
     except (ConfigError, LoaderError, OSError) as exc:
         return _RepoRow(name, 0, 0, 0, 0, 0.0, {}, error=str(exc))
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
@@ -564,7 +597,8 @@ def _cmd_diff(args: argparse.Namespace) -> int:
     loaded = _load_or_report(args)
     if loaded is None:
         return 2
-    cfg, needs = loaded
+    cfg, model = loaded
+    needs = list(model.needs)
     current = {r.need.id: r.state.value for r in resolve(needs, cfg.adapters, cfg.source_adapters)}
 
     snap = Path(args.snapshot)

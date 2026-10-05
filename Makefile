@@ -1,4 +1,8 @@
-# prodc -- task runner. uv is the only tool needed (the package itself is zero-dep).
+# prodc -- human task verbs. These are thin aliases: the CI-graded tasks
+# (lint/typecheck/test/docs/build) delegate to the matching moon task, so the
+# command + its inputs/outputs live in ONE place (moon.yml) and `make` runs
+# exactly what CI runs, with moon's caching. Only the verbs moon has no task for
+# (format = write, bump, install-hooks) run a command directly here.
 # One-time setup after cloning:  make install-hooks
 .DEFAULT_GOAL := help
 .PHONY: help install-hooks format lint typecheck test check bump docs build
@@ -16,22 +20,22 @@ format: ## auto-format + autofix lint (ruff)
 	uv run ruff format src tests examples
 	uv run ruff check --fix src tests examples
 
-lint: ## lint (ruff) -- same as CI
-	uv run ruff check src tests examples
+lint: ## lint (ruff) -- the CI :lint task
+	moon run :lint
 
-typecheck: ## type-check (pyright) -- same as CI
-	uv run pyright
+typecheck: ## type-check (pyright) -- the CI :typecheck task
+	moon run :typecheck
 
-test: ## run the test suite
-	uv run pytest -q
+test: ## run the test suite -- the CI :test task
+	moon run :test
 
 check: lint typecheck test ## the full CI test stage: lint + typecheck + test
 
 bump: ## bump version in pyproject.toml -- TYPE=patch|minor|major (default patch)
 	./scripts/bump-version $(or $(TYPE),patch)
 
-docs: ## build docs strictly (as CI / Read the Docs do)
-	uv run --extra docs mkdocs build --strict
+docs: ## build docs strictly (as CI / Read the Docs do) -- the CI :docs task
+	moon run :docs
 
-build: ## build sdist + wheel into dist/
-	uv build --out-dir dist
+build: ## build sdist + wheel into dist/ -- the CI :build task
+	moon run :build

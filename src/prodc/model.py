@@ -65,6 +65,19 @@ class Source:
 
 
 @dataclass(frozen=True)
+class Goal:
+    """A measurable objective that needs trace up to (Impact Mapping: Goal → … → Deliverable).
+
+    A need with no ``goal`` is flagged the way an unsourced need is flagged an opinion — it
+    lets the board answer "are we moving the objective", not only "is this need delivered".
+    """
+
+    id: str
+    text: str
+    metric: str | None = None  # how the objective is measured, e.g. "churn < 5%"
+
+
+@dataclass(frozen=True)
 class Attestation:
     """A human's sign-off that a need's proofs actually establish its claim (#13).
 
@@ -94,6 +107,7 @@ class Need:
     importance: int | None = None  # author-supplied ordinal (higher = more); refines ranking
     claim: str | None = None  # what delivering this need would establish — the warrant to review
     attestation: Attestation | None = None  # human sign-off that the proofs establish the claim
+    goal: str | None = None  # id of the Goal this need serves; None = no objective (flagged)
 
     @property
     def is_variant(self) -> bool:
@@ -116,6 +130,19 @@ class Need:
         order = list(SourceKind)  # declaration order is strongest-first
         kinds = {s.kind for s in self.sources}
         return next((k for k in order if k in kinds), None)
+
+
+@dataclass(frozen=True)
+class Model:
+    """Everything loaded from the prodc files: the nouns and their cross-references.
+
+    One aggregate so new nouns compose here instead of each inventing its own loader and
+    config key. Needs and goals share this file set; references between them are string ids
+    validated at load time.
+    """
+
+    needs: tuple[Need, ...] = ()
+    goals: tuple[Goal, ...] = ()
 
 
 # A leading verb that usually signals a solution-in-disguise, not a need (Torres, Ch. 6).

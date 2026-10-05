@@ -288,3 +288,42 @@ def test_plan_ranks_must_hole_first(tmp_path: Path, capsys: pytest.CaptureFixtur
     assert code == 0
     assert payload["plan"][0]["id"] == "H-1"  # the must-HOLE ranks first
     assert payload["plan"][-1]["id"] == "D-1"  # the delivered need ranks last
+
+
+_GOAL_TOML = """
+[prodc]
+needs = ["needs/*.yaml"]
+"""
+
+_GOAL_FILES = """
+goals:
+  - id: G-1
+    text: reduce churn
+    metric: churn < 5%
+needs:
+  - id: N-1
+    text: the owner can cancel in one step
+    goal: G-1
+  - id: N-2
+    text: a need with no objective
+"""
+
+
+def test_status_shows_goals_section(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    import json
+
+    (tmp_path / "needs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "prodc.toml").write_text(_GOAL_TOML, encoding="utf-8")
+    (tmp_path / "needs" / "g.yaml").write_text(_GOAL_FILES, encoding="utf-8")
+    p = str(tmp_path / "prodc.toml")
+
+    code = main(["status", "--config", p])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "goals (objectives" in out and "G-1" in out and "serve no goal" in out
+
+    assert main(["status", "--config", p, "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["goals"][0]["id"] == "G-1" and payload["ungoaled"] == ["N-2"]
+    n1 = next(n for n in payload["needs"] if n["id"] == "N-1")
+    assert n1["goal"] == "G-1"  # goal now in the board JSON (was drifting before)

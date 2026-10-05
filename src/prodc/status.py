@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from .adapters import Adapter, Enumerable, ProofResult, SourceAdapter
 from .model import (
     SOLUTION_VERBS,
+    Goal,
     Need,
     NeedResult,
     NeedState,
@@ -271,6 +272,26 @@ def _rank_key(r: NeedResult) -> tuple[int, int, int, str]:
 def rank(results: list[NeedResult]) -> list[NeedResult]:
     """Order a resolved board into a backlog by :func:`_rank_key`."""
     return sorted(results, key=_rank_key)
+
+
+def goal_report(
+    results: list[NeedResult], goals: list[Goal]
+) -> tuple[list[tuple[Goal, Summary]], list[NeedResult]]:
+    """Roll results up per goal, and list the needs that serve no goal.
+
+    Per-goal coverage is just :func:`summarize` over the needs that cite that goal — the
+    same summary the whole board uses. The ungoaled list is the flag symmetric to opinion:
+    a need with no objective above it.
+    """
+    by_goal: dict[str, list[NeedResult]] = {g.id: [] for g in goals}
+    ungoaled: list[NeedResult] = []
+    for r in results:
+        if r.need.goal is None:
+            ungoaled.append(r)
+        elif r.need.goal in by_goal:
+            by_goal[r.need.goal].append(r)
+    coverage = [(g, summarize(by_goal[g.id])) for g in goals]
+    return coverage, ungoaled
 
 
 def applicable_needs(needs: list[Need], client: str) -> list[Need]:
