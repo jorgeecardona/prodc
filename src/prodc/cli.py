@@ -317,6 +317,12 @@ def _cmd_status(args: argparse.Namespace) -> int:
         return 2
     cfg, model = loaded
     needs = list(model.needs)
+    # Scoped coverage (#49): restrict the board + coverage to a subset, so the number people
+    # act on (this client, this goal) isn't diluted by the whole mixed board.
+    if args.client:
+        needs = applicable_needs(needs, args.client)
+    if args.goal:
+        needs = [n for n in needs if n.goal == args.goal]
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
     shared = shared_proof_warnings(results)  # cross-need hygiene (#45), a board-level fact
     for r in results:
@@ -866,6 +872,10 @@ def main(argv: list[str] | None = None) -> int:
     st.add_argument("--json", action="store_true", help="machine-readable output")
     st.add_argument("--strict", action="store_true", help="also exit 1 on opinions")
     st.add_argument("--wide", action="store_true", help="never truncate the need text")
+    st.add_argument("--client", default=None, metavar="ID",
+                    help="scope the board + coverage to one client (its variants + baselines)")
+    st.add_argument("--goal", default=None, metavar="ID",
+                    help="scope the board + coverage to the needs serving one goal")
     st.add_argument(
         "--min-coverage",
         type=float,

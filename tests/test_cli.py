@@ -362,3 +362,21 @@ def test_wide_does_not_truncate_long_need(tmp_path: Path, capsys: pytest.Capture
     p = str(tmp_path / "prodc.toml")
     assert main(["status", "--config", p, "--wide"]) == 0
     assert long in capsys.readouterr().out  # full text present, no ellipsis
+
+
+def test_status_scoped_to_client(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    import json
+    (tmp_path / "needs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "prodc.toml").write_text("[prodc]\nneeds = [\"needs/*.yaml\"]\n", encoding="utf-8")
+    (tmp_path / "needs" / "a.yaml").write_text(
+        "needs:\n"
+        "  - id: B-1\n    text: shared baseline\n"
+        "  - id: A-1\n    text: acme only\n    client: acme\n"
+        "  - id: X-1\n    text: globex only\n    client: globex\n",
+        encoding="utf-8")
+    p = str(tmp_path / "prodc.toml")
+    assert main(["status", "--config", p, "--client", "acme", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    ids = {n["id"] for n in payload["needs"]}
+    assert ids == {"B-1", "A-1"}  # acme's need + the shared baseline; globex excluded
+    assert payload["summary"]["total"] == 2
