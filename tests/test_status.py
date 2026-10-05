@@ -240,3 +240,18 @@ def test_argument_defects_flags_unsupported_and_dangling() -> None:
     assert any("unsupported claim 'C-1'" in d for d in defects)
     assert any("dangling assumption 'A-1'" in d for d in defects)
     assert not any("'C-2'" in d for d in defects)  # C-2 cites evidence, not a defect
+
+
+def test_coverage_counts_leaves_not_flow_parents() -> None:
+    # a flow (parent with children) must not be double-counted in coverage (#43)
+    from prodc.status import summarize
+
+    needs = [
+        Need(id="F-1", text="roast day flow", children=("L-1", "L-2")),
+        Need(id="L-1", text="step one", proofs=("x:1",)),
+        Need(id="L-2", text="step two", proofs=("x:1",)),
+    ]
+    results = resolve(needs, {"x": _delivered()})
+    s = summarize(results)
+    assert s.total == 2 and s.delivered == 2  # the 2 leaves only, not 3 (flow excluded)
+    assert s.coverage == 1.0

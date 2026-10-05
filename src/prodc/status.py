@@ -199,17 +199,23 @@ class Summary:
 
 
 def summarize(results: list[NeedResult]) -> Summary:
-    """Roll a resolved board up into its gap counts."""
-    by_state = {s: sum(1 for r in results if r.state is s) for s in NeedState}
+    """Roll a resolved board up into its gap counts, over LEAF needs only.
+
+    A flow (a need with ``children``) is a roll-up view of its leaves, so counting it in the
+    denominator too would double-count every flow (#43). Coverage is the leaves; a flow's own
+    state is reported separately, never added on top of the children it aggregates.
+    """
+    leaves = [r for r in results if not r.need.children]
+    by_state = {s: sum(1 for r in leaves if r.state is s) for s in NeedState}
     return Summary(
-        total=len(results),
+        total=len(leaves),
         delivered=by_state[NeedState.DELIVERED],
         pending=by_state[NeedState.PENDING],
         hole=by_state[NeedState.HOLE],
-        must_hole=sum(1 for r in results if r.need.must and r.state is NeedState.HOLE),
+        must_hole=sum(1 for r in leaves if r.need.must and r.state is NeedState.HOLE),
         broken=by_state[NeedState.BROKEN],
         unresolved=by_state[NeedState.UNRESOLVED],
-        opinion=sum(1 for r in results if r.need.is_opinion),
+        opinion=sum(1 for r in leaves if r.need.is_opinion),
     )
 
 
