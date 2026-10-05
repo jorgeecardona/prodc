@@ -107,45 +107,62 @@ def _clip(text: str, width: int) -> str:
     return cut.rstrip() + "…"
 
 
+def _grounds_cell(r: NeedResult) -> str:
+    """The GROUNDS column as one aligned token: state, a `*` if declared, and n/n if proofs."""
+    star = "*" if (r.declared and r.state is NeedState.DELIVERED) else ""
+    nm = f" {r.delivered}/{r.total}" if r.total else ""
+    return f"{_LABEL[r.state]}{star}{nm}"
+
+
+def _marker(need: Need) -> str:
+    """The 2-char left gutter: must beats flow when a need is both."""
+    if need.must:
+        return "!!"
+    if need.children:
+        return "⊟ "
+    return "  "
+
+
 def _render(results: list[NeedResult], wide: bool = False) -> str:
+    if not results:
+        return "  (no needs)"
     groups: dict[str, list[NeedResult]] = {}
     for r in results:
         groups.setdefault(r.need.who or "(unassigned)", []).append(r)
 
-    # Size the need column to the terminal; ~54 cols go to the fixed id/state/nm
-    # prefix and the warrant suffix. Falls back to 100 cols when there is no tty.
-    # --wide gives the column the longest need, so text is never clipped.
+    # Fit every column to its widest content across the WHOLE board, so columns line up
+    # the same in every persona block. The need column takes whatever width is left.
+    id_w = max([len("id"), *(len(r.need.id) for r in results)])
+    grounds_w = max([len("grounds"), *(len(_grounds_cell(r)) for r in results)])
+    warrant_w = max([len("warrant"), *(len(_warrant(r.need)) for r in results)])
     if wide:
-        width = max((len(r.need.text) for r in results), default=30)
+        need_w = max([len("need"), *(len(r.need.text) for r in results)])
     else:
-        width = max(30, shutil.get_terminal_size(fallback=(100, 24)).columns - 54)
+        cols = shutil.get_terminal_size(fallback=(100, 24)).columns
+        need_w = max(24, cols - (id_w + grounds_w + warrant_w + 12))
 
-    out: list[str] = []
-    # The Toulmin split: GROUNDS (does a test prove it?) vs WARRANT (user signal it
-    # matters?). A need can be green on one and empty on the other — that gap is the point.
-    out.append(f"  {'':2} {'id':<9} {'GROUNDS':<10}{'':5} {'need':<{width}}  WARRANT")
-    out.append(
-        "  legend: * declared (no results artifact)  ·  !! must  ·  ⊟ flow (rolls up children)"
-        "  ·  GROUNDS = test proof  ·  WARRANT = evidence source"
-    )
+    def row(marker: str, c_id: str, c_grounds: str, c_need: str, c_warrant: str) -> str:
+        return (f"  {marker}  {c_id.ljust(id_w)}  {c_grounds.ljust(grounds_w)}  "
+                f"{c_need.ljust(need_w)}  {c_warrant}")
+
+    total_w = 2 + 2 + 2 + id_w + 2 + grounds_w + 2 + need_w + 2 + warrant_w
+    out: list[str] = [
+        row("  ", "id", "grounds", "need", "warrant"),
+        "  " + "─" * (total_w - 2),
+        "  legend: !! must · ⊟ flow · * declared (no results) · "
+        "grounds = test proof · warrant = user signal",
+    ]
     for who in sorted(groups):
         rs = sorted(groups[who], key=state_priority)
         label = next((x.need.label for x in rs if x.need.label), None)
         counts = {s: sum(1 for r in rs if r.state is s) for s in NeedState}
-        head = "  ·  ".join(f"{counts[s]} {_LABEL[s]}" for s in NeedState if counts[s])
+        head = "   ".join(f"{counts[s]} {_LABEL[s]}" for s in NeedState if counts[s])
         title = f"{who}" + (f" ({label})" if label else "")
         out.append(f"\n{title}    {head}")
-        out.append(f"    {_provenance_line(rs)}")
+        out.append(f"    {_provenance_line(rs)}\n")
         for r in rs:
-            bang = "!!" if r.need.must else "  "
-            star = "*" if r.declared and r.state is NeedState.DELIVERED else " "
-            nm = f"{r.delivered}/{r.total}" if r.total else ""
-            flow = "⊟ " if r.need.children else ""  # a flow rolls up its children (#44)
-            text = _clip(flow + r.need.text, width)
-            out.append(
-                f"  {bang} {r.need.id:<9} {_LABEL[r.state]:<9}{star} {nm:<5} "
-                f"{text:<{width}}  {_warrant(r.need)}"
-            )
+            out.append(row(_marker(r.need), r.need.id, _grounds_cell(r),
+                           _clip(r.need.text, need_w), _warrant(r.need)))
             for w in r.warnings:
                 out.append(f"       ⚠ {w}")
     return "\n".join(out)

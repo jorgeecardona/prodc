@@ -69,7 +69,7 @@ def test_board_shows_summary_and_warrant(
     out = capsys.readouterr().out
     assert code == 0  # a must-HOLE is an honest gap, never a failure
     assert "gaps:" in out and "coverage 1/3" in out  # leading gap-count line (#2)
-    assert "WARRANT" in out  # the warrant column header (#3)
+    assert "warrant" in out  # the warrant column header (#3)
     assert "interview:John" in out  # strongest warrant for D-1
     assert "opinion" in out  # O-1's warrant
     assert "legend:" in out  # glyph legend (#10)
