@@ -87,7 +87,7 @@ class Release:
     """
 
     id: str
-    text: str | None = None
+    text: str  # a release has a name, like a Goal
 
 
 @dataclass(frozen=True)

@@ -175,7 +175,7 @@ def _release(raw: object, where: str) -> Release:
     tbl = _as_mapping(raw, where)
     return Release(
         id=_as_str(tbl.get("id"), f"{where}.id"),
-        text=_opt_str(tbl.get("text"), f"{where}.text"),
+        text=_as_str(tbl.get("text"), f"{where}.text"),
     )
 
 

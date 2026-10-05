@@ -207,7 +207,7 @@ def _need_payload(r: NeedResult) -> dict[str, object]:
         "release": need.release,
         "importance": need.importance,
         "claim": need.claim,
-        "attested": (
+        "attestation": (
             {"who": need.attestation.who, "date": need.attestation.date}
             if need.attestation
             else None
