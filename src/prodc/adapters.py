@@ -204,7 +204,8 @@ class GherkinAdapter:
                 # filtered, crashed, or sharded away. Do NOT fall through to the tag and
                 # call it delivered (#41); surface that it never ran.
                 return ProofResult(
-                    ProofState.PENDING, False,
+                    ProofState.PENDING,
+                    False,
                     f"results configured but scenario not in report: {', '.join(missing)}",
                 )
             if all(states):

@@ -67,8 +67,16 @@ def test_set_on_last_need_keeps_everything_above(tmp_path: Path) -> None:
 def test_capture_preserves_comments(tmp_path: Path) -> None:
     cfg = _project(tmp_path)
     capture_source(
-        cfg, "N-1", kind="artifact", who=None, date="2026-10-05", quote=None,
-        locator="docs/x.md#y", observed_at="2026-10-05", expect_sha=None, dry_run=False,
+        cfg,
+        "N-1",
+        kind="artifact",
+        who=None,
+        date="2026-10-05",
+        quote=None,
+        locator="docs/x.md#y",
+        observed_at="2026-10-05",
+        expect_sha=None,
+        dry_run=False,
     )
     out = _read(tmp_path)
     assert "# Provenance contract: interview quotes are VERBATIM" in out
@@ -77,8 +85,7 @@ def test_capture_preserves_comments(tmp_path: Path) -> None:
 
 def test_accept_preserves_comments(tmp_path: Path) -> None:
     cfg = _project(tmp_path)
-    accept(cfg, "N-1", who="jorge", date="2026-10-05", revoke=False,
-           expect_sha=None, dry_run=False)
+    accept(cfg, "N-1", who="jorge", date="2026-10-05", revoke=False, expect_sha=None, dry_run=False)
     out = _read(tmp_path)
     assert "# ids are minted in the N-16xx range." in out
     assert "accept:jorge@2026-10-05" in out

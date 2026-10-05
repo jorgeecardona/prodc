@@ -145,12 +145,22 @@ def test_add_strict_dupes_refuses(tmp_path: Path, capsys: pytest.CaptureFixture[
     from prodc.cli import main
 
     cfg = _project(tmp_path, toml=_TOML + "\n[lint]\nduplicate_threshold = 0.4\n")
-    code = main([
-        "add", "need", "N-9",
-        "--text", "user can export their orders to CSV",
-        "--who", "agent", "--file", "needs/a.yaml",
-        "--strict-dupes", "--config", str(cfg),
-    ])
+    code = main(
+        [
+            "add",
+            "need",
+            "N-9",
+            "--text",
+            "user can export their orders to CSV",
+            "--who",
+            "agent",
+            "--file",
+            "needs/a.yaml",
+            "--strict-dupes",
+            "--config",
+            str(cfg),
+        ]
+    )
     err = capsys.readouterr().err
     assert code == 2 and "possible duplicate of N-1" in err
 
@@ -159,12 +169,22 @@ def test_add_no_dupe_check_skips(tmp_path: Path, capsys: pytest.CaptureFixture[s
     from prodc.cli import main
 
     cfg = _project(tmp_path, toml=_TOML + "\n[lint]\nduplicate_threshold = 0.4\n")
-    code = main([
-        "add", "need", "N-9",
-        "--text", "user can export their orders to CSV",
-        "--who", "agent", "--file", "needs/a.yaml",
-        "--no-dupe-check", "--config", str(cfg),
-    ])
+    code = main(
+        [
+            "add",
+            "need",
+            "N-9",
+            "--text",
+            "user can export their orders to CSV",
+            "--who",
+            "agent",
+            "--file",
+            "needs/a.yaml",
+            "--no-dupe-check",
+            "--config",
+            str(cfg),
+        ]
+    )
     err = capsys.readouterr().err
     assert code == 0 and "possible duplicate" not in err
 

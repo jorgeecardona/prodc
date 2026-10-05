@@ -25,6 +25,7 @@ from .model import (
     Model,
     Need,
     Release,
+    Role,
     Source,
     SourceKind,
 )
@@ -133,6 +134,7 @@ def _need(
     text = _as_str(tbl.get("text"), f"{where}.text")
     must = _as_bool(tbl["must"], f"{where}.must") if "must" in tbl else False
     who = _opt_str(tbl.get("who"), f"{where}.who") or file_who
+    role = _opt_str(tbl.get("role"), f"{where}.role")
     label = _opt_str(tbl.get("label"), f"{where}.label") or file_label
     client = _opt_str(tbl.get("client"), f"{where}.client") or file_client
     variant_of = _opt_str(tbl.get("variant_of"), f"{where}.variant_of")
@@ -181,6 +183,7 @@ def _need(
         id=nid,
         text=text,
         who=who,
+        role=role,
         must=must,
         sources=sources,
         proofs=proofs,
@@ -219,6 +222,14 @@ def _release(raw: object, where: str) -> Release:
     )
 
 
+def _role(raw: object, where: str) -> Role:
+    tbl = _as_mapping(raw, where)
+    return Role(
+        id=_as_str(tbl.get("id"), f"{where}.id"),
+        text=_as_str(tbl.get("text"), f"{where}.text"),
+    )
+
+
 def _arg_node(raw: object, where: str) -> ArgNode:
     tbl = _as_mapping(raw, where)
     kind_name = _as_str(tbl.get("kind"), f"{where}.kind")
@@ -250,6 +261,7 @@ class _Loaded:
     needs: list[Need] = field(default_factory=list[Need])
     goals: list[Goal] = field(default_factory=list[Goal])
     releases: list[Release] = field(default_factory=list[Release])
+    roles: list[Role] = field(default_factory=list[Role])
     argument: list[ArgNode] = field(default_factory=list[ArgNode])
 
 
@@ -286,6 +298,10 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
         release = _release(raw, f"{where}.releases[{i}]")
         _unique("release", release.id)
         out.releases.append(release)
+    for i, raw in enumerate(_as_list(tbl.get("roles"), f"{where}.roles")):
+        role = _role(raw, f"{where}.roles[{i}]")
+        _unique("role", role.id)
+        out.roles.append(role)
     for i, raw in enumerate(_as_list(tbl.get("argument"), f"{where}.argument")):
         node = _arg_node(raw, f"{where}.argument[{i}]")
         _unique("argument node", node.id)
@@ -297,28 +313,38 @@ def load(config: Config) -> Model:
     """Read every prodc file once into a :class:`~prodc.model.Model`, then validate cross-refs.
 
     One loader for every noun: ids are unique within their kind, and each string reference
-    (``variant_of``, ``children``, ``goal``, ``release``) is checked here as a hard error — a
-    dangling reference to something declared in these files is a typo you own, not a runtime
-    unknown.
+    (``variant_of``, ``children``, ``goal``, ``release``, ``role``) is checked here as a hard
+    error — a dangling reference to something declared in these files is a typo you own, not a
+    runtime unknown. ``role`` is checked unconditionally like ``goal``/``release``: it is a new
+    field, so (unlike free-text ``who``) there is no migration reason to make it lax.
     """
     acc = _Loaded()
-    seen: dict[str, dict[str, Path]] = {"need": {}, "goal": {}, "release": {}, "argument node": {}}
+    seen: dict[str, dict[str, Path]] = {
+        "need": {},
+        "goal": {},
+        "release": {},
+        "role": {},
+        "argument node": {},
+    }
     for pattern in config.need_globs:
         for path in sorted(config.root.glob(pattern)):
             f = _load_file(path, seen)
             acc.needs.extend(f.needs)
             acc.goals.extend(f.goals)
             acc.releases.extend(f.releases)
+            acc.roles.extend(f.roles)
             acc.argument.extend(f.argument)
     _check_variants(acc.needs)
     _check_children(acc.needs)
     _check_ref(acc.needs, "goal", lambda n: n.goal, {g.id for g in acc.goals})
     _check_ref(acc.needs, "release", lambda n: n.release, {r.id for r in acc.releases})
+    _check_ref(acc.needs, "role", lambda n: n.role, {p.id for p in acc.roles})
     _check_argument(acc.argument)
     return Model(
         needs=tuple(acc.needs),
         goals=tuple(acc.goals),
         releases=tuple(acc.releases),
+        roles=tuple(acc.roles),
         argument=tuple(acc.argument),
     )
 

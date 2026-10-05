@@ -81,8 +81,16 @@ def test_loader_parses_observed_at(tmp_path: Path) -> None:
 def test_status_stale_filters(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     from prodc.cli import main
 
-    code = main(["status", "--config", str(_project(tmp_path, _TOML, _needs_yaml())), "--stale",
-                 "180", "--json"])
+    code = main(
+        [
+            "status",
+            "--config",
+            str(_project(tmp_path, _TOML, _needs_yaml())),
+            "--stale",
+            "180",
+            "--json",
+        ]
+    )
     payload = json.loads(capsys.readouterr().out)
     assert code == 0
     ids = {n["id"] for n in payload["needs"]}
@@ -125,10 +133,22 @@ needs:
     text: user can see a thing
 """
     cfg = _project(tmp_path, _TOML, needs)
-    code = main([
-        "capture", "N-1", "--kind", "interview", "--who", "Ana",
-        "--quote", "I want it", "--observed-at", "2026-10-05", "--config", str(cfg),
-    ])
+    code = main(
+        [
+            "capture",
+            "N-1",
+            "--kind",
+            "interview",
+            "--who",
+            "Ana",
+            "--quote",
+            "I want it",
+            "--observed-at",
+            "2026-10-05",
+            "--config",
+            str(cfg),
+        ]
+    )
     assert code == 0
     written = (tmp_path / "needs" / "a.yaml").read_text(encoding="utf-8")
     assert "observed_at:" in written and "2026-10-05" in written

@@ -6,7 +6,7 @@ Every command takes `--config prodc.toml` (default) and `--json`. `prodc -C DIR 
 
 | Command | Does | Example |
 |---|---|---|
-| `status` | The board: needs vs proofs, per persona, with goals/releases/recurrence/orphans | `prodc status --only-must` |
+| `status` | The board: needs vs proofs, per role, with goals/releases/recurrence/orphans | `prodc status --only-must` |
 | `lint` | CI gate: exit 1 on BROKEN proof or a must-have with no evidence; warns on dupes, unlinked recurrence, stale evidence, importance off-scale/unrevisited (see `[lint]`) | `prodc lint --strict` |
 | `show <id>` | One need as a citable answer: grounds, warrant, sources, proofs | `prodc show N-1` |
 | `brief <client>` | Pre-meeting agenda for one client: its opinions and HOLEs, must first | `prodc brief acme` |

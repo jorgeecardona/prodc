@@ -61,9 +61,7 @@ def test_status_include_drafts(tmp_path: Path, capsys: pytest.CaptureFixture[str
     assert ids == {"N-1", "D-1"}
 
 
-def test_status_text_shows_draft_count(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_status_text_shows_draft_count(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     from prodc.cli import main
 
     main(["status", "--config", str(_project(tmp_path))])
@@ -75,10 +73,22 @@ def test_add_draft_writes_flag(tmp_path: Path) -> None:
     from prodc.cli import main
 
     cfg = _project(tmp_path, needs="needs: []\n")
-    code = main([
-        "add", "need", "N-9", "--text", "a new staged need",
-        "--who", "agent", "--file", "needs/a.yaml", "--draft", "--config", str(cfg),
-    ])
+    code = main(
+        [
+            "add",
+            "need",
+            "N-9",
+            "--text",
+            "a new staged need",
+            "--who",
+            "agent",
+            "--file",
+            "needs/a.yaml",
+            "--draft",
+            "--config",
+            str(cfg),
+        ]
+    )
     assert code == 0
     assert "draft: true" in (tmp_path / "needs" / "a.yaml").read_text(encoding="utf-8")
 
@@ -88,10 +98,21 @@ def test_default_draft_config(tmp_path: Path) -> None:
 
     toml = _TOML + "\n[add]\ndefault_draft = true\n"
     cfg = _project(tmp_path, toml=toml, needs="needs: []\n")
-    main([
-        "add", "need", "N-9", "--text", "a new staged need",
-        "--who", "agent", "--file", "needs/a.yaml", "--config", str(cfg),
-    ])
+    main(
+        [
+            "add",
+            "need",
+            "N-9",
+            "--text",
+            "a new staged need",
+            "--who",
+            "agent",
+            "--file",
+            "needs/a.yaml",
+            "--config",
+            str(cfg),
+        ]
+    )
     assert "draft: true" in (tmp_path / "needs" / "a.yaml").read_text(encoding="utf-8")
 
 

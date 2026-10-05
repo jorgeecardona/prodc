@@ -22,7 +22,17 @@ from . import __version__
 from .config import Config, ConfigError
 from .dedup import DupPair, VariantGroup, duplicate_pairs, matches_for, variant_suggestions
 from .loader import LoaderError, load
-from .model import Goal, Model, Need, NeedResult, NeedState, Release, SourceKind, ears_shape
+from .model import (
+    Goal,
+    Model,
+    Need,
+    NeedResult,
+    NeedState,
+    Release,
+    Role,
+    SourceKind,
+    ears_shape,
+)
 from .status import (
     Recurrence,
     Summary,
@@ -82,7 +92,7 @@ def _provenance_counts(results: list[NeedResult]) -> dict[str, int]:
 
 
 def _provenance_line(results: list[NeedResult]) -> str:
-    """Per-persona provenance mix — makes internal-only ('0 OPINION' but unvalidated) visible.
+    """Per-role provenance mix — makes internal-only ('0 OPINION' but unvalidated) visible.
 
     OPINION (no source) stays distinct from a weak INTERNAL source; the headline a PM
     wants is how many needs trace to a real user (interview), not just 'has any source'.
@@ -145,7 +155,7 @@ def _render(results: list[NeedResult], wide: bool = False) -> str:
         groups.setdefault(r.need.who or "(unassigned)", []).append(r)
 
     # Fit every column to its widest content across the WHOLE board, so columns line up
-    # the same in every persona block. The need column takes whatever width is left.
+    # the same in every role block. The need column takes whatever width is left.
     id_w = max([len("id"), *(len(r.need.id) for r in results)])
     grounds_w = max([len("grounds"), *(len(_grounds_cell(r)) for r in results)])
     warrant_w = max([len("warrant"), *(len(_warrant(r.need)) for r in results)])
@@ -156,8 +166,10 @@ def _render(results: list[NeedResult], wide: bool = False) -> str:
         need_w = max(24, cols - (id_w + grounds_w + warrant_w + 12))
 
     def row(marker: str, c_id: str, c_grounds: str, c_need: str, c_warrant: str) -> str:
-        return (f"  {marker}  {c_id.ljust(id_w)}  {c_grounds.ljust(grounds_w)}  "
-                f"{c_need.ljust(need_w)}  {c_warrant}")
+        return (
+            f"  {marker}  {c_id.ljust(id_w)}  {c_grounds.ljust(grounds_w)}  "
+            f"{c_need.ljust(need_w)}  {c_warrant}"
+        )
 
     total_w = 2 + 2 + 2 + id_w + 2 + grounds_w + 2 + need_w + 2 + warrant_w
     out: list[str] = [
@@ -175,8 +187,15 @@ def _render(results: list[NeedResult], wide: bool = False) -> str:
         out.append(f"\n{title}    {head}")
         out.append(f"    {_provenance_line(rs)}\n")
         for r in rs:
-            out.append(row(_marker(r.need), r.need.id, _grounds_cell(r),
-                           _clip(r.need.text, need_w), _warrant(r.need)))
+            out.append(
+                row(
+                    _marker(r.need),
+                    r.need.id,
+                    _grounds_cell(r),
+                    _clip(r.need.text, need_w),
+                    _warrant(r.need),
+                )
+            )
             for w in r.warnings:
                 out.append(f"       ⚠ {w}")
     return "\n".join(out)
@@ -189,8 +208,10 @@ _COLUMNS: dict[str, tuple[str, Callable[[NeedResult], str]]] = {
     "text": ("need", lambda r: r.need.text),
     "who": ("who", lambda r: r.need.who or ""),
     "warrant": ("warrant", lambda r: _warrant(r.need)),
-    "declared": ("declared",
-                 lambda r: "yes" if (r.declared and r.state is NeedState.DELIVERED) else ""),
+    "declared": (
+        "declared",
+        lambda r: "yes" if (r.declared and r.state is NeedState.DELIVERED) else "",
+    ),
     "must": ("must", lambda r: "!!" if r.need.must else ""),
     "opinion": ("opinion", lambda r: "opinion" if r.need.is_opinion else ""),
     "goal": ("goal", lambda r: r.need.goal or ""),
@@ -204,10 +225,7 @@ def _render_columns(results: list[NeedResult], columns: list[str]) -> str:
     rows = sorted(results, key=state_priority)
     cells = [[_COLUMNS[c][1](r) for c in columns] for r in rows]
     headers = [_COLUMNS[c][0] for c in columns]
-    widths = [
-        max([len(headers[i]), *(len(row[i]) for row in cells)])
-        for i in range(len(columns))
-    ]
+    widths = [max([len(headers[i]), *(len(row[i]) for row in cells)]) for i in range(len(columns))]
     out = ["  ".join(h.ljust(widths[i]) for i, h in enumerate(headers))]
     for row in cells:
         out.append("  ".join(row[i].ljust(widths[i]) for i in range(len(columns))))
@@ -288,6 +306,7 @@ def _need_payload(r: NeedResult) -> dict[str, object]:
     return {
         "id": need.id,
         "who": need.who,
+        "role": need.role,
         "text": need.text,
         "must": need.must,
         "state": r.state.value,
@@ -334,10 +353,12 @@ def _to_json(
     goal_cov: list[tuple[Goal, Summary]],
     ungoaled: list[NeedResult],
     rel_cov: list[tuple[Release, Summary]],
+    roles: tuple[Role, ...] = (),
 ) -> str:
     payload = {
         "summary": _summary_payload(summary, orphan_map),
         "orphans": orphan_map,
+        "roles": [{"id": p.id, "text": p.text} for p in roles],
         "releases": [
             {
                 "id": rel.id,
@@ -426,7 +447,9 @@ def _annotate_importance_warnings(results: list[NeedResult], cfg: Config) -> Non
             continue
         when = r.need.importance_set_at
         if when is None:
-            r.warnings.append("importance set but no revisit date (`set importance` stamps one) — #59")
+            r.warnings.append(
+                "importance set but no revisit date (`set importance` stamps one) — #59"
+            )
         elif cfg.importance_revisit_days is not None:
             try:
                 days = (today - date.fromisoformat(when)).days
@@ -480,12 +503,16 @@ def _cmd_lint(args: argparse.Namespace) -> int:
                 r.warnings.append(f"evidence is {age}d old (> {cfg.stale_after_days}d) — #58")
     _annotate_importance_warnings(results, cfg)
     errors = _lint_errors(results)
-    warnings = [(r.need.id, w) for r in sorted(results, key=lambda x: x.need.id) for w in r.warnings]
+    warnings = [
+        (r.need.id, w) for r in sorted(results, key=lambda x: x.need.id) for w in r.warnings
+    ]
     if args.json:
-        print(json.dumps(
-            {"errors": errors, "warnings": [{"id": i, "warning": w} for i, w in warnings]},
-            indent=2,
-        ))
+        print(
+            json.dumps(
+                {"errors": errors, "warnings": [{"id": i, "warning": w} for i, w in warnings]},
+                indent=2,
+            )
+        )
     else:
         for e in errors:
             print(f"  ERROR  {e}")
@@ -517,7 +544,8 @@ def _cmd_status(args: argparse.Namespace) -> int:
     if args.stale is not None:
         today = date.today()
         needs = [
-            n for n in needs
+            n
+            for n in needs
             if (age := evidence_age_days(n, today)) is not None and age > args.stale
         ]
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
@@ -531,12 +559,16 @@ def _cmd_status(args: argparse.Namespace) -> int:
     if args.columns:
         bad = [c for c in args.columns if c not in _COLUMNS]
         if bad:
-            print(f"prodc: unknown column(s) {', '.join(bad)} "
-                  f"(available: {', '.join(_COLUMNS)})", file=sys.stderr)
+            print(
+                f"prodc: unknown column(s) {', '.join(bad)} (available: {', '.join(_COLUMNS)})",
+                file=sys.stderr,
+            )
             return 2
 
     if args.json:
-        print(_to_json(results, summary, orphan_map, recs, goal_cov, ungoaled, rel_cov))
+        print(
+            _to_json(results, summary, orphan_map, recs, goal_cov, ungoaled, rel_cov, model.roles)
+        )
     else:
         commit = _git_rev(cfg.root)
         print(f"prodc status — {cfg.root.name}{f' @ {commit}' if commit else ''}")
@@ -590,6 +622,7 @@ def _render_show(r: NeedResult, importance_label: str | None = None) -> str:
     """One need as a citable answer — the artifact you drop into a thread."""
     need = r.need
     who = (need.who + (f" ({need.label})" if need.label else "")) if need.who else "(unassigned)"
+    who += f" — {need.role}" if need.role else ""
     nm = f"  {r.delivered}/{r.total}" if r.total else ""
     lines = [
         f"{need.id}{'  !!' if need.must else ''}{'  (draft)' if need.draft else ''}  {need.text}",
@@ -877,13 +910,20 @@ def _cmd_set(args: argparse.Namespace) -> int:
         if sep and "+" not in key and key.strip() == "importance":
             level = cfg.resolve_importance(raw)
             edit = set_importance(
-                cfg, args.need_id, level, date.today().isoformat(),
-                expect_sha=args.expect_sha, dry_run=args.dry_run,
+                cfg,
+                args.need_id,
+                level,
+                date.today().isoformat(),
+                expect_sha=args.expect_sha,
+                dry_run=args.dry_run,
             )
         else:
             edit = set_field(
-                cfg, args.need_id, args.assignment,
-                expect_sha=args.expect_sha, dry_run=args.dry_run,
+                cfg,
+                args.need_id,
+                args.assignment,
+                expect_sha=args.expect_sha,
+                dry_run=args.dry_run,
             )
     except (ConfigError, WriteError) as exc:
         print(f"prodc: {exc}", file=sys.stderr)
@@ -904,11 +944,15 @@ def _cmd_add(args: argparse.Namespace) -> int:
                 args.text, list(load(cfg).needs), cfg.duplicate_threshold, exclude_id=args.need_id
             )
             for need, score in hits:
-                print(f"prodc: possible duplicate of {need.id} ({score:.2f}): {need.text}",
-                      file=sys.stderr)
+                print(
+                    f"prodc: possible duplicate of {need.id} ({score:.2f}): {need.text}",
+                    file=sys.stderr,
+                )
             if hits and args.strict_dupes:
-                print("prodc: refusing to add — --strict-dupes and a possible duplicate exists",
-                      file=sys.stderr)
+                print(
+                    "prodc: refusing to add — --strict-dupes and a possible duplicate exists",
+                    file=sys.stderr,
+                )
                 return 2
         edit = add_need(
             cfg,
@@ -936,9 +980,15 @@ def _cmd_attest(args: argparse.Namespace) -> int:
     try:
         cfg = Config.load(cfg_path)
         edit = attest(
-            cfg, args.need_id, who=args.by, date=args.date,
-            kind="ai" if args.ai else "human", verdict=args.verdict, comment=args.comment,
-            expect_sha=args.expect_sha, dry_run=args.dry_run,
+            cfg,
+            args.need_id,
+            who=args.by,
+            date=args.date,
+            kind="ai" if args.ai else "human",
+            verdict=args.verdict,
+            comment=args.comment,
+            expect_sha=args.expect_sha,
+            dry_run=args.dry_run,
         )
     except (ConfigError, WriteError) as exc:
         print(f"prodc: {exc}", file=sys.stderr)
@@ -955,8 +1005,13 @@ def _cmd_accept(args: argparse.Namespace) -> int:
     try:
         cfg = Config.load(cfg_path)
         edit = accept(
-            cfg, args.need_id, who=args.who, date=args.date, revoke=args.revoke,
-            expect_sha=args.expect_sha, dry_run=args.dry_run,
+            cfg,
+            args.need_id,
+            who=args.who,
+            date=args.date,
+            revoke=args.revoke,
+            expect_sha=args.expect_sha,
+            dry_run=args.dry_run,
         )
     except (ConfigError, WriteError) as exc:
         print(f"prodc: {exc}", file=sys.stderr)
@@ -1139,11 +1194,20 @@ def _cmd_suggest(args: argparse.Namespace) -> int:
         results, cfg.adapters, min_score=args.min_score, top=args.top, kind=args.kind
     )
     if args.json:
-        print(json.dumps(
-            [{"need": s.need.id, "adapter": s.adapter, "locator": s.locator,
-              "score": round(s.score, 4)} for s in suggestions],
-            indent=2,
-        ))
+        print(
+            json.dumps(
+                [
+                    {
+                        "need": s.need.id,
+                        "adapter": s.adapter,
+                        "locator": s.locator,
+                        "score": round(s.score, 4),
+                    }
+                    for s in suggestions
+                ],
+                indent=2,
+            )
+        )
     else:
         last = None
         for s in suggestions:
@@ -1177,11 +1241,20 @@ def _cmd_recurrence(args: argparse.Namespace) -> int:
         return 0
     recs = recurrence(needs)
     if args.json:
-        print(json.dumps(
-            [{"baseline": r.baseline.id, "text": r.baseline.text,
-              "count": r.count, "clients": list(r.clients)} for r in recs],
-            indent=2,
-        ))
+        print(
+            json.dumps(
+                [
+                    {
+                        "baseline": r.baseline.id,
+                        "text": r.baseline.text,
+                        "count": r.count,
+                        "clients": list(r.clients),
+                    }
+                    for r in recs
+                ],
+                indent=2,
+            )
+        )
     else:
         for r in recs:
             print(f"  {r.count}x  {r.baseline.id}: {r.baseline.text}  [{', '.join(r.clients)}]")
@@ -1205,10 +1278,12 @@ def _cmd_dupes(args: argparse.Namespace) -> int:
     threshold = args.threshold if args.threshold is not None else cfg.duplicate_threshold
     pairs = duplicate_pairs(list(model.needs), threshold)
     if args.json:
-        print(json.dumps(
-            [_dup_payload(p) for p in pairs],
-            indent=2,
-        ))
+        print(
+            json.dumps(
+                [_dup_payload(p) for p in pairs],
+                indent=2,
+            )
+        )
     else:
         for p in pairs:
             scope = " [same client+goal]" if p.same_scope else ""
@@ -1246,13 +1321,25 @@ def main(argv: list[str] | None = None) -> int:
     st.add_argument("--json", action="store_true", help="machine-readable output")
     st.add_argument("--strict", action="store_true", help="also exit 1 on opinions")
     st.add_argument("--wide", action="store_true", help="never truncate the need text")
-    st.add_argument("--client", default=None, metavar="ID",
-                    help="scope the board + coverage to one client (its variants + baselines)")
-    st.add_argument("--goal", default=None, metavar="ID",
-                    help="scope the board + coverage to the needs serving one goal")
-    st.add_argument("--columns", default=None, type=lambda s: [c.strip() for c in s.split(",")],
-                    metavar="COLS",
-                    help="flat table of just these columns, e.g. id,state,text,warrant")
+    st.add_argument(
+        "--client",
+        default=None,
+        metavar="ID",
+        help="scope the board + coverage to one client (its variants + baselines)",
+    )
+    st.add_argument(
+        "--goal",
+        default=None,
+        metavar="ID",
+        help="scope the board + coverage to the needs serving one goal",
+    )
+    st.add_argument(
+        "--columns",
+        default=None,
+        type=lambda s: [c.strip() for c in s.split(",")],
+        metavar="COLS",
+        help="flat table of just these columns, e.g. id,state,text,warrant",
+    )
     st.add_argument("--only-must", action="store_true", help="show only must-have needs")
     st.add_argument(
         "--include-drafts",
@@ -1416,13 +1503,21 @@ def main(argv: list[str] | None = None) -> int:
     at.add_argument("--by", required=True, help="who reviewed it — a person's name or a model id")
     at.add_argument("--date", required=True, help="when (ISO, e.g. 2026-10-05)")
     at.add_argument("--ai", action="store_true", help="the reviewer is an AI model, not a human")
-    at.add_argument("--verdict", default=None, help="the reviewer's conclusion, e.g. pass/concerns/fail")
+    at.add_argument(
+        "--verdict", default=None, help="the reviewer's conclusion, e.g. pass/concerns/fail"
+    )
     at.add_argument("--comment", default=None, help="the review's feedback, kept on the record")
     at.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     at.add_argument("--json", action="store_true", help="machine-readable output")
-    at.add_argument("--dry-run", action="store_true", help="validate and show the diff, don't write")
-    at.add_argument("--expect-sha", default=None, metavar="SHA256",
-                    help="refuse if the file's content hash differs (optimistic lock)")
+    at.add_argument(
+        "--dry-run", action="store_true", help="validate and show the diff, don't write"
+    )
+    at.add_argument(
+        "--expect-sha",
+        default=None,
+        metavar="SHA256",
+        help="refuse if the file's content hash differs (optimistic lock)",
+    )
     at.set_defaults(func=_cmd_attest)
 
     ac = sub.add_parser("accept", help="record a human acceptance pass (accept proof) on a need")
@@ -1432,9 +1527,15 @@ def main(argv: list[str] | None = None) -> int:
     ac.add_argument("--revoke", action="store_true", help="remove this accept proof instead")
     ac.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     ac.add_argument("--json", action="store_true", help="machine-readable output")
-    ac.add_argument("--dry-run", action="store_true", help="validate and show the diff, don't write")
-    ac.add_argument("--expect-sha", default=None, metavar="SHA256",
-                    help="refuse if the file's content hash differs (optimistic lock)")
+    ac.add_argument(
+        "--dry-run", action="store_true", help="validate and show the diff, don't write"
+    )
+    ac.add_argument(
+        "--expect-sha",
+        default=None,
+        metavar="SHA256",
+        help="refuse if the file's content hash differs (optimistic lock)",
+    )
     ac.set_defaults(func=_cmd_accept)
 
     pf = sub.add_parser("portfolio", help="roll up many repos into one scoreboard")
@@ -1468,12 +1569,16 @@ def main(argv: list[str] | None = None) -> int:
     sg.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     sg.add_argument("--json", action="store_true", help="machine-readable output")
     sg.add_argument(
-        "--min-score", type=float, default=0.3, metavar="FRAC",
+        "--min-score",
+        type=float,
+        default=0.3,
+        metavar="FRAC",
         help="minimum text similarity to suggest (0..1, default 0.3)",
     )
     sg.add_argument("--top", type=int, default=3, metavar="N", help="max suggestions per need")
-    sg.add_argument("--kind", default=None, metavar="ADAPTER",
-                    help="only suggest from this adapter name")
+    sg.add_argument(
+        "--kind", default=None, metavar="ADAPTER", help="only suggest from this adapter name"
+    )
     sg.set_defaults(func=_cmd_suggest)
 
     du = sub.add_parser("dupes", help="list candidate duplicate need pairs by text similarity")

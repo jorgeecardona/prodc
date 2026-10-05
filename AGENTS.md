@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repo. Humans: read README.md and C
 
 ## Overview
 
-prodc: Product management as code: personas, flows, and features traced to evidence.
+prodc: Product management as code: roles, flows, and features traced to evidence.
 
 ## Build
 

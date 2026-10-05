@@ -3,7 +3,7 @@
 Three nouns (Torres): a Need is what a named person wants (an opportunity); a
 Source is its provenance (evidence) — a Need with no Source is an opinion; a proof
 is a locator to a delivery test, resolved by an adapter. Everything else is
-expressed with these: a flow is a Need with children, a persona is ``who``.
+expressed with these: a flow is a Need with children, a role is ``who``.
 """
 
 from __future__ import annotations
@@ -91,6 +91,23 @@ class Release:
     text: str  # a release has a name, like a Goal
 
 
+@dataclass(frozen=True)
+class Role:
+    """A role in the product's world — the archetype a need's ``who`` plays (#52).
+
+    The role is the noun; a concrete person is the instance. "Owner" and "Roaster" are
+    roles; John-at-Sincerely (``who: john, client: sincerely``) and Jacob-at-Sincerely are
+    instances of them, and a person's role can change (Roaster Aux → Head) without changing who
+    they are. Roles are client-agnostic: one ``owner`` is reused across every client, so the
+    board can answer "every Owner across all clients", not just within one. Kept thin on
+    purpose: evidence lives on the Need (``sources``), not here — a role is a structural
+    function (enumerated from the org), not an evidence-built user archetype (a UX persona).
+    """
+
+    id: str
+    text: str
+
+
 class AttestationKind(StrEnum):
     """Who reviewed the warrant — a ladder of strength, human strongest (cf. SourceKind)."""
 
@@ -122,6 +139,7 @@ class Need:
     id: str
     text: str
     who: str | None = None
+    role: str | None = None  # id of the Role (role) this need's `who` plays (#52)
     must: bool = False
     sources: tuple[Source, ...] = ()
     proofs: tuple[str, ...] = ()  # locators, "<adapter>:<payload>" (leaf needs)
@@ -204,6 +222,7 @@ class Model:
     needs: tuple[Need, ...] = ()
     goals: tuple[Goal, ...] = ()
     releases: tuple[Release, ...] = ()  # in declared order = ship sequence
+    roles: tuple[Role, ...] = ()  # the roles needs' `who` play (#52)
     argument: tuple[ArgNode, ...] = ()  # the GSN assurance graph (#28)
 
 

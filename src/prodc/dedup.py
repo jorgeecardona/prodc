@@ -65,11 +65,7 @@ def matches_for(
     Used at `add` time, before the new need is written, so `exclude_id` skips a need with
     the id being (re)written. Ties break by score then id for a stable order.
     """
-    out = [
-        (n, similarity(text, n.text))
-        for n in needs
-        if n.id != exclude_id
-    ]
+    out = [(n, similarity(text, n.text)) for n in needs if n.id != exclude_id]
     hits = [(n, s) for n, s in out if s >= threshold]
     hits.sort(key=lambda p: (-p[1], p[0].id))
     return hits

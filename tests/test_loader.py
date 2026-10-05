@@ -338,7 +338,10 @@ def test_argument_dangling_link_raises(tmp_path: Path) -> None:
 def test_product_flag_defaults_true_and_parses(tmp_path: Path) -> None:
     cfg = _config(
         tmp_path,
-        ("a.yaml", "needs:\n  - id: N-1\n    text: t\n  - id: N-2\n    text: infra\n    product: false\n"),
+        (
+            "a.yaml",
+            "needs:\n  - id: N-1\n    text: t\n  - id: N-2\n    text: infra\n    product: false\n",
+        ),
     )
     by_id = {n.id: n for n in load_needs(cfg)}
     assert by_id["N-1"].product is True and by_id["N-2"].product is False
@@ -376,7 +379,10 @@ def test_attestation_defaults_human(tmp_path: Path) -> None:
 
     cfg = _config(
         tmp_path,
-        ("a.yaml", "needs:\n  - id: N-1\n    text: t\n    attestation:\n      who: Jorge\n      date: 2026-10-05\n"),
+        (
+            "a.yaml",
+            "needs:\n  - id: N-1\n    text: t\n    attestation:\n      who: Jorge\n      date: 2026-10-05\n",
+        ),
     )
     (need,) = load_needs(cfg)
     assert need.attestation is not None and need.attestation.kind is AttestationKind.HUMAN

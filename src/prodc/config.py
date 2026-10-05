@@ -73,12 +73,16 @@ class Config:
             for level, (label, _meaning) in self.importance_levels.items():
                 if raw == str(level) or raw.lower() == label.lower():
                     return level
-            allowed = ", ".join(f"{n}={lbl}" for n, (lbl, _m) in sorted(self.importance_levels.items()))
+            allowed = ", ".join(
+                f"{n}={lbl}" for n, (lbl, _m) in sorted(self.importance_levels.items())
+            )
             raise ConfigError(f"importance {raw!r} is not on the scale ({allowed})")
         try:
             return int(raw)
         except ValueError:
-            raise ConfigError(f"importance {raw!r} is not an integer (no rubric declared)") from None
+            raise ConfigError(
+                f"importance {raw!r} is not an integer (no rubric declared)"
+            ) from None
 
     @classmethod
     def load(cls, path: Path) -> Config:
@@ -159,7 +163,9 @@ class Config:
         if not isinstance(dup, (int, float)) or isinstance(dup, bool) or not 0 < dup <= 1:
             raise ConfigError("[lint].duplicate_threshold must be a number in (0, 1]")
         stale = lint_tbl.get("stale_after_days")
-        if stale is not None and (not isinstance(stale, int) or isinstance(stale, bool) or stale < 1):
+        if stale is not None and (
+            not isinstance(stale, int) or isinstance(stale, bool) or stale < 1
+        ):
             raise ConfigError("[lint].stale_after_days must be a positive integer")
         revisit = lint_tbl.get("importance_revisit_days")
         if revisit is not None and (
@@ -181,9 +187,7 @@ class Config:
                 or not isinstance(row[1], str)
                 or not isinstance(row[2], str)
             ):
-                raise ConfigError(
-                    f"[importance].levels[{i}] must be [number, label, meaning]"
-                )
+                raise ConfigError(f"[importance].levels[{i}] must be [number, label, meaning]")
             importance_levels[row[0]] = (row[1], row[2])
 
         add_tbl = _as_dict(raw.get("add", {}), "[add]")

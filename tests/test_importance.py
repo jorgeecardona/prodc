@@ -15,10 +15,13 @@ _SCALE = """
 levels = [[1, "nice", "no one notices its absence"], [2, "useful", "asked for once"], [3, "needed", "blocks a flow"]]
 """
 
-_TOML = """
+_TOML = (
+    """
 [prodc]
 needs = ["needs/*.yaml"]
-""" + _SCALE
+"""
+    + _SCALE
+)
 
 
 def _project(tmp_path: Path, toml: str, needs: str) -> Path:
@@ -42,7 +45,7 @@ def test_config_parses_scale_and_labels(tmp_path: Path) -> None:
 
 
 def test_config_rejects_malformed_scale(tmp_path: Path) -> None:
-    bad = "[prodc]\nneeds = [\"needs/*.yaml\"]\n[importance]\nlevels = [[1, \"nice\"]]\n"
+    bad = '[prodc]\nneeds = ["needs/*.yaml"]\n[importance]\nlevels = [[1, "nice"]]\n'
     with pytest.raises(ConfigError, match="number, label, meaning"):
         Config.load(_project(tmp_path, bad, _ONE_NEED))
 
@@ -56,7 +59,7 @@ def test_resolve_importance_by_number_and_label(tmp_path: Path) -> None:
 
 
 def test_resolve_importance_without_scale_accepts_any_int(tmp_path: Path) -> None:
-    toml = "[prodc]\nneeds = [\"needs/*.yaml\"]\n"
+    toml = '[prodc]\nneeds = ["needs/*.yaml"]\n'
     cfg = Config.load(_project(tmp_path, toml, _ONE_NEED))
     assert cfg.resolve_importance("7") == 7
     with pytest.raises(ConfigError, match="not an integer"):
@@ -74,7 +77,9 @@ def test_set_importance_by_label_stamps_date(tmp_path: Path) -> None:
     assert "importance_set_at:" in text and date.today().isoformat() in text
 
 
-def test_set_importance_off_scale_refused(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_set_importance_off_scale_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     from prodc.cli import main
 
     cfg = _project(tmp_path, _TOML, _ONE_NEED)
@@ -97,7 +102,9 @@ needs:
     assert "importance: 2 (useful)" in out and "set 2026-10-01" in out
 
 
-def test_lint_flags_missing_revisit_date(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_lint_flags_missing_revisit_date(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     from prodc.cli import main
 
     needs = """

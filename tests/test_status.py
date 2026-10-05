@@ -283,7 +283,7 @@ def test_shared_proof_warning() -> None:
     # one scenario stands in for two needs; a third has its own proof
     needs = [
         Need(id="N-1", text="a", proofs=("web:f#S",)),
-        Need(id="N-2", text="b", proofs=("web:f#S",)),      # every proof shared with N-1
+        Need(id="N-2", text="b", proofs=("web:f#S",)),  # every proof shared with N-1
         Need(id="N-3", text="c", proofs=("web:f#S", "web:f#T")),  # f#T is its own
     ]
     results = resolve(needs, {"web": _delivered()})
@@ -296,8 +296,8 @@ def test_non_product_need_excluded_from_coverage() -> None:
     from prodc.status import summarize
 
     needs = [
-        Need(id="P-1", text="a user can log in", proofs=("x:1",)),       # product, delivered
-        Need(id="I-1", text="resize the database", product=False),        # infra, no proof
+        Need(id="P-1", text="a user can log in", proofs=("x:1",)),  # product, delivered
+        Need(id="I-1", text="resize the database", product=False),  # infra, no proof
     ]
     results = resolve(needs, {"x": _delivered()})
     s = summarize(results)
@@ -326,10 +326,15 @@ def test_flow_orphan_silent_without_flows() -> None:
 def test_ai_attestation_is_middle_rung_warning() -> None:
     from prodc.model import Attestation, AttestationKind
 
-    ai = Need(id="N-1", text="t", proofs=("x:1",),
-              attestation=Attestation(who="opus", date="2026-10-05", kind=AttestationKind.AI))
-    human = Need(id="N-2", text="t", proofs=("x:1",),
-                 attestation=Attestation(who="Jorge", date="2026-10-05"))
+    ai = Need(
+        id="N-1",
+        text="t",
+        proofs=("x:1",),
+        attestation=Attestation(who="opus", date="2026-10-05", kind=AttestationKind.AI),
+    )
+    human = Need(
+        id="N-2", text="t", proofs=("x:1",), attestation=Attestation(who="Jorge", date="2026-10-05")
+    )
     by_id = {r.need.id: r for r in resolve([ai, human], {"x": _delivered()})}
     assert any("(AI) — not a human" in w for w in by_id["N-1"].warnings)
     assert not any("#13" in w for w in by_id["N-2"].warnings)  # human review: no warning
@@ -340,7 +345,10 @@ def test_flow_seam_proof_gates_delivered() -> None:
     from prodc.adapters import Adapter
 
     flow = Need(id="F-1", text="roast day", children=("L-1", "L-2"), seam=("web:seam#E2E",))
-    children = [Need(id="L-1", text="a", proofs=("x:1",)), Need(id="L-2", text="b", proofs=("x:1",))]
+    children = [
+        Need(id="L-1", text="a", proofs=("x:1",)),
+        Need(id="L-2", text="b", proofs=("x:1",)),
+    ]
     adapters: dict[str, Adapter] = {
         "x": _delivered(),
         "web": StubAdapter(ProofResult(ProofState.PENDING, False, "not green")),

@@ -29,6 +29,7 @@ _SCALAR_FIELDS = frozenset(
     {
         "text",
         "who",
+        "role",
         "label",
         "must",
         "importance",
@@ -120,7 +121,9 @@ def _need_block_span(lines: list[str], need_id: str) -> tuple[int, int, int] | N
         if iid != need_id:
             continue
         end = bounds[idx + 1]
-        while end - 1 > start and (lines[end - 1].strip() == "" or lines[end - 1].strip().startswith("#")):
+        while end - 1 > start and (
+            lines[end - 1].strip() == "" or lines[end - 1].strip().startswith("#")
+        ):
             end -= 1
         return start, end, indent
     return None
@@ -168,9 +171,7 @@ def _render_edit(old_text: str, doc: dict[str, object], need_id: str) -> str:
     )
     if need is None:
         return _dump(doc)
-    dumped = yaml.safe_dump(
-        [need], sort_keys=False, allow_unicode=True, default_flow_style=False
-    )
+    dumped = yaml.safe_dump([need], sort_keys=False, allow_unicode=True, default_flow_style=False)
     pad = " " * indent
     block = "".join(pad + ln if ln.strip() else ln for ln in dumped.splitlines(keepends=True))
     return "".join(lines[:start]) + block + "".join(lines[end:])
@@ -341,8 +342,11 @@ def capture_source(
         raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
     source: dict[str, object] = {"kind": kind}
     for key, value in (
-        ("who", who), ("date", date), ("quote", quote),
-        ("locator", locator), ("observed_at", observed_at),
+        ("who", who),
+        ("date", date),
+        ("quote", quote),
+        ("locator", locator),
+        ("observed_at", observed_at),
     ):
         if value is not None:
             source[key] = value

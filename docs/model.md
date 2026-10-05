@@ -11,6 +11,7 @@ All nouns live in the files matched by `[prodc].needs`. Any file may carry `need
 | **Proof** | `<adapter>:<payload>` resolved against the repo | `proofs:` on a need |
 | **Goal** | measurable objective needs trace up to; `id`, `text`, `metric` | `goals:` |
 | **Release** | ship slice; list order = ship order; `id`, `text` | `releases:` |
+| **Role** | a role; `who`+`client` is an instance of it (John@Sincerely is the `owner`); `id`, `text` | `roles:` |
 | **ArgNode** | GSN node: `kind` claim/strategy/evidence/context/assumption/justification, `supported_by`, `in_context_of`, `about` | `argument:` |
 | **Attestation** | a review that the proofs establish the need | `attestation:` on a need |
 
@@ -22,7 +23,8 @@ File-level `who`, `label`, `client` default every need in that file.
 |---|---|
 | `id` | unique across all files |
 | `text` | the need; EARS shape (`When …, who can …`) is checked softly |
-| `who` | persona |
+| `who` | the person (free text — John, Jacob) |
+| `role` | Role id — the role `who` plays; checked against declared `roles:` |
 | `label` | free text for `who` |
 | `must` | must-have; a must with no proof tops the board |
 | `sources` | evidence list (see ladder) |

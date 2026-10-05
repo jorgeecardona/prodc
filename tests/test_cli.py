@@ -353,12 +353,17 @@ def test_chdir_bad_dir_errors(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     assert code == 2 and "cannot chdir" in capsys.readouterr().err
 
 
-def test_wide_does_not_truncate_long_need(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_wide_does_not_truncate_long_need(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     (tmp_path / "needs").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "prodc.toml").write_text("[prodc]\nneeds = [\"needs/*.yaml\"]\n", encoding="utf-8")
-    long = "the roastery operator can reconcile every drum load against the day's green intake ledger"
+    (tmp_path / "prodc.toml").write_text('[prodc]\nneeds = ["needs/*.yaml"]\n', encoding="utf-8")
+    long = (
+        "the roastery operator can reconcile every drum load against the day's green intake ledger"
+    )
     (tmp_path / "needs" / "a.yaml").write_text(
-        f"needs:\n  - id: N-1\n    text: {long}\n", encoding="utf-8")
+        f"needs:\n  - id: N-1\n    text: {long}\n", encoding="utf-8"
+    )
     p = str(tmp_path / "prodc.toml")
     assert main(["status", "--config", p, "--wide"]) == 0
     assert long in capsys.readouterr().out  # full text present, no ellipsis
@@ -366,14 +371,16 @@ def test_wide_does_not_truncate_long_need(tmp_path: Path, capsys: pytest.Capture
 
 def test_status_scoped_to_client(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     import json
+
     (tmp_path / "needs").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "prodc.toml").write_text("[prodc]\nneeds = [\"needs/*.yaml\"]\n", encoding="utf-8")
+    (tmp_path / "prodc.toml").write_text('[prodc]\nneeds = ["needs/*.yaml"]\n', encoding="utf-8")
     (tmp_path / "needs" / "a.yaml").write_text(
         "needs:\n"
         "  - id: B-1\n    text: shared baseline\n"
         "  - id: A-1\n    text: acme only\n    client: acme\n"
         "  - id: X-1\n    text: globex only\n    client: globex\n",
-        encoding="utf-8")
+        encoding="utf-8",
+    )
     p = str(tmp_path / "prodc.toml")
     assert main(["status", "--config", p, "--client", "acme", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
@@ -382,14 +389,17 @@ def test_status_scoped_to_client(tmp_path: Path, capsys: pytest.CaptureFixture[s
     assert payload["summary"]["total"] == 2
 
 
-def test_lint_fails_on_must_opinion_and_broken(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_lint_fails_on_must_opinion_and_broken(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     (tmp_path / "needs").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "prodc.toml").write_text("[prodc]\nneeds = [\"needs/*.yaml\"]\n", encoding="utf-8")
+    (tmp_path / "prodc.toml").write_text('[prodc]\nneeds = ["needs/*.yaml"]\n', encoding="utf-8")
     (tmp_path / "needs" / "a.yaml").write_text(
         "needs:\n"
-        "  - id: M-1\n    text: a must with no evidence\n    must: true\n"       # must-opinion → error
-        "  - id: B-1\n    text: dangling\n    proofs: [nope:x]\n",                 # BROKEN → error
-        encoding="utf-8")
+        "  - id: M-1\n    text: a must with no evidence\n    must: true\n"  # must-opinion → error
+        "  - id: B-1\n    text: dangling\n    proofs: [nope:x]\n",  # BROKEN → error
+        encoding="utf-8",
+    )
     p = str(tmp_path / "prodc.toml")
     code = main(["lint", "--config", p])
     out = capsys.readouterr().out
@@ -399,7 +409,9 @@ def test_lint_fails_on_must_opinion_and_broken(tmp_path: Path, capsys: pytest.Ca
 
 
 def test_lint_clean_board_passes(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    code = main(["lint", "--config", str(_project(tmp_path))])  # D-1 delivered, H-1 sourced, O-1 opinion (not must)
+    code = main(
+        ["lint", "--config", str(_project(tmp_path))]
+    )  # D-1 delivered, H-1 sourced, O-1 opinion (not must)
     capsys.readouterr()
     assert code == 0  # no BROKEN, no must-opinion → passes (O-1 is an opinion but not a must)
 
