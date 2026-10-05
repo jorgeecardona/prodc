@@ -379,6 +379,52 @@ class FieldAdapter:
         return ProofResult(ProofState.PENDING, True, f"'{payload}' not received upstream")
 
 
+class OutcomeAdapter:
+    """Resolves an observable-outcome key against a recorded results file (#25).
+
+    A proof that asserts externally-observable behaviour — an HTTP request/response pair, a UI
+    assertion — instead of binding to test internals (a pytest node, a Gherkin step), so it
+    survives a reimplementation and describes what a user can observe. The assertion runs
+    *outside* prodc (a harness, a probe); its pass/fail is recorded in a JSON results file
+    (``{"<outcome key>": true|false}``, or ``{"<key>": {"passed": bool}}``), and prodc only reads
+    that — records-only, never a live call, never a hard failure of its own.
+
+    DELIVERED when the key is recorded passing; PENDING when it is recorded failing or absent from
+    a present file; BROKEN when the results file itself is absent (nothing to resolve against).
+    """
+
+    def __init__(self, root: Path, results: str) -> None:
+        self._path = root / results
+        self._data: dict[str, bool] | None = None
+        self._loaded = False
+
+    def _load(self) -> dict[str, bool] | None:
+        if not self._loaded:
+            self._loaded = True
+            if self._path.exists():
+                out: dict[str, bool] = {}
+                raw: object = json.loads(self._path.read_text(encoding="utf-8"))
+                if isinstance(raw, dict):
+                    for key, val in cast("dict[str, object]", raw).items():
+                        if isinstance(val, bool):
+                            out[key] = val
+                        elif isinstance(val, dict):
+                            passed = cast("dict[str, object]", val).get("passed")
+                            out[key] = passed is True
+                self._data = out
+        return self._data
+
+    def resolve(self, payload: str) -> ProofResult:
+        data = self._load()
+        if data is None:
+            return ProofResult(ProofState.BROKEN, False, f"no results file '{self._path.name}'")
+        if payload not in data:
+            return ProofResult(ProofState.PENDING, False, f"outcome '{payload}' not in results")
+        if data[payload]:
+            return ProofResult(ProofState.DELIVERED, False, f"outcome '{payload}' recorded passing")
+        return ProofResult(ProofState.PENDING, False, f"outcome '{payload}' recorded failing")
+
+
 class PrototypeAdapter:
     """Resolves ``ref@who@date`` to a prototype validated with users in discovery.
 

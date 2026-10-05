@@ -16,6 +16,7 @@ from .adapters import (
     FilesAdapter,
     FrontmatterAdapter,
     GherkinAdapter,
+    OutcomeAdapter,
     PrototypeAdapter,
     PytestAdapter,
     SourceAdapter,
@@ -136,10 +137,14 @@ class Config:
             elif kind == "field":
                 sch = tbl.get("schema", "")
                 inner = FieldAdapter(root=proof_root, schema=sch if isinstance(sch, str) else "")
+            elif kind == "external":
+                if not results_s:
+                    raise ConfigError(f"[proofs.{name}]: external needs results = <json file>")
+                inner = OutcomeAdapter(root=proof_root, results=results_s)
             else:
                 raise ConfigError(
                     f"[proofs.{name}]: unknown kind {kind!r} "
-                    "(gherkin|pytest|files|accept|prototype|coverage|field)"
+                    "(gherkin|pytest|files|accept|prototype|coverage|field|external)"
                 )
             adapters[name] = (
                 External(inner, root / repo_field) if isinstance(repo_field, str) else inner

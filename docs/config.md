@@ -41,6 +41,7 @@ A proof is `<name>:<payload>`.
 | `prototype` | `ref@who@date` | always (validated with a user, declared) | — |
 | `coverage` | category | category is in `catalog` | `catalog` |
 | `field` | field name | field is `surfaced` in `schema` | `schema` |
+| `external` | observable-outcome key | key recorded passing in `results` (a JSON `{key: bool}`); implementation-independent | `results` |
 
 Any adapter takes `repo = "../sibling"` to resolve against a sibling checkout; absent sibling → UNRESOLVED, not BROKEN. `results` (cucumber-json or junit XML) turns declared states into real ones.
 
