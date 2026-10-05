@@ -262,9 +262,7 @@ def load(config: Config) -> Model:
     unknown.
     """
     acc = _Loaded()
-    seen: dict[str, dict[str, Path]] = {
-        "need": {}, "goal": {}, "release": {}, "argument node": {}
-    }
+    seen: dict[str, dict[str, Path]] = {"need": {}, "goal": {}, "release": {}, "argument node": {}}
     for pattern in config.need_globs:
         for path in sorted(config.root.glob(pattern)):
             f = _load_file(path, seen)

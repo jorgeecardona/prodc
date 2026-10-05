@@ -26,7 +26,9 @@ def _steps_passed(steps: list[object]) -> bool:
         if not isinstance(step, dict):
             return False
         result = cast("dict[str, object]", step).get("result")
-        status = cast("dict[str, object]", result).get("status") if isinstance(result, dict) else None
+        status = (
+            cast("dict[str, object]", result).get("status") if isinstance(result, dict) else None
+        )
         if status != "passed":
             return False
     return True
@@ -110,9 +112,7 @@ class GherkinAdapter:
                         continue
                     m = _SCENARIO_RE.match(line)
                     if m:
-                        found.append(
-                            _Scenario(fp.name, m.group(1), frozenset(pending))
-                        )
+                        found.append(_Scenario(fp.name, m.group(1), frozenset(pending)))
                         pending = set()
                     elif stripped and not stripped.startswith("#"):
                         pending = set()

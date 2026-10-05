@@ -102,8 +102,9 @@ def test_prototype_adapter_declared_delivered() -> None:
 
 
 def test_coverage_adapter(tmp_path: Path) -> None:
-    (tmp_path / "catalog.txt").write_text("billing/invoices\n# a comment\nroasting/queue\n",
-                                           encoding="utf-8")
+    (tmp_path / "catalog.txt").write_text(
+        "billing/invoices\n# a comment\nroasting/queue\n", encoding="utf-8"
+    )
     a = CoverageAdapter(root=tmp_path, catalog="catalog.txt")
     assert a.resolve("billing/invoices").state is ProofState.DELIVERED
     assert a.resolve("shipping/labels").state is ProofState.PENDING  # not yet covered

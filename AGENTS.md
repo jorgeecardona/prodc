@@ -22,6 +22,9 @@ prodc: Product management as code: personas, flows, and features traced to evide
 - Format and autofix: `make format` (ruff, line length 100).
 - Lint: `make lint`. Types: `make typecheck` (pyright strict on `src/`).
 - Prefer frozen dataclasses and explicit types. Keep the public API typed (`py.typed`).
+- Dependencies: pyyaml only. Write-back (`prodc set`/`add`) uses PyYAML's dumper, which
+  drops comments and reflows style — so an edit reformats the whole file it touches. Keep each
+  edit to one file, always show the diff, and dump with `sort_keys=False` to preserve key order.
 
 ## Gotchas
 

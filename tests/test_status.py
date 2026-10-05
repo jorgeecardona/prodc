@@ -86,10 +86,14 @@ def test_dangling_source_warns_distinct_from_opinion(tmp_path: Path) -> None:
     sources: dict[str, SourceAdapter] = {
         "issues": FrontmatterAdapter(root=tmp_path, paths=["issues/*.md"])
     }
-    good = Need(id="N-1", text="t",
-                sources=(Source(kind=SourceKind.ARTIFACT, locator="issues:reg.md#A-1"),))
-    bad = Need(id="N-2", text="t",
-               sources=(Source(kind=SourceKind.ARTIFACT, locator="issues:reg.md#NOPE"),))
+    good = Need(
+        id="N-1", text="t", sources=(Source(kind=SourceKind.ARTIFACT, locator="issues:reg.md#A-1"),)
+    )
+    bad = Need(
+        id="N-2",
+        text="t",
+        sources=(Source(kind=SourceKind.ARTIFACT, locator="issues:reg.md#NOPE"),),
+    )
     results = {r.need.id: r for r in resolve([good, bad], {}, sources)}
     assert not any("BROKEN source" in w for w in results["N-1"].warnings)
     assert any("BROKEN source" in w for w in results["N-2"].warnings)
@@ -150,8 +154,12 @@ def test_delivered_without_attestation_warns_warrant_unreviewed() -> None:
     from prodc.model import Attestation
 
     unattested = Need(id="U-1", text="delivered, link unreviewed", proofs=("x:1",))
-    attested = Need(id="A-1", text="delivered, link reviewed", proofs=("x:1",),
-                    attestation=Attestation(who="Jorge", date="2026-02-01"))
+    attested = Need(
+        id="A-1",
+        text="delivered, link reviewed",
+        proofs=("x:1",),
+        attestation=Attestation(who="Jorge", date="2026-02-01"),
+    )
     results = {r.need.id: r for r in resolve([unattested, attested], {"x": _delivered()})}
     assert any("warrant not human-reviewed" in w for w in results["U-1"].warnings)
     assert not any("warrant not human-reviewed" in w for w in results["A-1"].warnings)

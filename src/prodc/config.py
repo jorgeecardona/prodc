@@ -76,9 +76,7 @@ class Config:
                     delivered_tags=_as_str_list(
                         tbl.get("delivered", []), f"[proofs.{name}].delivered"
                     ),
-                    pending_tags=_as_str_list(
-                        tbl.get("pending", []), f"[proofs.{name}].pending"
-                    ),
+                    pending_tags=_as_str_list(tbl.get("pending", []), f"[proofs.{name}].pending"),
                     results=results_s,
                 )
             elif kind == "pytest":

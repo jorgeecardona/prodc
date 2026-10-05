@@ -121,8 +121,10 @@ class Resolver:
         if not need.proofs:
             return NeedResult(need, NeedState.HOLE)
         results = [_resolve_proof(p, self._adapters) for p in need.proofs]
-        detail = [f"{p} → {r.state.value}{'*' if r.declared else ''} ({r.detail})"
-                  for p, r in zip(need.proofs, results, strict=True)]
+        detail = [
+            f"{p} → {r.state.value}{'*' if r.declared else ''} ({r.detail})"
+            for p, r in zip(need.proofs, results, strict=True)
+        ]
         delivered = sum(1 for r in results if r.state is ProofState.DELIVERED)
         declared = any(r.declared for r in results if r.state is ProofState.DELIVERED)
         if any(r.state is ProofState.BROKEN for r in results):

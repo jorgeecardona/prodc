@@ -62,7 +62,9 @@ def _project(tmp_path: Path) -> Path:
     return tmp_path / "prodc.toml"
 
 
-def test_board_shows_summary_and_warrant(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_board_shows_summary_and_warrant(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     code = main(["status", "--config", str(_project(tmp_path))])
     out = capsys.readouterr().out
     assert code == 0  # a must-HOLE is an honest gap, never a failure
@@ -152,9 +154,7 @@ def test_show_unknown_need_exits_2(tmp_path: Path, capsys: pytest.CaptureFixture
     assert code == 2
 
 
-def test_portfolio_rolls_up_many_repos(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_portfolio_rolls_up_many_repos(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     a = _project(tmp_path / "alpha")
     b = _project(tmp_path / "beta")
     code = main(["portfolio", str(a), str(b)])

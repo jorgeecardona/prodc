@@ -33,6 +33,7 @@ from .status import (
     state_priority,
     summarize,
 )
+from .writer import Edit, WriteError, add_need, set_field
 
 _LABEL = {
     NeedState.DELIVERED: "DELIVERED",
@@ -362,8 +363,11 @@ def _render_show(r: NeedResult) -> str:
         lines.append("  sources:")
         for s in need.sources:
             bits = [s.kind.value]
-            bits += [f"{k}={v}" for k, v in (("who", s.who), ("date", s.date),
-                                             ("locator", s.locator)) if v]
+            bits += [
+                f"{k}={v}"
+                for k, v in (("who", s.who), ("date", s.date), ("locator", s.locator))
+                if v
+            ]
             line = "    - " + "  ".join(bits)
             lines.append(line + (f'  "{s.quote}"' if s.quote else ""))
     else:
@@ -386,8 +390,13 @@ def _show_json(r: NeedResult) -> str:
         {
             "label": need.label,
             "sources": [
-                {"kind": s.kind.value, "who": s.who, "date": s.date,
-                 "quote": s.quote, "locator": s.locator}
+                {
+                    "kind": s.kind.value,
+                    "who": s.who,
+                    "date": s.date,
+                    "quote": s.quote,
+                    "locator": s.locator,
+                }
                 for s in need.sources
             ],
             "proofs": list(need.proofs),
@@ -428,8 +437,12 @@ def _render_brief(client: str, results: list[NeedResult]) -> str:
     for r in open_:
         bang = "!!" if r.need.must else "  "
         gaps = " · ".join(
-            g for g in ("opinion" if r.need.is_opinion else "",
-                        "HOLE" if r.state is NeedState.HOLE else "") if g
+            g
+            for g in (
+                "opinion" if r.need.is_opinion else "",
+                "HOLE" if r.state is NeedState.HOLE else "",
+            )
+            if g
         )
         out.append(f"  {bang} {r.need.id:<12} [{gaps}]  {r.need.text}")
     return "\n".join(out)
@@ -573,6 +586,56 @@ def _argument_json(model: Model, defects: list[str]) -> str:
     )
 
 
+def _emit_edit(edit: Edit, dry_run: bool, as_json: bool) -> int:
+    if as_json:
+        print(json.dumps({"file": edit.path.name, "dry_run": dry_run, "diff": edit.diff}, indent=2))
+    else:
+        print(f"{'would edit' if dry_run else 'edited'} {edit.path.name}")
+        print(edit.diff, end="")
+    return 0
+
+
+def _cmd_set(args: argparse.Namespace) -> int:
+    """Set or append one field on an existing need, validated against the loader."""
+    cfg_path = Path(args.config)
+    if not cfg_path.exists():
+        print(f"prodc: no config at {cfg_path}", file=sys.stderr)
+        return 2
+    try:
+        cfg = Config.load(cfg_path)
+        edit = set_field(
+            cfg, args.need_id, args.assignment, expect_sha=args.expect_sha, dry_run=args.dry_run
+        )
+    except (ConfigError, WriteError) as exc:
+        print(f"prodc: {exc}", file=sys.stderr)
+        return 2
+    return _emit_edit(edit, args.dry_run, args.json)
+
+
+def _cmd_add(args: argparse.Namespace) -> int:
+    """Create a new need from an agent, with a proxy/internal provenance source."""
+    cfg_path = Path(args.config)
+    if not cfg_path.exists():
+        print(f"prodc: no config at {cfg_path}", file=sys.stderr)
+        return 2
+    try:
+        cfg = Config.load(cfg_path)
+        edit = add_need(
+            cfg,
+            args.need_id,
+            args.text,
+            who=args.who,
+            kind=args.kind,
+            file=args.file,
+            expect_sha=args.expect_sha,
+            dry_run=args.dry_run,
+        )
+    except (ConfigError, WriteError) as exc:
+        print(f"prodc: {exc}", file=sys.stderr)
+        return 2
+    return _emit_edit(edit, args.dry_run, args.json)
+
+
 def _cmd_argument(args: argparse.Namespace) -> int:
     """Show the GSN assurance graph and its defects (unsupported claim, dangling assumption)."""
     loaded = _load_or_report(args)
@@ -628,9 +691,7 @@ def _render_portfolio(rows: list[_RepoRow]) -> str:
         p = row.provenance
         prov = f"{p['interview']}/{p['artifact']}/{p['proxy']}/{p['internal']}/{p['opinion']}"
         cov = f"{round(row.coverage * 100)}%"
-        out.append(
-            f"  {row.repo:<18} {cov:>4}  {row.must_hole:>9}  {row.broken:>6}   {prov}"
-        )
+        out.append(f"  {row.repo:<18} {cov:>4}  {row.must_hole:>9}  {row.broken:>6}   {prov}")
     return "\n".join(out)
 
 
@@ -659,7 +720,9 @@ def _cmd_diff(args: argparse.Namespace) -> int:
     except (OSError, ValueError) as exc:
         print(f"prodc: cannot read snapshot {snap}: {exc}", file=sys.stderr)
         return 2
-    raw_needs = cast("dict[str, object]", payload).get("needs") if isinstance(payload, dict) else None
+    raw_needs = (
+        cast("dict[str, object]", payload).get("needs") if isinstance(payload, dict) else None
+    )
     old: dict[str, str] = {}
     for n in cast("list[object]", raw_needs) if isinstance(raw_needs, list) else []:
         if isinstance(n, dict):
@@ -759,12 +822,60 @@ def main(argv: list[str] | None = None) -> int:
     ar.add_argument("--strict", action="store_true", help="exit 1 if the graph has any defect")
     ar.set_defaults(func=_cmd_argument)
 
+    st2 = sub.add_parser("set", help="set or append one field on a need (writes YAML)")
+    st2.add_argument("need_id", help="the need id to edit, e.g. N-1")
+    st2.add_argument("assignment", help="key=value, or key+=value to append (proofs/children)")
+    st2.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    st2.add_argument("--json", action="store_true", help="machine-readable output")
+    st2.add_argument(
+        "--dry-run", action="store_true", help="validate and show the diff, don't write"
+    )
+    st2.add_argument(
+        "--expect-sha",
+        default=None,
+        metavar="SHA256",
+        help="refuse if the file's content hash differs (optimistic lock)",
+    )
+    st2.set_defaults(func=_cmd_set)
+
+    ad = sub.add_parser("add", help="create a new agent-authored need (writes YAML)")
+    ad.add_argument("noun", choices=["need"], help="what to add (need)")
+    ad.add_argument("need_id", help="the new need's id, e.g. N-9")
+    ad.add_argument("--text", required=True, help="the need text")
+    ad.add_argument("--who", required=True, help="the author (recorded on the provenance source)")
+    ad.add_argument(
+        "--kind",
+        choices=["internal", "proxy"],
+        default="internal",
+        help="provenance source kind (never interview for an agent)",
+    )
+    ad.add_argument(
+        "--file",
+        required=True,
+        metavar="PATH",
+        help="prodc file to write into, relative to the config (must match a glob)",
+    )
+    ad.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    ad.add_argument("--json", action="store_true", help="machine-readable output")
+    ad.add_argument(
+        "--dry-run", action="store_true", help="validate and show the diff, don't write"
+    )
+    ad.add_argument(
+        "--expect-sha",
+        default=None,
+        metavar="SHA256",
+        help="refuse if the file's content hash differs (optimistic lock)",
+    )
+    ad.set_defaults(func=_cmd_add)
+
     pf = sub.add_parser("portfolio", help="roll up many repos into one scoreboard")
     pf.add_argument("configs", nargs="+", metavar="PRODC_TOML", help="one or more prodc.toml paths")
     pf.add_argument("--json", action="store_true", help="machine-readable output")
     pf.set_defaults(func=_cmd_portfolio)
 
-    df = sub.add_parser("diff", help="diff the current board against a prior status --json snapshot")
+    df = sub.add_parser(
+        "diff", help="diff the current board against a prior status --json snapshot"
+    )
     df.add_argument("snapshot", help="path to a saved `prodc status --json` file")
     df.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     df.add_argument("--json", action="store_true", help="machine-readable output")
