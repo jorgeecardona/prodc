@@ -380,3 +380,25 @@ def test_status_scoped_to_client(tmp_path: Path, capsys: pytest.CaptureFixture[s
     ids = {n["id"] for n in payload["needs"]}
     assert ids == {"B-1", "A-1"}  # acme's need + the shared baseline; globex excluded
     assert payload["summary"]["total"] == 2
+
+
+def test_lint_fails_on_must_opinion_and_broken(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    (tmp_path / "needs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "prodc.toml").write_text("[prodc]\nneeds = [\"needs/*.yaml\"]\n", encoding="utf-8")
+    (tmp_path / "needs" / "a.yaml").write_text(
+        "needs:\n"
+        "  - id: M-1\n    text: a must with no evidence\n    must: true\n"       # must-opinion → error
+        "  - id: B-1\n    text: dangling\n    proofs: [nope:x]\n",                 # BROKEN → error
+        encoding="utf-8")
+    p = str(tmp_path / "prodc.toml")
+    code = main(["lint", "--config", p])
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "must-have is an opinion" in out and "BROKEN proof" in out
+    assert "2 error(s)" in out
+
+
+def test_lint_clean_board_passes(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(["lint", "--config", str(_project(tmp_path))])  # D-1 delivered, H-1 sourced, O-1 opinion (not must)
+    capsys.readouterr()
+    assert code == 0  # no BROKEN, no must-opinion → passes (O-1 is an opinion but not a must)

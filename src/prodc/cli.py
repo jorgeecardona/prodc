@@ -314,6 +314,59 @@ def _load_or_report(args: argparse.Namespace) -> tuple[Config, Model] | None:
         return None
 
 
+def _annotate_board_warnings(results: list[NeedResult], needs: list[Need]) -> None:
+    """Append the cross-need hygiene warnings (shared proofs #45, seam coverage #44)."""
+    shared = shared_proof_warnings(results)
+    flow_orphans = flow_orphan_warnings(needs)
+    for r in results:
+        if r.need.id in shared:
+            r.warnings.append(shared[r.need.id])
+        if r.need.id in flow_orphans:
+            r.warnings.append("belongs to no flow — seam not covered (#44)")
+
+
+def _lint_errors(results: list[NeedResult]) -> list[str]:
+    """Hard problems a lint gate fails on: a dangling proof, or a must-have with no evidence."""
+    errors: list[str] = []
+    for r in sorted(results, key=lambda x: x.need.id):
+        if r.state is NeedState.BROKEN:
+            errors.append(f"{r.need.id}: BROKEN proof — {'; '.join(r.detail)}")
+        if r.need.must and r.need.is_opinion:
+            errors.append(f"{r.need.id}: must-have is an opinion (no evidence)")
+    return errors
+
+
+def _cmd_lint(args: argparse.Namespace) -> int:
+    """Gate the board: fail on hard problems (BROKEN, must-opinion); list hygiene warnings.
+
+    The red-gate counterpart to `status` — so drift is a CI failure, not something you notice
+    by eye. `--strict` also fails on any hygiene warning.
+    """
+    loaded = _load_or_report(args)
+    if loaded is None:
+        return 2
+    cfg, model = loaded
+    needs = list(model.needs)
+    results = resolve(needs, cfg.adapters, cfg.source_adapters)
+    _annotate_board_warnings(results, needs)
+    errors = _lint_errors(results)
+    warnings = [(r.need.id, w) for r in sorted(results, key=lambda x: x.need.id) for w in r.warnings]
+    if args.json:
+        print(json.dumps(
+            {"errors": errors, "warnings": [{"id": i, "warning": w} for i, w in warnings]},
+            indent=2,
+        ))
+    else:
+        for e in errors:
+            print(f"  ERROR  {e}")
+        for nid, w in warnings:
+            print(f"  warn   {nid}: {w}")
+        print(f"lint: {len(errors)} error(s), {len(warnings)} warning(s)")
+    if errors or (args.strict and warnings):
+        return 1
+    return 0
+
+
 def _cmd_status(args: argparse.Namespace) -> int:
     loaded = _load_or_report(args)
     if loaded is None:
@@ -327,13 +380,7 @@ def _cmd_status(args: argparse.Namespace) -> int:
     if args.goal:
         needs = [n for n in needs if n.goal == args.goal]
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
-    shared = shared_proof_warnings(results)  # cross-need hygiene (#45), a board-level fact
-    flow_orphans = flow_orphan_warnings(needs)  # seam coverage (#44)
-    for r in results:
-        if r.need.id in shared:
-            r.warnings.append(shared[r.need.id])
-        if r.need.id in flow_orphans:
-            r.warnings.append("belongs to no flow — seam not covered (#44)")
+    _annotate_board_warnings(results, needs)
     summary = summarize(results)
     orphan_map = orphans(needs, cfg.adapters)
     recs = recurrence(needs)
@@ -904,6 +951,12 @@ def main(argv: list[str] | None = None) -> int:
         help="gate: exit 1 if more than N proof scenarios are claimed by no need",
     )
     st.set_defaults(func=_cmd_status)
+
+    ln = sub.add_parser("lint", help="gate the board: fail on BROKEN proofs and must-opinions")
+    ln.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    ln.add_argument("--json", action="store_true", help="machine-readable output")
+    ln.add_argument("--strict", action="store_true", help="also fail on any hygiene warning")
+    ln.set_defaults(func=_cmd_lint)
 
     sh = sub.add_parser("show", help="show one need as a citable answer")
     sh.add_argument("need_id", help="the need id to show, e.g. N-1")
