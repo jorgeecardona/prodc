@@ -303,3 +303,21 @@ def test_non_product_need_excluded_from_coverage() -> None:
     s = summarize(results)
     assert s.total == 1 and s.delivered == 1 and s.coverage == 1.0  # I-1 not counted
     assert s.hole == 0  # the non-product need is not a HOLE in the denominator
+
+
+def test_flow_orphan_warning() -> None:
+    from prodc.status import flow_orphan_warnings
+
+    needs = [
+        Need(id="F-1", text="a flow", children=("L-1",)),
+        Need(id="L-1", text="in the flow"),
+        Need(id="L-2", text="in no flow"),
+    ]
+    assert flow_orphan_warnings(needs) == {"L-2"}  # L-1 is in F-1; L-2 belongs to no flow
+
+
+def test_flow_orphan_silent_without_flows() -> None:
+    from prodc.status import flow_orphan_warnings
+
+    needs = [Need(id="A", text="a"), Need(id="B", text="b")]
+    assert flow_orphan_warnings(needs) == set()  # no flows → no seam to miss

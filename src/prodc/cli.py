@@ -25,6 +25,7 @@ from .status import (
     Summary,
     applicable_needs,
     argument_defects,
+    flow_orphan_warnings,
     goal_report,
     orphans,
     rank,
@@ -123,8 +124,8 @@ def _render(results: list[NeedResult], wide: bool = False) -> str:
     # matters?). A need can be green on one and empty on the other — that gap is the point.
     out.append(f"  {'':2} {'id':<9} {'GROUNDS':<10}{'':5} {'need':<{width}}  WARRANT")
     out.append(
-        "  legend: * declared (no results artifact)  ·  !! must  ·  "
-        "GROUNDS = test proof  ·  WARRANT = evidence source"
+        "  legend: * declared (no results artifact)  ·  !! must  ·  ⊟ flow (rolls up children)"
+        "  ·  GROUNDS = test proof  ·  WARRANT = evidence source"
     )
     for who in sorted(groups):
         rs = sorted(groups[who], key=state_priority)
@@ -138,9 +139,11 @@ def _render(results: list[NeedResult], wide: bool = False) -> str:
             bang = "!!" if r.need.must else "  "
             star = "*" if r.declared and r.state is NeedState.DELIVERED else " "
             nm = f"{r.delivered}/{r.total}" if r.total else ""
+            flow = "⊟ " if r.need.children else ""  # a flow rolls up its children (#44)
+            text = _clip(flow + r.need.text, width)
             out.append(
                 f"  {bang} {r.need.id:<9} {_LABEL[r.state]:<9}{star} {nm:<5} "
-                f"{_clip(r.need.text, width):<{width}}  {_warrant(r.need)}"
+                f"{text:<{width}}  {_warrant(r.need)}"
             )
             for w in r.warnings:
                 out.append(f"       ⚠ {w}")
@@ -325,9 +328,12 @@ def _cmd_status(args: argparse.Namespace) -> int:
         needs = [n for n in needs if n.goal == args.goal]
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
     shared = shared_proof_warnings(results)  # cross-need hygiene (#45), a board-level fact
+    flow_orphans = flow_orphan_warnings(needs)  # seam coverage (#44)
     for r in results:
         if r.need.id in shared:
             r.warnings.append(shared[r.need.id])
+        if r.need.id in flow_orphans:
+            r.warnings.append("belongs to no flow — seam not covered (#44)")
     summary = summarize(results)
     orphan_map = orphans(needs, cfg.adapters)
     recs = recurrence(needs)

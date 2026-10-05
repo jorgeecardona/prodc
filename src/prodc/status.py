@@ -385,6 +385,22 @@ def argument_defects(argument: list[ArgNode]) -> list[str]:
     return out
 
 
+def flow_orphan_warnings(needs: list[Need]) -> set[str]:
+    """Leaf needs that belong to no flow — the seam-coverage analogue of orphan proofs (#44).
+
+    A product feels half-baked at the seams (the walk *between* stories), which only a flow
+    (a need with children) scores. Once any flow exists, a leaf referenced by no flow is a
+    gap in that seam coverage. With no flows at all this is silent — there's no seam to miss.
+    """
+    flows = [n for n in needs if n.children]
+    if not flows:
+        return set()
+    in_a_flow: set[str] = set()
+    for flow in flows:
+        in_a_flow.update(flow.children)
+    return {n.id for n in needs if not n.children and n.id not in in_a_flow}
+
+
 def shared_proof_warnings(results: list[NeedResult]) -> dict[str, str]:
     """Flag a need whose *every* proof is also claimed by another need (#45).
 
