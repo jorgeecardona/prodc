@@ -190,6 +190,27 @@ def set_field(
     return _validated(config, path, old_text, _dump(doc), dry_run)
 
 
+def set_importance(
+    config: Config, need_id: str, level: int, when: str, *, expect_sha: str | None, dry_run: bool
+) -> Edit:
+    """Set a need's importance and record ``importance_set_at`` in one edit (#59).
+
+    The level is already resolved against the rubric by the caller; this just writes both fields
+    together so ranking never refines on a number nobody has revisited.
+    """
+    path, _ = _locate(config, need_id)
+    doc, old_text = _read_doc(path)
+    if expect_sha is not None and _sha256(old_text) != expect_sha:
+        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
+    for raw in _need_list(doc, path):
+        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
+            need = cast("dict[str, object]", raw)
+            need["importance"] = level
+            need["importance_set_at"] = when
+            break
+    return _validated(config, path, old_text, _dump(doc), dry_run)
+
+
 def capture_source(
     config: Config,
     need_id: str,

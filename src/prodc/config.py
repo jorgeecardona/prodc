@@ -49,6 +49,35 @@ class Config:
     source_adapters: dict[str, SourceAdapter] = field(default_factory=dict[str, SourceAdapter])
     duplicate_threshold: float = 0.8  # [lint].duplicate_threshold — dupe score to flag (#55)
     stale_after_days: int | None = None  # [lint].stale_after_days — flag older evidence (#58)
+    importance_levels: dict[int, tuple[str, str]] = field(
+        default_factory=dict[int, tuple[str, str]]
+    )  # [importance].levels — ordinal → (label, meaning); empty = no rubric declared (#59)
+    importance_revisit_days: int | None = None  # [lint].importance_revisit_days (#59)
+
+    def importance_label(self, level: int | None) -> str | None:
+        """The declared label for an importance level, or None if unset/undeclared (#59)."""
+        if level is None:
+            return None
+        pair = self.importance_levels.get(level)
+        return pair[0] if pair else None
+
+    def resolve_importance(self, value: str) -> int:
+        """Map a CLI importance value (a number or a declared label) to a valid level (#59).
+
+        With a rubric declared, the value must be one of its levels (by number or label); without
+        one, any integer is accepted so the bare ordinal keeps working. Raises on anything else.
+        """
+        raw = value.strip()
+        if self.importance_levels:
+            for level, (label, _meaning) in self.importance_levels.items():
+                if raw == str(level) or raw.lower() == label.lower():
+                    return level
+            allowed = ", ".join(f"{n}={lbl}" for n, (lbl, _m) in sorted(self.importance_levels.items()))
+            raise ConfigError(f"importance {raw!r} is not on the scale ({allowed})")
+        try:
+            return int(raw)
+        except ValueError:
+            raise ConfigError(f"importance {raw!r} is not an integer (no rubric declared)") from None
 
     @classmethod
     def load(cls, path: Path) -> Config:
@@ -131,6 +160,30 @@ class Config:
         stale = lint_tbl.get("stale_after_days")
         if stale is not None and (not isinstance(stale, int) or isinstance(stale, bool) or stale < 1):
             raise ConfigError("[lint].stale_after_days must be a positive integer")
+        revisit = lint_tbl.get("importance_revisit_days")
+        if revisit is not None and (
+            not isinstance(revisit, int) or isinstance(revisit, bool) or revisit < 1
+        ):
+            raise ConfigError("[lint].importance_revisit_days must be a positive integer")
+
+        importance_levels: dict[int, tuple[str, str]] = {}
+        imp_tbl = _as_dict(raw.get("importance", {}), "[importance]")
+        rows = imp_tbl.get("levels", [])
+        if not isinstance(rows, list):
+            raise ConfigError("[importance].levels must be a list of [number, label, meaning]")
+        for i, row in enumerate(cast("list[object]", rows)):
+            if (
+                not isinstance(row, list)
+                or len(cast("list[object]", row)) != 3
+                or not isinstance(row[0], int)
+                or isinstance(row[0], bool)
+                or not isinstance(row[1], str)
+                or not isinstance(row[2], str)
+            ):
+                raise ConfigError(
+                    f"[importance].levels[{i}] must be [number, label, meaning]"
+                )
+            importance_levels[row[0]] = (row[1], row[2])
 
         return cls(
             root=root,
@@ -139,4 +192,6 @@ class Config:
             source_adapters=source_adapters,
             duplicate_threshold=float(dup),
             stale_after_days=stale,
+            importance_levels=importance_levels,
+            importance_revisit_days=revisit,
         )

@@ -39,7 +39,7 @@ Each rewrites one YAML file, re-loads the whole model as validation, reverts on 
 
 | Command | Does | Example |
 |---|---|---|
-| `set <id> key=value` | set one field; `key+=value` appends to `proofs`/`children` | `prodc set N-2 proofs+=web:orders.feature#Export` |
+| `set <id> key=value` | set one field; `key+=value` appends to `proofs`/`children`; `importance=<n\|label>` is checked against the `[importance]` rubric and stamps `importance_set_at` | `prodc set N-2 importance=needed` |
 | `capture <id> --kind K` | append a source; `--who --date --quote --locator --observed-at` (observed-at defaults to today, for staleness) | `prodc capture N-3 --kind interview --who Ana --date 2026-10-05 --quote "…"` |
 | `accept <id> --who W --date D` | add an `accept:W@D` proof; `--revoke` removes it | `prodc accept N-2 --who jorge --date 2026-10-05` |
 | `attest <id> --by X --date D` | record a review that the proofs establish the need; `--ai --verdict --comment` | `prodc attest N-1 --by claude-fable-5-1 --ai --date 2026-10-05 --verdict pass` |

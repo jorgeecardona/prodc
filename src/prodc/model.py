@@ -131,6 +131,7 @@ class Need:
     client: str | None = None  # which client this instance is for; None = shared baseline
     variant_of: str | None = None  # id of the baseline need this specialises; None = standalone
     importance: int | None = None  # author-supplied ordinal (higher = more); refines ranking
+    importance_set_at: str | None = None  # ISO date importance was last set/revisited (#59)
     claim: str | None = None  # what delivering this need would establish — the warrant to review
     attestation: Attestation | None = None  # human sign-off that the proofs establish the claim
     goal: str | None = None  # id of the Goal this need serves; None = no objective (flagged)

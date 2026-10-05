@@ -41,7 +41,16 @@ from .status import (
     state_priority,
     summarize,
 )
-from .writer import Edit, WriteError, accept, add_need, attest, capture_source, set_field
+from .writer import (
+    Edit,
+    WriteError,
+    accept,
+    add_need,
+    attest,
+    capture_source,
+    set_field,
+    set_importance,
+)
 
 _LABEL = {
     NeedState.DELIVERED: "DELIVERED",
@@ -290,6 +299,7 @@ def _need_payload(r: NeedResult) -> dict[str, object]:
         "release": need.release,
         "product": need.product,
         "importance": need.importance,
+        "importance_set_at": need.importance_set_at,
         "claim": need.claim,
         "attestation": (
             {
@@ -401,6 +411,31 @@ def _annotate_duplicate_warnings(
             by_id[pair.b.id].warnings.append(msg_b)
 
 
+def _annotate_importance_warnings(results: list[NeedResult], cfg: Config) -> None:
+    """Flag importance values off the rubric, or set long ago / never dated (#59)."""
+    today = date.today()
+    for r in results:
+        imp = r.need.importance
+        if imp is None:
+            continue
+        if cfg.importance_levels and imp not in cfg.importance_levels:
+            allowed = ", ".join(str(n) for n in sorted(cfg.importance_levels))
+            r.warnings.append(f"importance {imp} is off the declared scale ({allowed}) — #59")
+            continue
+        when = r.need.importance_set_at
+        if when is None:
+            r.warnings.append("importance set but no revisit date (`set importance` stamps one) — #59")
+        elif cfg.importance_revisit_days is not None:
+            try:
+                days = (today - date.fromisoformat(when)).days
+            except ValueError:
+                days = None
+            if days is not None and days > cfg.importance_revisit_days:
+                r.warnings.append(
+                    f"importance set {days}d ago (> {cfg.importance_revisit_days}d) — revisit (#59)"
+                )
+
+
 def _lint_errors(results: list[NeedResult]) -> list[str]:
     """Hard problems a lint gate fails on: a dangling proof, or a must-have with no evidence."""
     errors: list[str] = []
@@ -441,6 +476,7 @@ def _cmd_lint(args: argparse.Namespace) -> int:
             age = evidence_age_days(r.need, today)
             if age is not None and age > cfg.stale_after_days:
                 r.warnings.append(f"evidence is {age}d old (> {cfg.stale_after_days}d) — #58")
+    _annotate_importance_warnings(results, cfg)
     errors = _lint_errors(results)
     warnings = [(r.need.id, w) for r in sorted(results, key=lambda x: x.need.id) for w in r.warnings]
     if args.json:
@@ -541,7 +577,7 @@ def _exit_code(args: argparse.Namespace, summary: Summary, orphan_total: int) ->
     return 0
 
 
-def _render_show(r: NeedResult) -> str:
+def _render_show(r: NeedResult, importance_label: str | None = None) -> str:
     """One need as a citable answer — the artifact you drop into a thread."""
     need = r.need
     who = (need.who + (f" ({need.label})" if need.label else "")) if need.who else "(unassigned)"
@@ -552,6 +588,10 @@ def _render_show(r: NeedResult) -> str:
         f"  grounds: {_LABEL[r.state]}{nm}    warrant: {_warrant(need)}",
         f"  shape: {ears_shape(need.text).value}",
     ]
+    if need.importance is not None:
+        label = f" ({importance_label})" if importance_label else ""
+        seen = f", set {need.importance_set_at}" if need.importance_set_at else ""
+        lines.append(f"  importance: {need.importance}{label}{seen}")
     if need.goal:
         lines.append(f"  goal: {need.goal}")
     if need.release:
@@ -628,7 +668,7 @@ def _cmd_show(args: argparse.Namespace) -> int:
     if r is None:
         print(f"prodc: no need '{args.need_id}'", file=sys.stderr)
         return 2
-    print(_show_json(r) if args.json else _render_show(r))
+    print(_show_json(r) if args.json else _render_show(r, cfg.importance_label(r.need.importance)))
     return 0
 
 
@@ -820,9 +860,20 @@ def _cmd_set(args: argparse.Namespace) -> int:
         return 2
     try:
         cfg = Config.load(cfg_path)
-        edit = set_field(
-            cfg, args.need_id, args.assignment, expect_sha=args.expect_sha, dry_run=args.dry_run
-        )
+        # `set importance=…` goes through its own path so the value is checked against the
+        # rubric and `importance_set_at` is stamped in the same edit (#59).
+        key, sep, raw = args.assignment.partition("=")
+        if sep and "+" not in key and key.strip() == "importance":
+            level = cfg.resolve_importance(raw)
+            edit = set_importance(
+                cfg, args.need_id, level, date.today().isoformat(),
+                expect_sha=args.expect_sha, dry_run=args.dry_run,
+            )
+        else:
+            edit = set_field(
+                cfg, args.need_id, args.assignment,
+                expect_sha=args.expect_sha, dry_run=args.dry_run,
+            )
     except (ConfigError, WriteError) as exc:
         print(f"prodc: {exc}", file=sys.stderr)
         return 2

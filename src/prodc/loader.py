@@ -137,6 +137,7 @@ def _need(
     client = _opt_str(tbl.get("client"), f"{where}.client") or file_client
     variant_of = _opt_str(tbl.get("variant_of"), f"{where}.variant_of")
     importance = _opt_importance(tbl.get("importance"), f"{where}.importance")
+    importance_set_at = _opt_str(tbl.get("importance_set_at"), f"{where}.importance_set_at")
     claim = _opt_str(tbl.get("claim"), f"{where}.claim")
     attestation = _attestation(tbl.get("attestation"), f"{where}.attestation")
     goal = _opt_str(tbl.get("goal"), f"{where}.goal")
@@ -195,6 +196,7 @@ def _need(
         product=product,
         not_duplicate_of=not_duplicate_of,
         not_variant_of=not_variant_of,
+        importance_set_at=importance_set_at,
     )
 
 
