@@ -402,3 +402,24 @@ def test_lint_clean_board_passes(tmp_path: Path, capsys: pytest.CaptureFixture[s
     code = main(["lint", "--config", str(_project(tmp_path))])  # D-1 delivered, H-1 sourced, O-1 opinion (not must)
     capsys.readouterr()
     assert code == 0  # no BROKEN, no must-opinion → passes (O-1 is an opinion but not a must)
+
+
+def test_columns_table_selects_fields(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(["status", "--config", str(_project(tmp_path)), "--columns", "id,state,warrant"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "id" in out and "state" in out and "warrant" in out
+    assert "interview:John" in out  # D-1's warrant column
+    assert "GROUNDS = test proof" not in out  # rich-board legend suppressed in columns mode
+
+
+def test_columns_unknown_errors(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(["status", "--config", str(_project(tmp_path)), "--columns", "id,bogus"])
+    assert code == 2 and "unknown column" in capsys.readouterr().err
+
+
+def test_only_must_filters(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(["status", "--config", str(_project(tmp_path)), "--columns", "id", "--only-must"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "H-1" in out and "D-1" not in out.split("id")[-1]  # only the must-have H-1 shown

@@ -12,6 +12,7 @@ import json
 import os
 import shutil
 import sys
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
@@ -147,6 +148,38 @@ def _render(results: list[NeedResult], wide: bool = False) -> str:
             )
             for w in r.warnings:
                 out.append(f"       ⚠ {w}")
+    return "\n".join(out)
+
+
+_COLUMNS: dict[str, tuple[str, Callable[[NeedResult], str]]] = {
+    "id": ("id", lambda r: r.need.id),
+    "state": ("state", lambda r: _LABEL[r.state]),
+    "grounds": ("grounds", lambda r: f"{r.delivered}/{r.total}" if r.total else ""),
+    "text": ("need", lambda r: r.need.text),
+    "who": ("who", lambda r: r.need.who or ""),
+    "warrant": ("warrant", lambda r: _warrant(r.need)),
+    "declared": ("declared",
+                 lambda r: "yes" if (r.declared and r.state is NeedState.DELIVERED) else ""),
+    "must": ("must", lambda r: "!!" if r.need.must else ""),
+    "opinion": ("opinion", lambda r: "opinion" if r.need.is_opinion else ""),
+    "goal": ("goal", lambda r: r.need.goal or ""),
+    "release": ("release", lambda r: r.need.release or ""),
+    "client": ("client", lambda r: r.need.client or ""),
+}
+
+
+def _render_columns(results: list[NeedResult], columns: list[str]) -> str:
+    """A flat table of exactly the chosen columns — the board cut to the question asked (#40)."""
+    rows = sorted(results, key=state_priority)
+    cells = [[_COLUMNS[c][1](r) for c in columns] for r in rows]
+    headers = [_COLUMNS[c][0] for c in columns]
+    widths = [
+        max([len(headers[i]), *(len(row[i]) for row in cells)])
+        for i in range(len(columns))
+    ]
+    out = ["  ".join(h.ljust(widths[i]) for i, h in enumerate(headers))]
+    for row in cells:
+        out.append("  ".join(row[i].ljust(widths[i]) for i in range(len(columns))))
     return "\n".join(out)
 
 
@@ -387,13 +420,26 @@ def _cmd_status(args: argparse.Namespace) -> int:
     goal_cov, ungoaled = goal_report(results, list(model.goals))
     rel_cov = release_report(results, list(model.releases))
 
+    if args.columns:
+        bad = [c for c in args.columns if c not in _COLUMNS]
+        if bad:
+            print(f"prodc: unknown column(s) {', '.join(bad)} "
+                  f"(available: {', '.join(_COLUMNS)})", file=sys.stderr)
+            return 2
+
     if args.json:
         print(_to_json(results, summary, orphan_map, recs, goal_cov, ungoaled, rel_cov))
     else:
         commit = _git_rev(cfg.root)
         print(f"prodc status — {cfg.root.name}{f' @ {commit}' if commit else ''}")
         print(_summary_line(summary))
-        print(_render([r for r in results if r.need.product], wide=args.wide))
+        visible = [r for r in results if r.need.product]
+        if args.only_must:
+            visible = [r for r in visible if r.need.must]
+        if args.columns:
+            print(_render_columns(visible, args.columns))
+            return _exit_code(args, summary, sum(len(v) for v in orphan_map.values()))
+        print(_render(visible, wide=args.wide))
         out_of_scope = [r for r in results if not r.need.product]
         if out_of_scope:
             print(_render_out_of_scope(out_of_scope))
@@ -929,6 +975,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="scope the board + coverage to one client (its variants + baselines)")
     st.add_argument("--goal", default=None, metavar="ID",
                     help="scope the board + coverage to the needs serving one goal")
+    st.add_argument("--columns", default=None, type=lambda s: [c.strip() for c in s.split(",")],
+                    metavar="COLS",
+                    help="flat table of just these columns, e.g. id,state,text,warrant")
+    st.add_argument("--only-must", action="store_true", help="show only must-have needs")
     st.add_argument(
         "--min-coverage",
         type=float,
