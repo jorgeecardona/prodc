@@ -26,6 +26,9 @@ exclude_docs: |
 
 nav:
   - Home: index.md
+  - Quickstart: quickstart.md
+  - Commands: commands.md
+  - Model: model.md
 
 markdown_extensions:
   - admonition

@@ -50,7 +50,7 @@ class Config:
 
     @classmethod
     def load(cls, path: Path) -> Config:
-        root = path.parent
+        root = path.resolve().parent  # resolve so root.name is the dir, not "" for a bare file
         raw = _as_dict(tomllib.loads(path.read_text(encoding="utf-8")), "prodc.toml")
 
         prodc_tbl = _as_dict(raw.get("prodc", {}), "[prodc]")
