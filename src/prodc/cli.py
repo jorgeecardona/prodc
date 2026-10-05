@@ -31,6 +31,7 @@ from .status import (
     recurrence,
     release_report,
     resolve,
+    shared_proof_warnings,
     state_priority,
     summarize,
 )
@@ -293,6 +294,10 @@ def _cmd_status(args: argparse.Namespace) -> int:
     cfg, model = loaded
     needs = list(model.needs)
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
+    shared = shared_proof_warnings(results)  # cross-need hygiene (#45), a board-level fact
+    for r in results:
+        if r.need.id in shared:
+            r.warnings.append(shared[r.need.id])
     summary = summarize(results)
     orphan_map = orphans(needs, cfg.adapters)
     recs = recurrence(needs)

@@ -275,3 +275,18 @@ def test_rank_recurrence_lifts_shared_baseline() -> None:
     # is real by flipping: give B-2 the recurrence instead
     order2 = [r.need.id for r in rank(results, {"B-2": 5})]
     assert order2.index("B-2") < order2.index("B-1")
+
+
+def test_shared_proof_warning() -> None:
+    from prodc.status import shared_proof_warnings
+
+    # one scenario stands in for two needs; a third has its own proof
+    needs = [
+        Need(id="N-1", text="a", proofs=("web:f#S",)),
+        Need(id="N-2", text="b", proofs=("web:f#S",)),      # every proof shared with N-1
+        Need(id="N-3", text="c", proofs=("web:f#S", "web:f#T")),  # f#T is its own
+    ]
+    results = resolve(needs, {"web": _delivered()})
+    flagged = shared_proof_warnings(results)
+    assert "N-1" in flagged and "N-2" in flagged
+    assert "N-3" not in flagged  # has an independently-claimed proof

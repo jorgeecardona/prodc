@@ -385,6 +385,26 @@ def argument_defects(argument: list[ArgNode]) -> list[str]:
     return out
 
 
+def shared_proof_warnings(results: list[NeedResult]) -> dict[str, str]:
+    """Flag a need whose *every* proof is also claimed by another need (#45).
+
+    `orphans` catches a proof claimed by no need; this catches the opposite inflation — one
+    scenario standing in for many needs, so several green rows rest on a single assertion.
+    Sharing is sometimes legitimate (one behaviour serves two needs), so it is a warning, not
+    a failure. A need with no proof, or at least one proof it alone claims, is not flagged.
+    """
+    by_proof: dict[str, set[str]] = {}
+    for r in results:
+        for p in r.need.proofs:
+            by_proof.setdefault(p, set()).add(r.need.id)
+    out: dict[str, str] = {}
+    for r in results:
+        proofs = r.need.proofs
+        if proofs and all(len(by_proof[p]) > 1 for p in proofs):
+            out[r.need.id] = "every proof shared with another need — weak independent coverage"
+    return out
+
+
 def orphans(needs: list[Need], adapters: dict[str, Adapter]) -> dict[str, list[str]]:
     """Proof units claimed by no need, per enumerable adapter — the reverse of the board.
 
