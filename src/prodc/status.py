@@ -274,25 +274,36 @@ def state_priority(r: NeedResult) -> int:
     return _STATE_RANK[r.state]
 
 
-def _rank_key(r: NeedResult) -> tuple[int, int, int, str]:
+def _rank_key(r: NeedResult, recurrence_counts: dict[str, int]) -> tuple[int, int, int, int, str]:
     """Pure ordering over recorded inputs only — never a conjured score (#34).
 
     1. must + state: a must-HOLE sits at the top, then BROKEN, PENDING, …, DELIVERED.
     2. evidence kind: a real `interview` outranks `proxy`/`internal`/opinion at the same
        state, because a user actually asked — this is what reorders the author's guesses.
-    3. `importance`: the author's optional ordinal, higher first; absent falls to the back
-       of its tier, so it only refines (1)+(2) and never invents priority where none was set.
+    3. recurrence: how many clients share this baseline (#51). Breadth of demand is a
+       first-order, objective signal, so it outranks the author's importance guess.
+    4. `importance`: the author's optional ordinal, higher first; absent falls to the back
+       of its tier, so it only refines 1-3 and never invents priority where none was set.
     """
     state_rank = state_priority(r)
     kind = r.need.strongest_kind
     kind_rank = list(SourceKind).index(kind) if kind is not None else len(SourceKind)
+    recurrence_rank = -recurrence_counts.get(r.need.id, 0)
     importance_rank = -(r.need.importance or 0)
-    return (state_rank, kind_rank, importance_rank, r.need.id)
+    return (state_rank, kind_rank, recurrence_rank, importance_rank, r.need.id)
 
 
-def rank(results: list[NeedResult]) -> list[NeedResult]:
-    """Order a resolved board into a backlog by :func:`_rank_key`."""
-    return sorted(results, key=_rank_key)
+def rank(
+    results: list[NeedResult], recurrence_counts: dict[str, int] | None = None
+) -> list[NeedResult]:
+    """Order a resolved board into a backlog by :func:`_rank_key`.
+
+    ``recurrence_counts`` maps a baseline need id to how many clients share it (from
+    :func:`recurrence`); a shared baseline then outranks a single-client need with the same
+    state and evidence. Omitted, recurrence contributes nothing.
+    """
+    counts = recurrence_counts or {}
+    return sorted(results, key=lambda r: _rank_key(r, counts))
 
 
 def goal_report(

@@ -499,9 +499,9 @@ def _importance_cell(need: Need) -> str:
     return f"imp={need.importance}{' (guess)' if weak else ''}"
 
 
-def _render_plan(results: list[NeedResult]) -> str:
-    ranked = rank(results)
-    out = ["plan — ranked backlog (must + state + evidence, importance refines)"]
+def _render_plan(results: list[NeedResult], recurrence_counts: dict[str, int]) -> str:
+    ranked = rank(results, recurrence_counts)
+    out = ["plan — ranked backlog (must + state + evidence + recurrence, importance refines)"]
     for i, r in enumerate(ranked, 1):
         bang = "!!" if r.need.must else "  "
         imp = _importance_cell(r.need)
@@ -512,8 +512,8 @@ def _render_plan(results: list[NeedResult]) -> str:
     return "\n".join(out)
 
 
-def _plan_json(results: list[NeedResult]) -> str:
-    ranked = rank(results)
+def _plan_json(results: list[NeedResult], recurrence_counts: dict[str, int]) -> str:
+    ranked = rank(results, recurrence_counts)
     return json.dumps(
         {
             "plan": [
@@ -524,6 +524,7 @@ def _plan_json(results: list[NeedResult]) -> str:
                     "must": r.need.must,
                     "state": r.state.value,
                     "warrant": _warrant(r.need),
+                    "recurrence": recurrence_counts.get(r.need.id, 0),
                     "importance": r.need.importance,
                     "importance_is_guess": (
                         r.need.importance is not None
@@ -548,7 +549,12 @@ def _cmd_plan(args: argparse.Namespace) -> int:
     cfg, model = loaded
     needs = list(model.needs)
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
-    print(_plan_json(results) if args.json else _render_plan(results))
+    recurrence_counts = {rec.baseline.id: rec.count for rec in recurrence(needs)}
+    print(
+        _plan_json(results, recurrence_counts)
+        if args.json
+        else _render_plan(results, recurrence_counts)
+    )
     return 0
 
 

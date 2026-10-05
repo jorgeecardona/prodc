@@ -255,3 +255,23 @@ def test_coverage_counts_leaves_not_flow_parents() -> None:
     s = summarize(results)
     assert s.total == 2 and s.delivered == 2  # the 2 leaves only, not 3 (flow excluded)
     assert s.coverage == 1.0
+
+
+def test_rank_recurrence_lifts_shared_baseline() -> None:
+    from prodc.status import rank
+
+    # two baselines, same state (HOLE) and no evidence; B-1 is shared by 2 clients
+    needs = [
+        Need(id="B-1", text="shared need"),
+        Need(id="B-2", text="single-client need"),
+        Need(id="B-1@x", text="shared", client="x", variant_of="B-1"),
+        Need(id="B-1@y", text="shared", client="y", variant_of="B-1"),
+    ]
+    results = resolve(needs, {})
+    counts = {"B-1": 2}  # B-1 shared by 2 clients
+    order = [r.need.id for r in rank(results, counts)]
+    assert order.index("B-1") < order.index("B-2")  # recurrence lifts the shared baseline
+    # without the counts, they order by id (tie) — B-1 before B-2 anyway, so check the boost
+    # is real by flipping: give B-2 the recurrence instead
+    order2 = [r.need.id for r in rank(results, {"B-2": 5})]
+    assert order2.index("B-2") < order2.index("B-1")
