@@ -351,3 +351,14 @@ def test_chdir_bad_dir_errors(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     finally:
         os.chdir(cwd)
     assert code == 2 and "cannot chdir" in capsys.readouterr().err
+
+
+def test_wide_does_not_truncate_long_need(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    (tmp_path / "needs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "prodc.toml").write_text("[prodc]\nneeds = [\"needs/*.yaml\"]\n", encoding="utf-8")
+    long = "the roastery operator can reconcile every drum load against the day's green intake ledger"
+    (tmp_path / "needs" / "a.yaml").write_text(
+        f"needs:\n  - id: N-1\n    text: {long}\n", encoding="utf-8")
+    p = str(tmp_path / "prodc.toml")
+    assert main(["status", "--config", p, "--wide"]) == 0
+    assert long in capsys.readouterr().out  # full text present, no ellipsis

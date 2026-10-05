@@ -94,14 +94,29 @@ def _summary_line(s: Summary) -> str:
     return f"gaps: {gaps}    coverage {s.delivered}/{s.total} ({round(s.coverage * 100)}%)"
 
 
-def _render(results: list[NeedResult]) -> str:
+def _clip(text: str, width: int) -> str:
+    """Fit text to width, breaking at a word boundary with an ellipsis, not mid-word (#39)."""
+    if len(text) <= width:
+        return text
+    budget = width - 1  # leave room for the ellipsis
+    cut = text[:budget]
+    if text[budget] != " " and " " in cut:  # boundary lands mid-word → back up to last space
+        cut = cut[: cut.rfind(" ")]
+    return cut.rstrip() + "…"
+
+
+def _render(results: list[NeedResult], wide: bool = False) -> str:
     groups: dict[str, list[NeedResult]] = {}
     for r in results:
         groups.setdefault(r.need.who or "(unassigned)", []).append(r)
 
     # Size the need column to the terminal; ~54 cols go to the fixed id/state/nm
     # prefix and the warrant suffix. Falls back to 100 cols when there is no tty.
-    width = max(30, shutil.get_terminal_size(fallback=(100, 24)).columns - 54)
+    # --wide gives the column the longest need, so text is never clipped.
+    if wide:
+        width = max((len(r.need.text) for r in results), default=30)
+    else:
+        width = max(30, shutil.get_terminal_size(fallback=(100, 24)).columns - 54)
 
     out: list[str] = []
     # The Toulmin split: GROUNDS (does a test prove it?) vs WARRANT (user signal it
@@ -125,7 +140,7 @@ def _render(results: list[NeedResult]) -> str:
             nm = f"{r.delivered}/{r.total}" if r.total else ""
             out.append(
                 f"  {bang} {r.need.id:<9} {_LABEL[r.state]:<9}{star} {nm:<5} "
-                f"{r.need.text[:width]:<{width}}  {_warrant(r.need)}"
+                f"{_clip(r.need.text, width):<{width}}  {_warrant(r.need)}"
             )
             for w in r.warnings:
                 out.append(f"       ⚠ {w}")
@@ -319,7 +334,7 @@ def _cmd_status(args: argparse.Namespace) -> int:
         commit = _git_rev(cfg.root)
         print(f"prodc status — {cfg.root.name}{f' @ {commit}' if commit else ''}")
         print(_summary_line(summary))
-        print(_render([r for r in results if r.need.product]))
+        print(_render([r for r in results if r.need.product], wide=args.wide))
         out_of_scope = [r for r in results if not r.need.product]
         if out_of_scope:
             print(_render_out_of_scope(out_of_scope))
@@ -850,6 +865,7 @@ def main(argv: list[str] | None = None) -> int:
     st.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     st.add_argument("--json", action="store_true", help="machine-readable output")
     st.add_argument("--strict", action="store_true", help="also exit 1 on opinions")
+    st.add_argument("--wide", action="store_true", help="never truncate the need text")
     st.add_argument(
         "--min-coverage",
         type=float,
