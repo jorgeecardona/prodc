@@ -77,6 +77,9 @@ model via the loader before keeping the change, shows the diff, and supports `--
 - `prodc set <id> key=value` (or `key+=value` for proofs/children) — edit one field.
 - `prodc capture <id> --kind … [--who --date --quote --locator]` — append a source (evidence).
 - `prodc accept <id> --who … --date … [--revoke]` — record a human acceptance pass.
+- `prodc attest <id> --by <who|model> --date … [--ai --verdict … --comment …]` — record a
+  human or AI review that the proofs establish the need (human > AI > none; prodc records the
+  review, the agent makes the model call).
 - `prodc add need <id> --text … --who … --file …` — create a need with agent provenance.
 
 ## Model
