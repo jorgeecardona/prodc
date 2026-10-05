@@ -2,8 +2,10 @@
 
 The one dangerous thing prodc does is edit files, so every edit goes through one gate:
 mutate a copy of the target file, write it, re-run :func:`~prodc.loader.load` as the schema,
-and revert if the model no longer loads. PyYAML's dumper reflows style and drops comments, so
-an edit reformats the whole file it touches — kept to one file per edit, always shown as a diff.
+and revert if the model no longer loads. An in-place edit splices only the changed need's block
+back into the original text (#53), so the file header and every other need keep their comments
+and formatting; only the edited need's own block is reflowed, and an unrecognised file shape
+falls back to a full PyYAML re-dump. One file per edit, always shown as a diff.
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ from __future__ import annotations
 import datetime
 import difflib
 import hashlib
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -73,6 +76,104 @@ def _sha256(text: str) -> str:
 def _dump(doc: dict[str, object]) -> str:
     # sort_keys=False keeps authored key order; the file is still reflowed (comments lost).
     return yaml.safe_dump(doc, sort_keys=False, allow_unicode=True, default_flow_style=False)
+
+
+def _need_block_span(lines: list[str], need_id: str) -> tuple[int, int, int] | None:
+    """Line span [start, end) and item indent of the `needs:` item whose id is ``need_id``.
+
+    Line-based and deliberately conservative: it understands the common prodc layout (a
+    top-level ``needs:`` key whose items are ``- `` at a fixed indent) and returns None for
+    anything it is not sure about, so the caller can fall back to a full re-dump. Trailing
+    blank and comment lines are left out of the span, so a comment that introduces the *next*
+    need is never swallowed.
+    """
+    needs_at = next((i for i, ln in enumerate(lines) if re.match(r"^needs:\s*(#.*)?$", ln)), None)
+    if needs_at is None:
+        return None
+    item_re = None
+    item_indent = -1
+    i = needs_at + 1
+    spans: list[tuple[int, int, int, str | None]] = []  # start, end, indent, id
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+        if stripped == "" or stripped.startswith("#"):
+            i += 1
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        m = re.match(r"^(\s*)-\s", line)
+        if item_re is None:
+            if m is None:
+                return None  # first non-blank line under needs: isn't a list item — unknown shape
+            item_indent = len(m.group(1))
+            item_re = re.compile(rf"^\s{{{item_indent}}}-\s")
+        if indent < item_indent and m is None:
+            break  # dedented past the list — end of needs:
+        if item_re.match(line):
+            spans.append((i, i, item_indent, _item_id(lines, i, item_indent)))
+        elif indent <= item_indent and m is None:
+            break
+        i += 1
+    # close each span at the start of the next item (or `i`, the end of the list region)
+    bounds = [s[0] for s in spans] + [i]
+    for idx, (start, _e, indent, iid) in enumerate(spans):
+        if iid != need_id:
+            continue
+        end = bounds[idx + 1]
+        while end - 1 > start and (lines[end - 1].strip() == "" or lines[end - 1].strip().startswith("#")):
+            end -= 1
+        return start, end, indent
+    return None
+
+
+def _item_id(lines: list[str], start: int, item_indent: int) -> str | None:
+    """The id of the list item beginning at ``lines[start]`` (inline or on a child line)."""
+    first = re.match(r"^\s*-\s+id:\s*(\S+)\s*$", lines[start])
+    if first:
+        return first.group(1).strip("\"'")
+    key_re = re.compile(rf"^\s{{{item_indent + 2}}}id:\s*(\S+)\s*$")
+    j = start + 1
+    while j < len(lines):
+        indent = len(lines[j]) - len(lines[j].lstrip(" "))
+        if lines[j].strip() and indent <= item_indent:
+            break
+        km = key_re.match(lines[j])
+        if km:
+            return km.group(1).strip("\"'")
+        j += 1
+    return None
+
+
+def _render_edit(old_text: str, doc: dict[str, object], need_id: str) -> str:
+    """Re-render after an in-place edit, splicing only the changed need to keep comments (#53).
+
+    Dumps just the edited need's block and replaces its span in the original text, so the file
+    header and every other need stay byte-for-byte. Falls back to a full re-dump (the old
+    behaviour) when the file's shape is anything the splice isn't sure of — the reload gate in
+    :func:`_validated` guards correctness either way.
+    """
+    lines = old_text.splitlines(keepends=True)
+    span = _need_block_span(lines, need_id)
+    needs = doc.get("needs")
+    if span is None or not isinstance(needs, list):
+        return _dump(doc)
+    start, end, indent = span
+    need = next(
+        (
+            cast("dict[str, object]", n)
+            for n in cast("list[object]", needs)
+            if isinstance(n, dict) and cast("dict[str, object]", n).get("id") == need_id
+        ),
+        None,
+    )
+    if need is None:
+        return _dump(doc)
+    dumped = yaml.safe_dump(
+        [need], sort_keys=False, allow_unicode=True, default_flow_style=False
+    )
+    pad = " " * indent
+    block = "".join(pad + ln if ln.strip() else ln for ln in dumped.splitlines(keepends=True))
+    return "".join(lines[:start]) + block + "".join(lines[end:])
 
 
 def _read_doc(path: Path) -> tuple[dict[str, object], str]:
@@ -188,7 +289,7 @@ def set_field(
         if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
             _apply_assignment(cast("dict[str, object]", raw), assignment, path)
             break
-    return _validated(config, path, old_text, _dump(doc), dry_run)
+    return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
 
 
 def set_importance(
@@ -209,7 +310,7 @@ def set_importance(
             need["importance"] = level
             need["importance_set_at"] = when
             break
-    return _validated(config, path, old_text, _dump(doc), dry_run)
+    return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
 
 
 def capture_source(
@@ -255,7 +356,7 @@ def capture_source(
             sources.append(source)
             need["sources"] = sources
             break
-    return _validated(config, path, old_text, _dump(doc), dry_run)
+    return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
 
 
 def attest(
@@ -290,7 +391,7 @@ def attest(
         if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
             cast("dict[str, object]", raw)["attestation"] = att
             break
-    return _validated(config, path, old_text, _dump(doc), dry_run)
+    return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
 
 
 def accept(
@@ -326,7 +427,7 @@ def accept(
                 proofs.append(locator)
             need["proofs"] = proofs
             break
-    return _validated(config, path, old_text, _dump(doc), dry_run)
+    return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
 
 
 def add_need(

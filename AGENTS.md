@@ -22,9 +22,11 @@ prodc: Product management as code: personas, flows, and features traced to evide
 - Format and autofix: `make format` (ruff, line length 100).
 - Lint: `make lint`. Types: `make typecheck` (pyright strict on `src/`).
 - Prefer frozen dataclasses and explicit types. Keep the public API typed (`py.typed`).
-- Dependencies: pyyaml only. Write-back (`prodc set`/`add`) uses PyYAML's dumper, which
-  drops comments and reflows style — so an edit reformats the whole file it touches. Keep each
-  edit to one file, always show the diff, and dump with `sort_keys=False` to preserve key order.
+- Dependencies: pyyaml only. An in-place write-back (`set`/`capture`/`accept`/`attest`) splices
+  only the changed need's block back into the original text, so the file header and other needs
+  keep their comments; only the edited need's block is reflowed, and an unrecognised file shape
+  falls back to a full PyYAML re-dump. Keep each edit to one file, always show the diff, and dump
+  with `sort_keys=False` to preserve key order.
 
 ## Gotchas
 
