@@ -35,7 +35,7 @@ from .status import (
     state_priority,
     summarize,
 )
-from .writer import Edit, WriteError, add_need, capture_source, set_field
+from .writer import Edit, WriteError, accept, add_need, capture_source, set_field
 
 _LABEL = {
     NeedState.DELIVERED: "DELIVERED",
@@ -648,6 +648,24 @@ def _cmd_add(args: argparse.Namespace) -> int:
     return _emit_edit(edit, args.dry_run, args.json)
 
 
+def _cmd_accept(args: argparse.Namespace) -> int:
+    """Record (or --revoke) a human acceptance pass on a need."""
+    cfg_path = Path(args.config)
+    if not cfg_path.exists():
+        print(f"prodc: no config at {cfg_path}", file=sys.stderr)
+        return 2
+    try:
+        cfg = Config.load(cfg_path)
+        edit = accept(
+            cfg, args.need_id, who=args.who, date=args.date, revoke=args.revoke,
+            expect_sha=args.expect_sha, dry_run=args.dry_run,
+        )
+    except (ConfigError, WriteError) as exc:
+        print(f"prodc: {exc}", file=sys.stderr)
+        return 2
+    return _emit_edit(edit, args.dry_run, args.json)
+
+
 def _cmd_capture(args: argparse.Namespace) -> int:
     """Append a Source to an existing need (capture evidence)."""
     cfg_path = Path(args.config)
@@ -936,6 +954,18 @@ def main(argv: list[str] | None = None) -> int:
         help="refuse if the file's content hash differs (optimistic lock)",
     )
     cp.set_defaults(func=_cmd_capture)
+
+    ac = sub.add_parser("accept", help="record a human acceptance pass (accept proof) on a need")
+    ac.add_argument("need_id", help="the need id that was accepted")
+    ac.add_argument("--who", required=True, help="who accepted it")
+    ac.add_argument("--date", required=True, help="when (ISO, e.g. 2026-10-05)")
+    ac.add_argument("--revoke", action="store_true", help="remove this accept proof instead")
+    ac.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    ac.add_argument("--json", action="store_true", help="machine-readable output")
+    ac.add_argument("--dry-run", action="store_true", help="validate and show the diff, don't write")
+    ac.add_argument("--expect-sha", default=None, metavar="SHA256",
+                    help="refuse if the file's content hash differs (optimistic lock)")
+    ac.set_defaults(func=_cmd_accept)
 
     pf = sub.add_parser("portfolio", help="roll up many repos into one scoreboard")
     pf.add_argument("configs", nargs="+", metavar="PRODC_TOML", help="one or more prodc.toml paths")

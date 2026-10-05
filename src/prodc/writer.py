@@ -230,6 +230,42 @@ def capture_source(
     return _validated(config, path, old_text, _dump(doc), dry_run)
 
 
+def accept(
+    config: Config,
+    need_id: str,
+    *,
+    who: str,
+    date: str,
+    revoke: bool,
+    expect_sha: str | None,
+    dry_run: bool,
+) -> Edit:
+    """Record (or revoke) a human acceptance pass as an ``accept:<who>@<date>`` proof (#46).
+
+    Some needs are proven by a person looking, not a test — this makes recording that a
+    one-liner instead of a hand edit. Idempotent: re-accepting the same who/date is a no-op.
+    """
+    locator = f"accept:{who}@{date}"
+    path, _ = _locate(config, need_id)
+    doc, old_text = _read_doc(path)
+    if expect_sha is not None and _sha256(old_text) != expect_sha:
+        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
+    for raw in _need_list(doc, path):
+        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
+            need = cast("dict[str, object]", raw)
+            current = need.get("proofs", [])
+            if not isinstance(current, list):
+                raise WriteError(f"{path.name}: 'proofs' is not a list")
+            proofs = [p for p in cast("list[object]", current)]
+            if revoke:
+                proofs = [p for p in proofs if p != locator]
+            elif locator not in proofs:
+                proofs.append(locator)
+            need["proofs"] = proofs
+            break
+    return _validated(config, path, old_text, _dump(doc), dry_run)
+
+
 def add_need(
     config: Config,
     need_id: str,

@@ -165,3 +165,24 @@ def test_capture_bad_kind_rejected(tmp_path: Path) -> None:
             expect_sha=None,
             dry_run=False,
         )
+
+
+def test_accept_appends_and_is_idempotent(tmp_path: Path) -> None:
+    from prodc.writer import accept
+
+    cfg = _proj(tmp_path, "needs:\n  - id: N-1\n    text: t\n")
+    accept(cfg, "N-1", who="jorge", date="2026-10-05", revoke=False,
+           expect_sha=None, dry_run=False)
+    assert load(cfg).needs[0].proofs == ("accept:jorge@2026-10-05",)
+    accept(cfg, "N-1", who="jorge", date="2026-10-05", revoke=False,
+           expect_sha=None, dry_run=False)  # again
+    assert load(cfg).needs[0].proofs == ("accept:jorge@2026-10-05",)  # no duplicate
+
+
+def test_accept_revoke_removes(tmp_path: Path) -> None:
+    from prodc.writer import accept
+
+    cfg = _proj(tmp_path, "needs:\n  - id: N-1\n    text: t\n    proofs: [accept:jorge@2026-10-05]\n")
+    accept(cfg, "N-1", who="jorge", date="2026-10-05", revoke=True,
+           expect_sha=None, dry_run=False)
+    assert load(cfg).needs[0].proofs == ()
