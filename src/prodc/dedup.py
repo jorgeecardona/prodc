@@ -153,3 +153,58 @@ def duplicate_pairs(
                 pairs.append(DupPair(a, b, score, same))
     pairs.sort(key=lambda p: (-p.score, not p.same_scope, p.a.id, p.b.id))
     return pairs
+
+
+@dataclass(frozen=True)
+class WhoVariant:
+    """A cluster of `who` strings that likely name the same person within one client (#61)."""
+
+    client: str | None
+    whos: tuple[str, ...]  # the distinct who-strings in the cluster, sorted
+    need_ids: tuple[str, ...]  # the needs carrying any of them, sorted
+
+
+def who_variants(needs: list[Need], threshold: float) -> list[WhoVariant]:
+    """Clusters of `who` strings that drift apart within one client — John vs john (#61).
+
+    `role` (#52) is validated at load; `who` is free text, so the same person splits the board
+    when spelled inconsistently. Scoped per client (same name at two clients is not flagged):
+    two whos cluster when they are equal after normalisation (case/whitespace) or their text
+    similarity is >= `threshold`. Only clusters of two or more distinct whos are returned. A soft
+    lint signal — the fix is to normalise the data, so there is no suppression knob.
+    """
+    by_client: dict[str | None, list[Need]] = {}
+    for n in needs:
+        if n.who is not None:
+            by_client.setdefault(n.client, []).append(n)
+
+    out: list[WhoVariant] = []
+    for client, group in by_client.items():
+        whos = sorted({n.who for n in group if n.who is not None})
+        if len(whos) < 2:
+            continue
+        parent = {w: w for w in whos}
+
+        def find(x: str, parent: dict[str, str] = parent) -> str:
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        for i in range(len(whos)):
+            for j in range(i + 1, len(whos)):
+                a, b = whos[i], whos[j]
+                if _normalise(a) == _normalise(b) or similarity(a, b) >= threshold:
+                    parent[find(a)] = find(b)
+
+        clusters: dict[str, list[str]] = {}
+        for w in whos:
+            clusters.setdefault(find(w), []).append(w)
+        for members in clusters.values():
+            if len(members) < 2:
+                continue
+            member_set = set(members)
+            ids = sorted(n.id for n in group if n.who in member_set)
+            out.append(WhoVariant(client, tuple(sorted(members)), tuple(ids)))
+    out.sort(key=lambda v: (v.client or "", v.whos))
+    return out

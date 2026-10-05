@@ -20,7 +20,14 @@ from typing import cast
 
 from . import __version__
 from .config import Config, ConfigError
-from .dedup import DupPair, VariantGroup, duplicate_pairs, matches_for, variant_suggestions
+from .dedup import (
+    DupPair,
+    VariantGroup,
+    duplicate_pairs,
+    matches_for,
+    variant_suggestions,
+    who_variants,
+)
 from .loader import LoaderError, load
 from .model import (
     Goal,
@@ -501,6 +508,13 @@ def _cmd_lint(args: argparse.Namespace) -> int:
             age = evidence_age_days(r.need, today)
             if age is not None and age > cfg.stale_after_days:
                 r.warnings.append(f"evidence is {age}d old (> {cfg.stale_after_days}d) — #58")
+    for v in who_variants(needs, cfg.duplicate_threshold):
+        whos = " / ".join(repr(w) for w in v.whos)
+        for nid in v.need_ids:
+            if nid in by_id:
+                by_id[nid].warnings.append(
+                    f"who may name the same person: {whos} (needs {', '.join(v.need_ids)}) — #61"
+                )
     _annotate_importance_warnings(results, cfg)
     errors = _lint_errors(results)
     warnings = [
