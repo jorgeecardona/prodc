@@ -33,6 +33,7 @@ from .status import (
     goal_report,
     last_observed,
     orphans,
+    proof_suggestions,
     rank,
     recurrence,
     release_report,
@@ -1121,6 +1122,39 @@ def _git_rev(root: Path) -> str | None:
     return ref[:7]
 
 
+def _cmd_suggest(args: argparse.Namespace) -> int:
+    """Propose candidate proof locators for HOLE needs from the adapters' inventories (#54)."""
+    loaded = _load_or_report(args)
+    if loaded is None:
+        return 2
+    cfg, model = loaded
+    needs = list(model.needs)
+    results = resolve(needs, cfg.adapters, cfg.source_adapters)
+    if args.need_id:
+        results = [r for r in results if r.need.id == args.need_id]
+        if not results:
+            print(f"prodc: no need '{args.need_id}'", file=sys.stderr)
+            return 2
+    suggestions = proof_suggestions(
+        results, cfg.adapters, min_score=args.min_score, top=args.top, kind=args.kind
+    )
+    if args.json:
+        print(json.dumps(
+            [{"need": s.need.id, "adapter": s.adapter, "locator": s.locator,
+              "score": round(s.score, 4)} for s in suggestions],
+            indent=2,
+        ))
+    else:
+        last = None
+        for s in suggestions:
+            if s.need.id != last:
+                print(f"{s.need.id}: {s.need.text}")
+                last = s.need.id
+            print(f"    {s.score:.2f}  {s.locator}")
+        print(f"suggest: {len(suggestions)} candidate(s) at min-score {args.min_score:.2f}")
+    return 0
+
+
 def _cmd_recurrence(args: argparse.Namespace) -> int:
     """Show baselines shared across clients; `--suggest` proposes unlinked variant groups (#56)."""
     loaded = _load_or_report(args)
@@ -1426,6 +1460,21 @@ def main(argv: list[str] | None = None) -> int:
         help="similarity for --suggest (0..1); overrides [lint].duplicate_threshold",
     )
     rc.set_defaults(func=_cmd_recurrence)
+
+    sg = sub.add_parser(
+        "suggest", help="propose candidate proofs for HOLE needs from adapter inventories (#54)"
+    )
+    sg.add_argument("need_id", nargs="?", default=None, help="only this need (default: all HOLEs)")
+    sg.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    sg.add_argument("--json", action="store_true", help="machine-readable output")
+    sg.add_argument(
+        "--min-score", type=float, default=0.3, metavar="FRAC",
+        help="minimum text similarity to suggest (0..1, default 0.3)",
+    )
+    sg.add_argument("--top", type=int, default=3, metavar="N", help="max suggestions per need")
+    sg.add_argument("--kind", default=None, metavar="ADAPTER",
+                    help="only suggest from this adapter name")
+    sg.set_defaults(func=_cmd_suggest)
 
     du = sub.add_parser("dupes", help="list candidate duplicate need pairs by text similarity")
     du.add_argument("--config", default="prodc.toml", help="path to prodc.toml")

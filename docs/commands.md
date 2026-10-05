@@ -16,6 +16,7 @@ Every command takes `--config prodc.toml` (default) and `--json`. `prodc -C DIR 
 | `portfolio <toml>…` | Many repos, one scoreboard | `prodc portfolio a/prodc.toml b/prodc.toml` |
 | `dupes` | Candidate duplicate need pairs by text similarity; `--threshold` overrides `[lint].duplicate_threshold` | `prodc dupes --threshold 0.7` |
 | `recurrence` | Baselines shared across clients; `--suggest` proposes unlinked cross-client needs that could share one (set `variant_of` or `not_variant_of`) | `prodc recurrence --suggest` |
+| `suggest [id]` | Candidate proof locators for HOLE needs, ranked by text similarity to adapter inventories; `--min-score --top --kind` | `prodc suggest H-1 --min-score 0.4` |
 
 ### `status` flags
 

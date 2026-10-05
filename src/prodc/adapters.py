@@ -61,6 +61,18 @@ class Adapter(Protocol):
 
 
 @runtime_checkable
+class Inventoried(Protocol):
+    """An adapter that can list every proof unit it knows (for proof discovery, #54).
+
+    Weaker than :class:`Enumerable`: discovery only needs the universe, not the per-payload
+    `covers` mapping the orphan report uses — so an adapter can offer suggestions without
+    changing orphan behaviour.
+    """
+
+    def inventory(self) -> list[str]: ...  # canonical ids of every proof unit
+
+
+@runtime_checkable
 class Enumerable(Protocol):
     """An adapter that can list every proof unit it knows and which a payload claims.
 
@@ -314,6 +326,10 @@ class CoverageAdapter:
             self._cats = out
         return self._cats
 
+    def inventory(self) -> list[str]:
+        """Every catalog category — the universe a coverage proof can point at (#54)."""
+        return sorted(self._load())
+
     def resolve(self, payload: str) -> ProofResult:
         if payload in self._load():
             return ProofResult(ProofState.DELIVERED, True, f"covered by '{payload}'")
@@ -347,6 +363,11 @@ class FieldAdapter:
                         received = {x for x in cast("list[object]", r) if isinstance(x, str)}
             self._data = (surfaced, received)
         return self._data
+
+    def inventory(self) -> list[str]:
+        """Every field the upstream schema knows (surfaced or received) — the universe (#54)."""
+        surfaced, received = self._load()
+        return sorted(surfaced | received)
 
     def resolve(self, payload: str) -> ProofResult:
         surfaced, received = self._load()

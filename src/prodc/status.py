@@ -10,7 +10,8 @@ import contextlib
 from dataclasses import dataclass
 from datetime import date
 
-from .adapters import Adapter, Enumerable, ProofResult, SourceAdapter
+from .adapters import Adapter, Enumerable, Inventoried, ProofResult, SourceAdapter
+from .dedup import similarity
 from .model import (
     SOLUTION_VERBS,
     ArgKind,
@@ -295,6 +296,55 @@ def recurrence(needs: list[Need]) -> list[Recurrence]:
         clients = tuple(sorted({v.client for v in variants if v.client}))
         out.append(Recurrence(by_id[base_id], clients, len(variants)))
     out.sort(key=lambda r: (-r.count, r.baseline.id))
+    return out
+
+
+@dataclass(frozen=True)
+class ProofSuggestion:
+    """A candidate proof locator for a HOLE need, ranked by text similarity (#54)."""
+
+    need: Need
+    adapter: str  # the adapter name the locator resolves through
+    locator: str  # a ready-to-paste proof locator, "<adapter>:<inventory id>"
+    score: float
+
+
+def _matchable(inventory_id: str) -> str:
+    """The human-meaningful part of an inventory id (a scenario title, a field name)."""
+    return inventory_id.rsplit("#", 1)[-1]
+
+
+def proof_suggestions(
+    results: list[NeedResult],
+    adapters: dict[str, Adapter],
+    *,
+    min_score: float,
+    top: int,
+    kind: str | None = None,
+) -> list[ProofSuggestion]:
+    """Rank candidate proofs for every HOLE need against the adapters' inventories (#54).
+
+    For each leaf need with no proof, compare its text with every enumerable adapter's known
+    proof units and return the closest matches as ready-to-paste locators. Read-only — it never
+    writes; ``--apply`` and BROKEN-relink are left to the caller/follow-up.
+    """
+    inventories: list[tuple[str, list[str]]] = [
+        (name, ad.inventory())
+        for name, ad in adapters.items()
+        if isinstance(ad, Inventoried) and (kind is None or name == kind)
+    ]
+    out: list[ProofSuggestion] = []
+    for r in results:
+        if r.state is not NeedState.HOLE or r.need.children:
+            continue
+        scored: list[ProofSuggestion] = []
+        for name, ids in inventories:
+            for inv in ids:
+                score = similarity(r.need.text, _matchable(inv))
+                if score >= min_score:
+                    scored.append(ProofSuggestion(r.need, name, f"{name}:{inv}", score))
+        scored.sort(key=lambda s: (-s.score, s.locator))
+        out.extend(scored[:top])
     return out
 
 
