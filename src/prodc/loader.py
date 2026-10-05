@@ -127,6 +127,7 @@ def _need(
     attestation = _attestation(tbl.get("attestation"), f"{where}.attestation")
     goal = _opt_str(tbl.get("goal"), f"{where}.goal")
     release = _opt_str(tbl.get("release"), f"{where}.release")
+    product = _as_bool(tbl["product"], f"{where}.product") if "product" in tbl else True
 
     sources = tuple(
         _source(s, f"{where}.sources[{i}]")
@@ -159,6 +160,7 @@ def _need(
         attestation=attestation,
         goal=goal,
         release=release,
+        product=product,
     )
 
 

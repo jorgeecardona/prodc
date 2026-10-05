@@ -205,7 +205,7 @@ def summarize(results: list[NeedResult]) -> Summary:
     denominator too would double-count every flow (#43). Coverage is the leaves; a flow's own
     state is reported separately, never added on top of the children it aggregates.
     """
-    leaves = [r for r in results if not r.need.children]
+    leaves = [r for r in results if not r.need.children and r.need.product]
     by_state = {s: sum(1 for r in leaves if r.state is s) for s in NeedState}
     return Summary(
         total=len(leaves),

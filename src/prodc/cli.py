@@ -142,6 +142,14 @@ def _render_orphans(orphan_map: dict[str, list[str]]) -> str:
     return "\n".join(out)
 
 
+def _render_out_of_scope(results: list[NeedResult]) -> str:
+    """Non-product needs (infra/NFR/internal): listed, not counted, never a HOLE (#48)."""
+    out = [f"\nout of scope (not product — excluded from coverage): {len(results)}"]
+    for r in sorted(results, key=lambda x: x.need.id):
+        out.append(f"  {r.need.id:<12} {_LABEL[r.state]:<10} {r.need.text[:54]}")
+    return "\n".join(out)
+
+
 def _render_goals(goal_cov: list[tuple[Goal, Summary]], ungoaled: list[NeedResult]) -> str:
     """Per-goal coverage, plus the needs that serve no objective (#27)."""
     out = ["\ngoals (objectives needs trace up to):"]
@@ -208,6 +216,7 @@ def _need_payload(r: NeedResult) -> dict[str, object]:
         "variant_of": need.variant_of,
         "goal": need.goal,
         "release": need.release,
+        "product": need.product,
         "importance": need.importance,
         "claim": need.claim,
         "attestation": (
@@ -310,7 +319,10 @@ def _cmd_status(args: argparse.Namespace) -> int:
         commit = _git_rev(cfg.root)
         print(f"prodc status — {cfg.root.name}{f' @ {commit}' if commit else ''}")
         print(_summary_line(summary))
-        print(_render(results))
+        print(_render([r for r in results if r.need.product]))
+        out_of_scope = [r for r in results if not r.need.product]
+        if out_of_scope:
+            print(_render_out_of_scope(out_of_scope))
         if model.goals:
             print(_render_goals(goal_cov, ungoaled))
         if model.releases:

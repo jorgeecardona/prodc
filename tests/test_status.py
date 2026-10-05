@@ -290,3 +290,16 @@ def test_shared_proof_warning() -> None:
     flagged = shared_proof_warnings(results)
     assert "N-1" in flagged and "N-2" in flagged
     assert "N-3" not in flagged  # has an independently-claimed proof
+
+
+def test_non_product_need_excluded_from_coverage() -> None:
+    from prodc.status import summarize
+
+    needs = [
+        Need(id="P-1", text="a user can log in", proofs=("x:1",)),       # product, delivered
+        Need(id="I-1", text="resize the database", product=False),        # infra, no proof
+    ]
+    results = resolve(needs, {"x": _delivered()})
+    s = summarize(results)
+    assert s.total == 1 and s.delivered == 1 and s.coverage == 1.0  # I-1 not counted
+    assert s.hole == 0  # the non-product need is not a HOLE in the denominator

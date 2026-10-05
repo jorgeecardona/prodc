@@ -122,6 +122,7 @@ class Need:
     attestation: Attestation | None = None  # human sign-off that the proofs establish the claim
     goal: str | None = None  # id of the Goal this need serves; None = no objective (flagged)
     release: str | None = None  # id of the Release slice this need ships in; None = unslotted
+    product: bool = True  # False = infra/NFR/internal, excluded from product coverage (#48)
 
     @property
     def is_variant(self) -> bool:
