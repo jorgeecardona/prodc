@@ -120,7 +120,13 @@ class GherkinAdapter:
         return found
 
     def _load_results(self) -> dict[str, bool]:
-        """Map scenario name -> passed, from a cucumber-json report if configured."""
+        """Map ``file#scenario`` -> passed, from a cucumber-json report if configured.
+
+        Keyed by ``file#name`` (matching :meth:`_id`), not the bare scenario name, so two
+        features with a same-named scenario don't collide (#42). A Scenario Outline expands to
+        one row per Examples line, all sharing the name — those are AND-ed (every example must
+        pass), not last-write-wins.
+        """
         if self._results is not None:
             return self._results
         out: dict[str, bool] = {}
@@ -132,7 +138,10 @@ class GherkinAdapter:
                     for feature in cast("list[object]", data):
                         if not isinstance(feature, dict):
                             continue
-                        elements = cast("dict[str, object]", feature).get("elements")
+                        feat = cast("dict[str, object]", feature)
+                        uri = feat.get("uri")
+                        fname = Path(uri).name if isinstance(uri, str) else None
+                        elements = feat.get("elements")
                         if not isinstance(elements, list):
                             continue
                         for el in cast("list[object]", elements):
@@ -142,7 +151,9 @@ class GherkinAdapter:
                             name = el_d.get("name")
                             steps = el_d.get("steps")
                             if isinstance(name, str) and isinstance(steps, list):
-                                out[name] = _steps_passed(cast("list[object]", steps))
+                                key = f"{fname}#{name}" if fname else name
+                                passed = _steps_passed(cast("list[object]", steps))
+                                out[key] = out.get(key, True) and passed
         self._results = out
         return out
 
@@ -174,12 +185,19 @@ class GherkinAdapter:
 
         results = self._load_results()
         if results:
-            states = [results.get(s.title) for s in matches]
-            if all(v is True for v in states):
+            states = [results.get(self._id(s)) for s in matches]
+            missing = [self._id(s) for s, v in zip(matches, states, strict=True) if v is None]
+            if missing:
+                # Wired a results artifact but a matched scenario isn't in it — renamed,
+                # filtered, crashed, or sharded away. Do NOT fall through to the tag and
+                # call it delivered (#41); surface that it never ran.
+                return ProofResult(
+                    ProofState.PENDING, False,
+                    f"results configured but scenario not in report: {', '.join(missing)}",
+                )
+            if all(states):
                 return ProofResult(ProofState.DELIVERED, False, "results: passed")
-            if any(v is False for v in states):
-                return ProofResult(ProofState.PENDING, False, "results: failing")
-            # matched scenarios absent from the report → declared only
+            return ProofResult(ProofState.PENDING, False, "results: failing")
         tags: frozenset[str] = frozenset()
         for s in matches:
             tags |= s.tags

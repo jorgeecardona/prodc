@@ -131,3 +131,63 @@ def test_external_reads_sibling_and_records_rev(tmp_path: Path) -> None:
     r = External(FilesAdapter(root=sib), sib).resolve("verify.py")
     assert r.state is ProofState.DELIVERED
     assert "@ sib:abc1234" in r.detail  # traceable to the sibling's exact revision
+
+
+def _gherkin_with_results(tmp_path: Path, feature: str, feature_name: str, results: object):
+    import json as _json
+
+    from prodc.adapters import GherkinAdapter
+
+    (tmp_path / feature_name).write_text(feature, encoding="utf-8")
+    (tmp_path / "results.json").write_text(_json.dumps(results), encoding="utf-8")
+    return GherkinAdapter(root=tmp_path, paths=["*.feature"], delivered_tags=["@done"],
+                          pending_tags=[], results="results.json")
+
+
+def _passed(n: int) -> list[dict[str, object]]:
+    return [{"result": {"status": "passed"}} for _ in range(n)]
+
+
+def _failed() -> list[dict[str, object]]:
+    return [{"result": {"status": "failed"}}]
+
+
+def test_gherkin_results_no_crossfile_collision(tmp_path: Path) -> None:
+    # two features, same scenario name, different outcomes — must not overwrite each other (#42)
+    (tmp_path / "a.feature").write_text(
+        "@done\nFeature: A\n  Scenario: Happy path\n    Given a\n    Then b\n", encoding="utf-8")
+    (tmp_path / "b.feature").write_text(
+        "@done\nFeature: B\n  Scenario: Happy path\n    Given a\n    Then b\n", encoding="utf-8")
+    import json as _json
+    (tmp_path / "results.json").write_text(_json.dumps([
+        {"uri": "a.feature", "elements": [{"name": "Happy path", "steps": _passed(2)}]},
+        {"uri": "b.feature", "elements": [{"name": "Happy path", "steps": _failed()}]},
+    ]), encoding="utf-8")
+    from prodc.adapters import GherkinAdapter
+    a = GherkinAdapter(root=tmp_path, paths=["*.feature"], delivered_tags=["@done"],
+                       pending_tags=[], results="results.json")
+    assert a.resolve("a.feature#Happy path").state is ProofState.DELIVERED
+    assert a.resolve("b.feature#Happy path").state is ProofState.PENDING  # failing, not masked
+
+
+def test_gherkin_outline_examples_anded(tmp_path: Path) -> None:
+    # one outline, two example rows sharing the name; one fails → PENDING, not last-write-wins (#42)
+    feature = "@done\nFeature: X\n  Scenario Outline: Export\n    Given <n>\n    Then ok\n"
+    a = _gherkin_with_results(tmp_path, feature, "x.feature", [
+        {"uri": "x.feature", "elements": [
+            {"name": "Export", "steps": _passed(2)},
+            {"name": "Export", "steps": _failed()},
+        ]},
+    ])
+    assert a.resolve("x.feature#Export").state is ProofState.PENDING
+
+
+def test_gherkin_scenario_missing_from_report_not_declared(tmp_path: Path) -> None:
+    # results wired but this scenario never ran — must NOT fall through to the @done tag (#41)
+    feature = "@done\nFeature: X\n  Scenario: Smoke\n    Given a\n    Then b\n"
+    a = _gherkin_with_results(tmp_path, feature, "x.feature", [
+        {"uri": "x.feature", "elements": [{"name": "Other", "steps": _passed(1)}]},
+    ])
+    r = a.resolve("x.feature#Smoke")
+    assert r.state is ProofState.PENDING and not r.declared
+    assert "not in report" in r.detail
