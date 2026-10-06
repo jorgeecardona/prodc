@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from functools import cache
 
 from .model import Need
 
@@ -21,21 +22,47 @@ def _normalise(text: str) -> str:
     return _NON_ALNUM.sub(" ", text.lower()).strip()
 
 
+@cache
 def _trigrams(text: str) -> frozenset[str]:
-    """Character trigrams of the normalised text, padded so short strings still yield some."""
+    """Character trigrams of the normalised text, padded so short strings still yield some.
+
+    Cached per distinct string: an O(n²) matcher compares each need's text O(n) times, so
+    recomputing its trigrams every call was the bulk of the cost (#62). The cache keeps it
+    one compute per distinct string for the life of the process; results are immutable.
+    """
     padded = f"  {_normalise(text)} "
     if len(padded) < 3:
         return frozenset()
     return frozenset(padded[i : i + 3] for i in range(len(padded) - 2))
 
 
-def similarity(a: str, b: str) -> float:
-    """Trigram Jaccard of two texts, in 0..1 (1.0 = identical after normalisation)."""
-    ta, tb = _trigrams(a), _trigrams(b)
+def _jaccard(ta: frozenset[str], tb: frozenset[str]) -> float:
+    """Jaccard overlap of two trigram sets, in 0..1."""
     if not ta or not tb:
         return 0.0
     union = len(ta | tb)
     return len(ta & tb) / union if union else 0.0
+
+
+def _score_if_reachable(ta: frozenset[str], tb: frozenset[str], threshold: float) -> float:
+    """:func:`_jaccard`, but skip the set work when the size ratio alone rules it out (#62).
+
+    Jaccard = intersection / union <= min(|ta|,|tb|) / max(|ta|,|tb|), since the intersection is at
+    most the smaller set and the union at least the larger. So when that ratio is below ``threshold``
+    the score cannot reach it — an exact prune that returns 0.0 without the (costly) intersection,
+    never changing which pairs clear the threshold.
+    """
+    if not ta or not tb:
+        return 0.0
+    lo, hi = (len(ta), len(tb)) if len(ta) <= len(tb) else (len(tb), len(ta))
+    if lo < threshold * hi:
+        return 0.0
+    return _jaccard(ta, tb)
+
+
+def similarity(a: str, b: str) -> float:
+    """Trigram Jaccard of two texts, in 0..1 (1.0 = identical after normalisation)."""
+    return _jaccard(_trigrams(a), _trigrams(b))
 
 
 @dataclass(frozen=True)
@@ -97,6 +124,7 @@ def variant_suggestions(needs: list[Need], threshold: float) -> list[VariantGrou
     pairwise link. Most-similar groups first.
     """
     parent = {n.id: n.id for n in needs}
+    trigrams = {n.id: _trigrams(n.text) for n in needs}
 
     def find(x: str) -> str:
         while parent[x] != x:
@@ -110,7 +138,7 @@ def variant_suggestions(needs: list[Need], threshold: float) -> list[VariantGrou
             a, b = needs[i], needs[j]
             if not _variant_candidate(a, b):
                 continue
-            score = similarity(a.text, b.text)
+            score = _score_if_reachable(trigrams[a.id], trigrams[b.id], threshold)
             if score >= threshold:
                 edges.append((a.id, b.id, score))
                 parent[find(a.id)] = find(b.id)
@@ -142,12 +170,13 @@ def duplicate_pairs(
     `include_acknowledged` is set. Same-scope pairs rank above cross-scope at equal score.
     """
     pairs: list[DupPair] = []
+    trigrams = {n.id: _trigrams(n.text) for n in needs}
     for i in range(len(needs)):
         for j in range(i + 1, len(needs)):
             a, b = needs[i], needs[j]
             if not include_acknowledged and _acknowledged(a, b):
                 continue
-            score = similarity(a.text, b.text)
+            score = _score_if_reachable(trigrams[a.id], trigrams[b.id], threshold)
             if score >= threshold:
                 same = a.client == b.client and a.goal == b.goal
                 pairs.append(DupPair(a, b, score, same))

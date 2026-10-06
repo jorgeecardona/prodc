@@ -156,3 +156,136 @@ needs:
     code = main(["set", "N-1", "role=owner", "--config", str(cfg)])
     assert code == 0
     assert "role: owner" in (tmp_path / "needs" / "a.yaml").read_text(encoding="utf-8")
+
+
+_ROSTER = """
+roles:
+  - id: sales
+    text: takes the order
+  - id: roaster
+    text: roasts the day's coffee
+  - id: owner
+    text: owns the roastery
+  - id: packer
+    text: packs the orders
+needs:
+  - id: F-1
+    text: the day's run from order to summary
+    children: [N-1, N-2, N-3]
+  - id: N-1
+    text: sales takes a phone order
+    who: sara
+    client: sincerely
+    role: sales
+  - id: N-2
+    text: jacob roasts the order
+    who: jacob
+    client: sincerely
+    role: roaster
+  - id: N-3
+    text: john sees the day's summary
+    who: john
+    client: sincerely
+    role: owner
+  - id: N-4
+    text: an unroled standalone need
+    who: nobody
+"""
+
+
+def test_role_report_coverage_orphans_and_unroled(tmp_path: Path) -> None:
+    from prodc.status import resolve, role_report
+
+    model = load(_project(tmp_path, _ROSTER))
+    results = resolve(list(model.needs), {})
+    coverage, unroled = role_report(results, list(model.roles))
+    by_role = {role.id: rsum for role, rsum in coverage}
+    # every declared role appears, including the one no need plays (orphan: total 0)
+    assert set(by_role) == {"sales", "roaster", "owner", "packer"}
+    assert by_role["sales"].total == 1
+    assert by_role["packer"].total == 0  # orphan role — on the roster, no need yet
+    # N-4 has a who but no role -> unroled
+    assert [r.need.id for r in unroled] == ["N-4"]
+
+
+def test_handoffs_derived_from_ordered_cross_role_flow(tmp_path: Path) -> None:
+    from prodc.status import handoffs
+
+    model = load(_project(tmp_path, _ROSTER))
+    hos = handoffs(list(model.needs))
+    # F-1's ordered children cross sales -> roaster -> owner: two handoffs, in order
+    assert [(h.from_role, h.to_role) for h in hos] == [("sales", "roaster"), ("roaster", "owner")]
+    assert [(h.from_need.id, h.to_need.id) for h in hos] == [("N-1", "N-2"), ("N-2", "N-3")]
+    assert hos[0].flow.id == "F-1"
+
+
+def test_handoffs_ignores_same_role_and_missing_role(tmp_path: Path) -> None:
+    from prodc.status import handoffs
+
+    needs = """
+roles:
+  - id: roaster
+    text: roasts
+needs:
+  - id: F-1
+    text: two roaster steps then an unroled one
+    children: [N-1, N-2, N-3]
+  - id: N-1
+    text: first roast step
+    role: roaster
+  - id: N-2
+    text: second roast step
+    role: roaster
+  - id: N-3
+    text: an unroled step
+    who: someone
+"""
+    model = load(_project(tmp_path, needs))
+    # same role (N-1->N-2) and a missing role (N-2->N-3) both yield no handoff
+    assert handoffs(list(model.needs)) == []
+
+
+def test_status_text_shows_roster_and_handoffs(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+
+    cfg = tmp_path / "prodc.toml"
+    _project(tmp_path, _ROSTER)
+    main(["status", "--config", str(cfg)])
+    out = capsys.readouterr().out
+    assert "roles (the roster" in out
+    assert "orphan role" in out  # packer, no need plays it
+    assert "handoffs" in out
+    assert "sales → roaster" in out
+
+
+def test_status_json_handoffs_orphan_and_unroled(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+
+    cfg = tmp_path / "prodc.toml"
+    _project(tmp_path, _ROSTER)
+    main(["status", "--config", str(cfg), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+    roles = {r["id"]: r for r in payload["roles"]}
+    assert roles["packer"]["orphan"] is True
+    assert roles["sales"]["orphan"] is False
+    assert payload["unroled"] == ["N-4"]
+    assert payload["handoffs"] == [
+        {
+            "flow": "F-1",
+            "from_role": "sales",
+            "to_role": "roaster",
+            "from_need": "N-1",
+            "to_need": "N-2",
+        },
+        {
+            "flow": "F-1",
+            "from_role": "roaster",
+            "to_role": "owner",
+            "from_need": "N-2",
+            "to_need": "N-3",
+        },
+    ]

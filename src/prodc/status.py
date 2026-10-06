@@ -9,6 +9,7 @@ from __future__ import annotations
 import contextlib
 from dataclasses import dataclass
 from datetime import date
+from itertools import pairwise
 
 from .adapters import Adapter, Enumerable, Inventoried, ProofResult, SourceAdapter
 from .dedup import similarity
@@ -23,6 +24,7 @@ from .model import (
     NeedState,
     ProofState,
     Release,
+    Role,
     SourceKind,
     ears_warnings,
 )
@@ -432,6 +434,65 @@ def release_report(
         if res.need.release in by_release:
             by_release[res.need.release].append(res)
     return [(rel, summarize(by_release[rel.id])) for rel in releases]
+
+
+def role_report(
+    results: list[NeedResult], roles: list[Role]
+) -> tuple[list[tuple[Role, Summary]], list[NeedResult]]:
+    """Coverage per declared role, plus the needs whose ``who`` plays no declared role (#52).
+
+    The roster view: like :func:`goal_report`, each role's coverage is :func:`summarize` over the
+    needs that name it, so a role reads the same as the whole board. A declared role with a 0/0
+    summary is an orphan role — on the roster though no need references it yet (a new packer),
+    the symmetric flag to a need that serves no role. Scope to one client by resolving a
+    client-filtered need set first (``status --client``), exactly as goals/releases do.
+    """
+    by_role: dict[str, list[NeedResult]] = {p.id: [] for p in roles}
+    unroled: list[NeedResult] = []
+    for r in results:
+        if r.need.role is not None:
+            if r.need.role in by_role:
+                by_role[r.need.role].append(r)
+        elif r.need.who is not None:
+            # a person is named but plays no declared role — the flag symmetric to an
+            # ungoaled need. A need with neither who nor role (e.g. a bare flow) is not a
+            # person with a missing role, so it is not listed here.
+            unroled.append(r)
+    coverage = [(p, summarize(by_role[p.id])) for p in roles]
+    return coverage, unroled
+
+
+@dataclass(frozen=True)
+class Handoff:
+    """A derived step in a cross-role journey: one flow child hands off to the next (#52)."""
+
+    flow: Need
+    from_need: Need
+    to_need: Need
+    from_role: str
+    to_role: str
+
+
+def handoffs(needs: list[Need]) -> list[Handoff]:
+    """Derive the cross-role handoffs in every flow from its ordered ``children`` (#52).
+
+    A handoff is a consecutive pair of a flow's children whose ``role`` differs — the point in
+    the journey where one person's work passes to the next (Patton's backbone, read as an
+    ordered story map). It keys on ``role``, not ``who``: ``role`` is set deliberately on the
+    need and is never inherited from a file-level default, so deriving on it does not fire on
+    the file-level ``who`` that every need in a file silently shares (the noise #52's follow-up
+    flagged). No new edge type — the order already in ``children`` is the sequence.
+    """
+    by_id = {n.id: n for n in needs}
+    out: list[Handoff] = []
+    for flow in needs:
+        if not flow.children:
+            continue
+        steps = [by_id[c] for c in flow.children if c in by_id]
+        for a, b in pairwise(steps):
+            if a.role and b.role and a.role != b.role:
+                out.append(Handoff(flow, a, b, a.role, b.role))
+    return out
 
 
 def applicable_needs(needs: list[Need], client: str) -> list[Need]:

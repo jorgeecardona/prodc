@@ -41,6 +41,7 @@ from .model import (
     ears_shape,
 )
 from .status import (
+    Handoff,
     Recurrence,
     Summary,
     applicable_needs,
@@ -48,6 +49,7 @@ from .status import (
     evidence_age_days,
     flow_orphan_warnings,
     goal_report,
+    handoffs,
     last_observed,
     orphans,
     proof_suggestions,
@@ -55,6 +57,7 @@ from .status import (
     recurrence,
     release_report,
     resolve,
+    role_report,
     shared_proof_warnings,
     state_priority,
     summarize,
@@ -214,6 +217,7 @@ _COLUMNS: dict[str, tuple[str, Callable[[NeedResult], str]]] = {
     "grounds": ("grounds", lambda r: f"{r.delivered}/{r.total}" if r.total else ""),
     "text": ("need", lambda r: r.need.text),
     "who": ("who", lambda r: r.need.who or ""),
+    "role": ("role", lambda r: r.need.role or ""),
     "warrant": ("warrant", lambda r: _warrant(r.need)),
     "declared": (
         "declared",
@@ -277,6 +281,32 @@ def _render_releases(rel_cov: list[tuple[Release, Summary]]) -> str:
         pct = round(rsum.coverage * 100)
         title = f"  {rel.text}" if rel.text else ""
         out.append(f"  {rel.id:<12} {rsum.delivered}/{rsum.total} ({pct}%){title}")
+    return "\n".join(out)
+
+
+def _render_roles(role_cov: list[tuple[Role, Summary]], unroled: list[NeedResult]) -> str:
+    """The roster: coverage per declared role, orphan roles (0 needs), and unroled needs (#52)."""
+    out = ["\nroles (the roster — who plays which function):"]
+    for role, rsum in role_cov:
+        if rsum.total:
+            pct = round(rsum.coverage * 100)
+            out.append(f"  {role.id:<12} {rsum.delivered}/{rsum.total} ({pct}%)  {role.text}")
+        else:
+            out.append(f"  {role.id:<12} —  (orphan role: no need plays it yet)  {role.text}")
+    if unroled:
+        ids = ", ".join(r.need.id for r in unroled)
+        out.append(f"  ⚠ need(s) whose who plays no declared role: {ids}")
+    return "\n".join(out)
+
+
+def _render_handoffs(hos: list[Handoff]) -> str:
+    """Derived cross-role journey: where a flow's ordered steps pass between roles (#52)."""
+    out = [f"\nhandoffs (derived from ordered cross-role flows): {len(hos)}"]
+    for h in hos:
+        out.append(
+            f"  {h.flow.id:<12} {h.from_role} → {h.to_role}"
+            f"    {h.from_need.id} → {h.to_need.id}"
+        )
     return "\n".join(out)
 
 
@@ -360,12 +390,35 @@ def _to_json(
     goal_cov: list[tuple[Goal, Summary]],
     ungoaled: list[NeedResult],
     rel_cov: list[tuple[Release, Summary]],
-    roles: tuple[Role, ...] = (),
+    role_cov: list[tuple[Role, Summary]],
+    unroled: list[NeedResult],
+    hos: list[Handoff],
 ) -> str:
     payload = {
         "summary": _summary_payload(summary, orphan_map),
         "orphans": orphan_map,
-        "roles": [{"id": p.id, "text": p.text} for p in roles],
+        "roles": [
+            {
+                "id": role.id,
+                "text": role.text,
+                "coverage": round(rsum.coverage, 4),
+                "delivered": rsum.delivered,
+                "total": rsum.total,
+                "orphan": rsum.total == 0,
+            }
+            for role, rsum in role_cov
+        ],
+        "unroled": [r.need.id for r in unroled],
+        "handoffs": [
+            {
+                "flow": h.flow.id,
+                "from_role": h.from_role,
+                "to_role": h.to_role,
+                "from_need": h.from_need.id,
+                "to_need": h.to_need.id,
+            }
+            for h in hos
+        ],
         "releases": [
             {
                 "id": rel.id,
@@ -569,6 +622,8 @@ def _cmd_status(args: argparse.Namespace) -> int:
     recs = recurrence(needs)
     goal_cov, ungoaled = goal_report(results, list(model.goals))
     rel_cov = release_report(results, list(model.releases))
+    role_cov, unroled = role_report(results, list(model.roles))
+    hos = handoffs(needs)
 
     if args.columns:
         bad = [c for c in args.columns if c not in _COLUMNS]
@@ -581,7 +636,18 @@ def _cmd_status(args: argparse.Namespace) -> int:
 
     if args.json:
         print(
-            _to_json(results, summary, orphan_map, recs, goal_cov, ungoaled, rel_cov, model.roles)
+            _to_json(
+                results,
+                summary,
+                orphan_map,
+                recs,
+                goal_cov,
+                ungoaled,
+                rel_cov,
+                role_cov,
+                unroled,
+                hos,
+            )
         )
     else:
         commit = _git_rev(cfg.root)
@@ -603,6 +669,10 @@ def _cmd_status(args: argparse.Namespace) -> int:
             print(_render_goals(goal_cov, ungoaled))
         if model.releases:
             print(_render_releases(rel_cov))
+        if model.roles:
+            print(_render_roles(role_cov, unroled))
+        if hos:
+            print(_render_handoffs(hos))
         if recs:
             print(_render_recurrence(recs))
         if orphan_map:

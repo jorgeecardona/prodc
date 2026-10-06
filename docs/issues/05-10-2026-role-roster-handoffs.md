@@ -14,13 +14,22 @@ area: cli
 - Surfaced: `show` prints `who: john — owner`; `status --json` lists `roles` and carries
   `role` per need; `set <id> role=<id>` writes it.
 
-## What is deferred
+## Also done (#52, roster + handoffs pass)
 
-1. **Roster grouping by role** — group the board / `brief <client>` by client → role, and
-   show a declared role with zero needs (an orphan-role line, like orphan goals).
-2. **Derived handoffs** — a report over an ordered cross-role flow's `children` (consecutive
-   steps whose `who`/`role` differ). Noisy as-is because children inherit a file-level `who`;
-   needs its own design. No new edge type.
+1. **Roster grouping by role** — `status` (and `status --client`, which scopes the needs first)
+   now prints a `roles:` section: per-role coverage like goals/releases, a declared role with
+   zero needs shown as an orphan-role line, and a `⚠` for any need whose `who` plays no declared
+   role. `status --json` carries `roles[].coverage/orphan` and `unroled`. `role` is a `--columns`
+   column. (`status.role_report`)
+2. **Derived handoffs** — `status` prints a `handoffs:` section (and `status --json` a `handoffs`
+   list) derived from each flow's ordered `children`: consecutive steps whose `role` differs.
+   The noise the earlier note feared is avoided by keying on `role`, not `who`: `role` is set
+   deliberately per need and is never inherited from a file-level default, so a shared file-level
+   `who` no longer fabricates handoffs. No new edge type — the `children` order is the sequence.
+   (`status.handoffs`)
+
+## What is still deferred
+
 3. **`add role` / dedicated write-back** — today a role is hand-authored or `set` on a need.
 4. **`Need.label` deprecation** — once roles carry the role description, the per-need `label`
    (hoisted onto the roster today) is redundant. Deprecate separately.

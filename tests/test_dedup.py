@@ -199,3 +199,31 @@ def test_lint_surfaces_duplicate_warning(
     out = capsys.readouterr().out
     assert code == 0  # a possible duplicate is a warning, not a hard error
     assert "possible duplicate of N-2" in out or "possible duplicate of N-1" in out
+
+
+def test_score_prune_matches_brute_force() -> None:
+    # the size-ratio short-circuit (#62) must never change which pairs clear the threshold:
+    # compare optimized duplicate_pairs against a brute-force scan using raw similarity().
+    texts = [
+        "user can export their orders to CSV",
+        "user can export orders to a CSV file",
+        "export the weekly totals to CSV",
+        "admin schedules the weekly roast",
+        "schedule the weekly roast run",
+        "a short one",
+        "a short two",
+        "highlight past due orders on the board",
+        "past-due orders are highlighted on the board",
+    ]
+    needs = [_n(f"N-{i}", t) for i, t in enumerate(texts)]
+    for threshold in (0.2, 0.4, 0.6, 0.8):
+        got = {
+            frozenset((p.a.id, p.b.id)): round(p.score, 10) for p in duplicate_pairs(needs, threshold)
+        }
+        brute: dict[frozenset[str], float] = {}
+        for i in range(len(needs)):
+            for j in range(i + 1, len(needs)):
+                s = similarity(needs[i].text, needs[j].text)
+                if s >= threshold:
+                    brute[frozenset((needs[i].id, needs[j].id))] = round(s, 10)
+        assert got == brute, f"mismatch at threshold {threshold}"
