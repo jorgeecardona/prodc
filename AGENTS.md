@@ -8,8 +8,7 @@ prodc: Product management as code: roles, flows, and features traced to evidence
 
 ## Build
 
-- `uv sync` installs dependencies. Toolchain (moon, uv) is pinned in `.prototools`; `proto install` brings it up.
-- `make install-hooks` once, to enable the tracked git hooks.
+- `make setup` once after cloning: syncs dependencies (`uv sync`) and installs the tracked git hooks (`make install-hooks`). Toolchain (moon, uv) is pinned in `.prototools`; `proto install` brings it up.
 
 ## Test
 

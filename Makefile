@@ -3,13 +3,17 @@
 # command + its inputs/outputs live in ONE place (moon.yml) and `make` runs
 # exactly what CI runs, with moon's caching. Only the verbs moon has no task for
 # (format = write, bump, install-hooks) run a command directly here.
-# One-time setup after cloning:  make install-hooks
+# One-time setup after cloning:  make setup
 .DEFAULT_GOAL := help
-.PHONY: help install-hooks format lint typecheck test check bump docs build
+.PHONY: help setup install-hooks format lint typecheck test check bump docs build
 
 help: ## list targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
 		| awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
+
+setup: ## one-time dev setup after cloning: sync deps + install git hooks
+	uv sync
+	$(MAKE) install-hooks
 
 install-hooks: ## point git at the tracked .githooks/ (pre-commit + pre-push)
 	git config core.hooksPath .githooks
