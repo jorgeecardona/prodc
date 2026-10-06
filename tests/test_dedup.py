@@ -218,7 +218,8 @@ def test_score_prune_matches_brute_force() -> None:
     needs = [_n(f"N-{i}", t) for i, t in enumerate(texts)]
     for threshold in (0.2, 0.4, 0.6, 0.8):
         got = {
-            frozenset((p.a.id, p.b.id)): round(p.score, 10) for p in duplicate_pairs(needs, threshold)
+            frozenset((p.a.id, p.b.id)): round(p.score, 10)
+            for p in duplicate_pairs(needs, threshold)
         }
         brute: dict[frozenset[str], float] = {}
         for i in range(len(needs)):

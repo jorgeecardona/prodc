@@ -177,9 +177,7 @@ class Config:
                     token_env=token_env,
                 )
             else:
-                raise ConfigError(
-                    f"[sources.{name}]: unknown kind {kind!r} (frontmatter|gitlab)"
-                )
+                raise ConfigError(f"[sources.{name}]: unknown kind {kind!r} (frontmatter|gitlab)")
 
         lint_tbl = _as_dict(raw.get("lint", {}), "[lint]")
         dup = lint_tbl.get("duplicate_threshold", 0.8)

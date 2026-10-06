@@ -92,3 +92,66 @@ def test_coverage_adapter_inventory(tmp_path: Path) -> None:
     ad = CoverageAdapter(root=tmp_path, catalog="cats.txt")
     assert isinstance(ad, Inventoried)
     assert ad.inventory() == ["alpha", "beta"]
+
+
+def test_suggest_apply_dry_run_shows_diff_but_does_not_write(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+
+    cfg = _project(tmp_path)
+    before = (tmp_path / "needs" / "a.yaml").read_text(encoding="utf-8")
+    code = main(["suggest", "--config", str(cfg), "--apply", "--dry-run"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "would write web:orders.feature#Export orders to CSV → H-1" in out
+    assert (tmp_path / "needs" / "a.yaml").read_text(encoding="utf-8") == before  # untouched
+
+
+def test_suggest_apply_writes_best_proof_per_need(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+    from prodc.config import Config
+    from prodc.loader import load
+
+    cfg = _project(tmp_path)
+    code = main(["suggest", "--config", str(cfg), "--apply"])
+    assert code == 0
+    assert "wrote web:orders.feature#Export orders to CSV → H-1" in capsys.readouterr().out
+    model = load(Config.load(cfg))
+    h1 = next(n for n in model.needs if n.id == "H-1")
+    assert "web:orders.feature#Export orders to CSV" in h1.proofs
+
+
+def test_suggest_apply_is_idempotent(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+    from prodc.config import Config
+    from prodc.loader import load
+
+    cfg = _project(tmp_path)
+    assert main(["suggest", "--config", str(cfg), "--apply"]) == 0
+    capsys.readouterr()
+    # H-1 now has the proof, so it is no longer a HOLE -> nothing left to apply
+    assert main(["suggest", "--config", str(cfg), "--apply"]) == 0
+    assert "wrote 0 proof(s)" in capsys.readouterr().out
+    model = load(Config.load(cfg))
+    h1 = next(n for n in model.needs if n.id == "H-1")
+    assert h1.proofs.count("web:orders.feature#Export orders to CSV") == 1
+
+
+def test_suggest_apply_json_lists_writes(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+
+    cfg = _project(tmp_path)
+    code = main(["suggest", "--config", str(cfg), "--apply", "--json"])
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload[0]["need"] == "H-1"
+    assert payload[0]["locator"] == "web:orders.feature#Export orders to CSV"
+    assert payload[0]["dry_run"] is False
+    assert "diff" in payload[0]

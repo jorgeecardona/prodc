@@ -607,7 +607,9 @@ class GitLabSource:
             title = d.get("title", "")
             author = d.get("author")
             author_name = (
-                cast("dict[str, object]", author).get("username", "") if isinstance(author, dict) else ""
+                cast("dict[str, object]", author).get("username", "")
+                if isinstance(author, dict)
+                else ""
             )
             created_at = str(d.get("created_at", ""))[:10]
             return SourceResult(True, f"#{iid_s} '{title}' by {author_name} at {created_at}")

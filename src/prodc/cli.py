@@ -42,6 +42,7 @@ from .model import (
 )
 from .status import (
     Handoff,
+    ProofSuggestion,
     Recurrence,
     Summary,
     applicable_needs,
@@ -67,6 +68,7 @@ from .writer import (
     WriteError,
     accept,
     add_need,
+    add_proof,
     attest,
     capture_source,
     set_field,
@@ -304,8 +306,7 @@ def _render_handoffs(hos: list[Handoff]) -> str:
     out = [f"\nhandoffs (derived from ordered cross-role flows): {len(hos)}"]
     for h in hos:
         out.append(
-            f"  {h.flow.id:<12} {h.from_role} → {h.to_role}"
-            f"    {h.from_need.id} → {h.to_need.id}"
+            f"  {h.flow.id:<12} {h.from_role} → {h.to_role}    {h.from_need.id} → {h.to_need.id}"
         )
     return "\n".join(out)
 
@@ -1277,6 +1278,8 @@ def _cmd_suggest(args: argparse.Namespace) -> int:
     suggestions = proof_suggestions(
         results, cfg.adapters, min_score=args.min_score, top=args.top, kind=args.kind
     )
+    if args.apply:
+        return _apply_suggestions(cfg, suggestions, args)
     if args.json:
         print(
             json.dumps(
@@ -1300,6 +1303,53 @@ def _cmd_suggest(args: argparse.Namespace) -> int:
                 last = s.need.id
             print(f"    {s.score:.2f}  {s.locator}")
         print(f"suggest: {len(suggestions)} candidate(s) at min-score {args.min_score:.2f}")
+    return 0
+
+
+def _apply_suggestions(
+    cfg: Config, suggestions: list[ProofSuggestion], args: argparse.Namespace
+) -> int:
+    """Write the single best suggestion per need as a proof, printing each need's diff (#54).
+
+    ``suggestions`` is already ranked best-first within each need, so the first seen per need id
+    is its top candidate. Each need is one single-file, reload-validated edit (:func:`add_proof`),
+    applied in id order; a write that the loader rejects aborts with a non-zero exit.
+    """
+    best: dict[str, ProofSuggestion] = {}
+    for s in suggestions:
+        best.setdefault(s.need.id, s)
+    applied: list[tuple[ProofSuggestion, Edit]] = []
+    for nid in sorted(best):
+        s = best[nid]
+        try:
+            edit = add_proof(cfg, nid, s.locator, dry_run=args.dry_run)
+        except WriteError as exc:
+            print(f"prodc: {exc}", file=sys.stderr)
+            return 2
+        applied.append((s, edit))
+    if args.json:
+        print(
+            json.dumps(
+                [
+                    {
+                        "need": s.need.id,
+                        "locator": s.locator,
+                        "score": round(s.score, 4),
+                        "file": edit.path.name,
+                        "dry_run": args.dry_run,
+                        "diff": edit.diff,
+                    }
+                    for s, edit in applied
+                ],
+                indent=2,
+            )
+        )
+    else:
+        verb = "would write" if args.dry_run else "wrote"
+        for s, edit in applied:
+            print(f"{verb} {s.locator} → {s.need.id} ({s.score:.2f}) in {edit.path.name}")
+            print(edit.diff, end="")
+        print(f"suggest --apply: {verb} {len(applied)} proof(s) at min-score {args.min_score:.2f}")
     return 0
 
 
@@ -1662,6 +1712,16 @@ def main(argv: list[str] | None = None) -> int:
     sg.add_argument("--top", type=int, default=3, metavar="N", help="max suggestions per need")
     sg.add_argument(
         "--kind", default=None, metavar="ADAPTER", help="only suggest from this adapter name"
+    )
+    sg.add_argument(
+        "--apply",
+        action="store_true",
+        help="write the best suggestion per need as a proof (#54); honours --min-score",
+    )
+    sg.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="with --apply: validate and show the diff, don't write",
     )
     sg.set_defaults(func=_cmd_suggest)
 

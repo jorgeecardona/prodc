@@ -434,6 +434,33 @@ def accept(
     return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
 
 
+def add_proof(
+    config: Config, need_id: str, locator: str, *, expect_sha: str | None = None, dry_run: bool
+) -> Edit:
+    """Append a proof locator to an existing need, idempotently — the write path for `suggest --apply`.
+
+    A thin single-field edit (same splice as :func:`set_field` `proofs+=`), factored out so the
+    batch apply can call it per need and show each need's diff. Re-adding a locator already on the
+    need is a no-op, so applying the same suggestion twice does not duplicate it (#54).
+    """
+    path, _ = _locate(config, need_id)
+    doc, old_text = _read_doc(path)
+    if expect_sha is not None and _sha256(old_text) != expect_sha:
+        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
+    for raw in _need_list(doc, path):
+        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
+            need = cast("dict[str, object]", raw)
+            current = need.get("proofs", [])
+            if not isinstance(current, list):
+                raise WriteError(f"{path.name}: 'proofs' is not a list")
+            proofs = list(cast("list[object]", current))
+            if locator not in proofs:
+                proofs.append(locator)
+            need["proofs"] = proofs
+            break
+    return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
+
+
 def add_need(
     config: Config,
     need_id: str,

@@ -13,11 +13,15 @@ area: adapters
   text similarity (reuses the #55 matcher) and return ready-to-paste `<adapter>:<id>` locators.
 - `prodc suggest [need-id]` (read-only) with `--min-score`, `--top`, `--kind`, and `--json`.
 
-## What is deferred
+## Also done (0.3.x)
 
-1. **`suggest --apply`** — write the top suggestion above a threshold as a proof, in bulk, printing
-   what was written per need so the batch shows in the diff. Reuses the `set proofs+=` write path;
-   left out so the first slice stays read-only.
+1. **`suggest --apply`** — writes the single best suggestion per HOLE need as a proof (honours
+   `--min-score`), printing each need's diff; `--dry-run` validates without writing, `--json`
+   lists the writes. Idempotent (re-applying an existing locator is a no-op). Per need it is one
+   single-file, reload-validated edit via `writer.add_proof`.
+
+## What is still deferred
+
 2. **More adapter inventories** — pytest (collect node ids), files (glob the script dirs). Pytest
    needs a real collection step; files needs the configured globs. Both are cheap-ish but out of
    this slice.

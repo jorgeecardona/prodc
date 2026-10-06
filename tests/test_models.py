@@ -184,7 +184,9 @@ def _flow_delivered_iff_all_green(s: Flow) -> bool:
     all_green = (
         len(s.children) > 0
         and all(c == "delivered" for c in s.children)
-        and all(x == "delivered" for x in s.seam if x != "none")  # "none" = no seam, vacuously green
+        and all(
+            x == "delivered" for x in s.seam if x != "none"
+        )  # "none" = no seam, vacuously green
     )
     return (flow_state(s) is NeedState.DELIVERED) == all_green
 
