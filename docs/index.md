@@ -1,16 +1,29 @@
 # prodc
 
-Product management as code: needs, evidence and proofs live in the repo, so status is read, not asked.
+prodc is about sharing product work across a team. Understanding what users need, and whether you've delivered it, tends to get locked inside one role and one set of tools. But AI assistants now help everyone read and shape software, so everyone can take part in the product thinking too. prodc gives that work a home inside the repo, next to the code it's about.
 
-Two rules:
+The work lives as plain files: you note what a person needs, where the need came from, and the test that proves it's done. They get reviewed in pull requests like anything else, so when someone asks "is this feature done?", the answer is read from the repo, not remembered from the last standup.
 
-1. **No source = opinion.** A need with no evidence is flagged.
-2. **Status comes from the repo, not a standup.** A proof is a locator into your tests; `prodc status` reports what is delivered, pending, a hole, or broken.
+prodc only records that structure and checks it holds together. It doesn't call a model or ping a tracker — it reads your files and your tests and shows you the gaps.
+
+## Two rules
+
+Everything in prodc comes down to two ideas, and both are about not fooling yourself.
+
+The first: **a need with no evidence is just an opinion.** If you write down that a user wants something, prodc wants to know who said so — a quote from an interview, a ticket, an email, anything real. A need with nothing behind it still loads, but it gets flagged as an opinion, because that's what it is until someone outside the room has asked for it.
+
+The second: **"done" is a claim your tests have to back.** You don't mark a need delivered; you attach a *proof* — a locator that points into your actual test suite. `prodc status` then resolves those locators and reports each need as DELIVERED, PENDING, a HOLE (an honest gap, no proof yet), or BROKEN (a proof that points at nothing). The status comes from the repo, so it can't drift away from reality the way a standup update does.
+
+## Install
 
 ```bash
 pip install prodc
 prodc status
 ```
+
+That's enough to run the board against a project that already has needs defined. If you're starting from nothing, the Quickstart below walks through the three files you need.
+
+## Where to go next
 
 | Go to | For |
 |---|---|

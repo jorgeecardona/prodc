@@ -1,6 +1,6 @@
 # Quickstart
 
-Three files, one command.
+You only need three files to get going. One tells prodc where to look, one is where you jot down what people need, and the third is a test you've probably already written. Fill them in, run a single command, and you've got a board. Here's the smallest one that actually does something.
 
 ## 1. `prodc.toml`
 
