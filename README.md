@@ -1,11 +1,11 @@
 # prodc
 
-Product management as code: needs, evidence and proofs live in the repo, so status is read, not asked.
+Product management as code: roles, flows, and features, each traced to the evidence behind it and the test that proves it. The aim is to make product work something a whole team can share — kept in the repo, next to the code, read by the tools you already use — rather than a specialty locked in one person's head and one tracker.
 
-Two rules:
+prodc records that structure and checks it holds together; it does not call a model or ping a tracker. Two ideas carry it, both about not fooling yourself:
 
-1. **No source = opinion.** A need with no evidence is flagged.
-2. **Status comes from the repo, not a standup.** A proof is a locator into your tests; `prodc status` reports DELIVERED / PENDING / HOLE / BROKEN.
+1. **A need with no evidence is an opinion.** Write down who asked for something — an interview, a ticket, an email — or prodc flags it as an opinion, because that is what it is until someone outside the room has asked.
+2. **"Done" is a claim your tests back.** You attach a proof (a locator into your test suite), and `prodc status` reports each need as DELIVERED, PENDING, HOLE (an honest gap), or BROKEN. The status is read from the repo, not remembered from a standup.
 
 ## Install
 
@@ -38,6 +38,6 @@ GROUNDS = does a test prove it. WARRANT = did a user ask for it. The gap between
 
 - [Quickstart](docs/quickstart.md) — 60 seconds to a board
 - [Commands](docs/commands.md) — every verb, one line each
-- [Model](docs/model.md) — the nouns and the Need fields
+- [Model](docs/model.md) — the nouns (Need, Role, Goal, Release) and the Need fields
 
 `docs/issues/` holds follow-ups. `AGENTS.md` is for coding agents.
