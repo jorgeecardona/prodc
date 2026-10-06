@@ -16,7 +16,7 @@ Every command takes `--config prodc.toml` (default) and `--json`. `prodc -C DIR 
 | `portfolio <toml>…` | Many repos, one scoreboard | `prodc portfolio a/prodc.toml b/prodc.toml` |
 | `dupes` | Candidate duplicate need pairs by text similarity; `--threshold` overrides `[lint].duplicate_threshold` | `prodc dupes --threshold 0.7` |
 | `recurrence` | Baselines shared across clients; `--suggest` proposes unlinked cross-client needs that could share one (set `variant_of` or `not_variant_of`); `--threshold` overrides `[lint].duplicate_threshold` | `prodc recurrence --suggest` |
-| `suggest [id]` | Candidate proof locators for HOLE needs, ranked by text similarity to adapter inventories; `--min-score --top --kind` | `prodc suggest H-1 --min-score 0.4` |
+| `suggest [id]` | Candidate proof locators for HOLE needs, ranked by text similarity to adapter inventories; `--min-score --top --kind`; `--apply` writes the best per need as a proof (`--dry-run` to preview) | `prodc suggest H-1 --min-score 0.4 --apply` |
 
 ### `status` flags
 
@@ -46,5 +46,6 @@ Each rewrites one YAML file, re-loads the whole model as validation, reverts on 
 | `accept <id> --who W --date D` | add an `accept:W@D` proof; `--revoke` removes it | `prodc accept N-2 --who jorge --date 2026-10-05` |
 | `attest <id> --by X --date D` | record a review that the proofs establish the need; `--ai --verdict --comment` | `prodc attest N-1 --by claude-fable-5-1 --ai --date 2026-10-05 --verdict pass` |
 | `add need <id> --text T --who W --file F` | new need with agent provenance; `--kind internal\|proxy` (never interview); warns on a possible duplicate, `--strict-dupes` refuses, `--no-dupe-check` skips; `--draft` stages it off the board (promote later with `set <id> draft=false`) | `prodc add need N-9 --text "…" --who bot --file needs/bot.yaml --draft` |
+| `add role <id> --text T --file F` | declare a Role in `F`'s `roles:` list (new file created if needed); duplicate id refused | `prodc add role owner --text "owns the roastery" --file needs/roles.yaml` |
 
 `set` fields: `text who label must importance claim goal release variant_of client product draft`; lists: `proofs children`.

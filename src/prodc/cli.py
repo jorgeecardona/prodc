@@ -69,6 +69,7 @@ from .writer import (
     accept,
     add_need,
     add_proof,
+    add_role,
     attest,
     capture_source,
     set_field,
@@ -1017,10 +1018,28 @@ def _cmd_set(args: argparse.Namespace) -> int:
 
 
 def _cmd_add(args: argparse.Namespace) -> int:
-    """Create a new need from an agent, with a proxy/internal provenance source."""
+    """Create a new need (with a proxy/internal provenance source) or declare a new role (#52)."""
     cfg_path = Path(args.config)
     if not cfg_path.exists():
         print(f"prodc: no config at {cfg_path}", file=sys.stderr)
+        return 2
+    if args.noun == "role":
+        try:
+            cfg = Config.load(cfg_path)
+            edit = add_role(
+                cfg,
+                args.need_id,
+                args.text,
+                file=args.file,
+                expect_sha=args.expect_sha,
+                dry_run=args.dry_run,
+            )
+        except (ConfigError, LoaderError, WriteError) as exc:
+            print(f"prodc: {exc}", file=sys.stderr)
+            return 2
+        return _emit_edit(edit, args.dry_run, args.json)
+    if args.who is None:
+        print("prodc: add need requires --who (the author recorded on the source)", file=sys.stderr)
         return 2
     try:
         cfg = Config.load(cfg_path)
@@ -1558,16 +1577,20 @@ def main(argv: list[str] | None = None) -> int:
     )
     st2.set_defaults(func=_cmd_set)
 
-    ad = sub.add_parser("add", help="create a new agent-authored need (writes YAML)")
-    ad.add_argument("noun", choices=["need"], help="what to add (need)")
-    ad.add_argument("need_id", help="the new need's id, e.g. N-9")
-    ad.add_argument("--text", required=True, help="the need text")
-    ad.add_argument("--who", required=True, help="the author (recorded on the provenance source)")
+    ad = sub.add_parser("add", help="create a new agent-authored need, or declare a role (writes YAML)")
+    ad.add_argument("noun", choices=["need", "role"], help="what to add (need or role)")
+    ad.add_argument("need_id", help="the new need's id (or role id for `add role`), e.g. N-9")
+    ad.add_argument("--text", required=True, help="the need text (or the role description)")
+    ad.add_argument(
+        "--who",
+        default=None,
+        help="need only: the author (recorded on the provenance source); required for `add need`",
+    )
     ad.add_argument(
         "--kind",
         choices=["internal", "proxy"],
         default="internal",
-        help="provenance source kind (never interview for an agent)",
+        help="need only: provenance source kind (never interview for an agent)",
     )
     ad.add_argument(
         "--file",

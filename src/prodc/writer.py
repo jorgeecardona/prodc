@@ -263,18 +263,31 @@ def _guard_target(config: Config, path: Path) -> None:
 
 
 def _validated(config: Config, path: Path, old_text: str, new_text: str, dry_run: bool) -> Edit:
-    """Write ``new_text``, re-load the model as the schema, and revert on failure or dry-run."""
+    """Write ``new_text``, re-load the model as the schema, and revert on failure or dry-run.
+
+    Reverting restores the prior state exactly: a file that did not exist before (a first `add`
+    into a new file) is removed again rather than left as an empty file, so a rejected or
+    dry-run write leaves the tree untouched.
+    """
     _guard_target(config, path)
+    existed = path.exists()
+
+    def _restore() -> None:
+        if existed:
+            path.write_text(old_text, encoding="utf-8")
+        else:
+            path.unlink(missing_ok=True)
+
     path.write_text(new_text, encoding="utf-8")
     try:
         load(config)
     except BaseException as exc:  # revert on ANY failure, then re-raise
-        path.write_text(old_text, encoding="utf-8")
+        _restore()
         if isinstance(exc, LoaderError):
             raise WriteError(f"edit rejected: {exc}") from exc
         raise
     if dry_run:
-        path.write_text(old_text, encoding="utf-8")
+        _restore()
     return Edit(path=path, old_text=old_text, new_text=new_text)
 
 
@@ -502,4 +515,39 @@ def add_need(
     if draft:
         new_need["draft"] = True
     needs.append(new_need)
+    return _validated(config, target, old_text, _dump(doc), dry_run)
+
+
+def add_role(
+    config: Config,
+    role_id: str,
+    text: str,
+    *,
+    file: str,
+    expect_sha: str | None = None,
+    dry_run: bool,
+) -> Edit:
+    """Declare a new Role in ``file``'s top-level ``roles:`` list (#52 follow-up).
+
+    The dedicated write-back for a role, so a roster entry is a one-liner instead of a hand
+    edit. Like :func:`add_need`, a new/edited file is re-dumped whole (comments in that file are
+    not preserved — use `set` on an existing need for a comment-safe splice); the reload gate
+    still rejects anything that does not load. A duplicate role id is refused.
+    """
+    target = config.root / file
+    if target.exists():
+        doc, old_text = _read_doc(target)
+    else:
+        doc, old_text = {}, ""
+    if expect_sha is not None and _sha256(old_text) != expect_sha:
+        raise WriteError(f"{target.name} changed since it was read (optimistic lock)")
+    raw = doc.setdefault("roles", [])
+    if not isinstance(raw, list):
+        raise WriteError(f"{target.name}: 'roles' is not a list")
+    roles = cast("list[object]", raw)
+    if any(
+        isinstance(r, dict) and cast("dict[str, object]", r).get("id") == role_id for r in roles
+    ):
+        raise WriteError(f"role {role_id!r} already exists in {target.name}")
+    roles.append({"id": role_id, "text": text})
     return _validated(config, target, old_text, _dump(doc), dry_run)

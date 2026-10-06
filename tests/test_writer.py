@@ -9,7 +9,7 @@ import pytest
 
 from prodc.config import Config
 from prodc.loader import load
-from prodc.writer import WriteError, add_need, capture_source, set_field
+from prodc.writer import WriteError, add_need, add_role, capture_source, set_field
 
 
 def _proj(tmp_path: Path, body: str) -> Config:
@@ -226,3 +226,29 @@ def test_attest_bad_kind_rejected(tmp_path: Path) -> None:
             expect_sha=None,
             dry_run=False,
         )
+
+
+def test_add_role_declares_role_in_new_file(tmp_path: Path) -> None:
+    cfg = _proj(tmp_path, "needs:\n  - id: N-1\n    text: t\n")
+    add_role(cfg, "owner", "owns the roastery", file="needs/roles.yaml", dry_run=False)
+    model = load(cfg)
+    assert {r.id: r.text for r in model.roles} == {"owner": "owns the roastery"}
+
+
+def test_add_role_duplicate_id_rejected(tmp_path: Path) -> None:
+    cfg = _proj(tmp_path, "roles:\n  - id: owner\n    text: one\n")
+    with pytest.raises(WriteError, match="already exists"):
+        add_role(cfg, "owner", "two", file="needs/a.yaml", dry_run=False)
+
+
+def test_add_role_outside_glob_rejected(tmp_path: Path) -> None:
+    cfg = _proj(tmp_path, "needs:\n  - id: N-1\n    text: t\n")
+    with pytest.raises(WriteError, match="does not match any"):
+        add_role(cfg, "owner", "t", file="outside.yaml", dry_run=False)
+
+
+def test_add_role_dry_run_leaves_no_file(tmp_path: Path) -> None:
+    cfg = _proj(tmp_path, "needs:\n  - id: N-1\n    text: t\n")
+    edit = add_role(cfg, "owner", "owns it", file="needs/roles.yaml", dry_run=True)
+    assert "owner" in edit.diff
+    assert not (cfg.root / "needs" / "roles.yaml").exists()  # dry-run wrote nothing

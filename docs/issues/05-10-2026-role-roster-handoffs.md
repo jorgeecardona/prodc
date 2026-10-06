@@ -28,8 +28,12 @@ area: cli
    `who` no longer fabricates handoffs. No new edge type — the `children` order is the sequence.
    (`status.handoffs`)
 
+3. **`add role` / dedicated write-back** — done: `prodc add role <id> --text <desc> --file <path>`
+   declares a Role in that file's top-level `roles:` list (new file created if needed),
+   duplicate id refused, `--dry-run`/`--json`/`--expect-sha` like the other writers.
+   (`writer.add_role`; a dry-run or rejected first-write now leaves no empty file behind.)
+
 ## What is still deferred
 
-3. **`add role` / dedicated write-back** — today a role is hand-authored or `set` on a need.
 4. **`Need.label` deprecation** — once roles carry the role description, the per-need `label`
    (hoisted onto the roster today) is redundant. Deprecate separately.
