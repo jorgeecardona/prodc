@@ -484,6 +484,15 @@ wheels = [
 ]
 
 [[package]]
+name = "musil"
+version = "0.35.6"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/25/80/81ddfc14c213b6f282a6e0d183eca97727186c93b5a83e85f5417f10df12/musil-0.35.6.tar.gz", hash = "sha256:eb8e42916e3db2793f854d58297a06f41b9be75f2a572951186f0ec65b79ef2a", size = 374026, upload-time = "2026-09-02T15:16:06.243Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8e/e6/6b4203b77594e86dde0fcc1056a437e9158a78addad6b3feb26657967698/musil-0.35.6-py3-none-any.whl", hash = "sha256:9e5468e7adcafff02c2f9cbeaad56b1a0f52f80ad39cb306a6321a0d90f2b687", size = 186247, upload-time = "2026-09-02T15:16:07.436Z" },
+]
+
+[[package]]
 name = "nodeenv"
 version = "1.11.0"
 source = { registry = "https://pypi.org/simple" }
@@ -554,6 +563,7 @@ docs = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "musil" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "ruff" },
@@ -571,6 +581,7 @@ provides-extras = ["docs"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "musil", specifier = ">=0.35" },
     { name = "pyright", specifier = ">=1.1.390" },
     { name = "pytest", specifier = ">=8" },
     { name = "ruff", specifier = ">=0.6" },

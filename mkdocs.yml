@@ -30,6 +30,8 @@ nav:
   - Commands: commands.md
   - Model: model.md
   - Config: config.md
+  - Lifecycle: lifecycle.md
+  - Grounding (Torres): grounding-torres.md
 
 markdown_extensions:
   - admonition

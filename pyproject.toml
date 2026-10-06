@@ -47,7 +47,8 @@ packages = ["src/prodc"]
 include = ["src", "tests", "examples", "README.md", "CHANGELOG.md", "LICENSE"]
 
 [dependency-groups]
-dev = ["ruff>=0.6", "pyright>=1.1.390", "pytest>=8", "types-pyyaml>=6"]
+# musil is a dev-only model checker (tests/test_models.py); prodc's runtime stays pyyaml-only.
+dev = ["ruff>=0.6", "pyright>=1.1.390", "pytest>=8", "types-pyyaml>=6", "musil>=0.35"]
 
 [tool.ruff]
 line-length = 100
