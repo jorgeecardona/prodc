@@ -15,7 +15,7 @@ Every command takes `--config prodc.toml` (default) and `--json`. `prodc -C DIR 
 | `diff <snapshot>` | State changes since a saved `status --json` | `prodc diff last.json` |
 | `portfolio <toml>…` | Many repos, one scoreboard | `prodc portfolio a/prodc.toml b/prodc.toml` |
 | `dupes` | Candidate duplicate need pairs by text similarity; `--threshold` overrides `[lint].duplicate_threshold` | `prodc dupes --threshold 0.7` |
-| `recurrence` | Baselines shared across clients; `--suggest` proposes unlinked cross-client needs that could share one (set `variant_of` or `not_variant_of`); `--threshold` overrides `[lint].duplicate_threshold` | `prodc recurrence --suggest` |
+| `recurrence` | Baselines shared across clients; `--suggest` proposes unlinked cross-client needs that could share one (set `variant_of` or `not_variant_of`); `--suggest --apply --baseline-id ID --file F` creates a shared baseline for the top group and links its members (`--dry-run` to preview); `--threshold` overrides `[lint].duplicate_threshold` | `prodc recurrence --suggest --apply --baseline-id B-1 --file needs/base.yaml` |
 | `suggest [id]` | Candidate proof locators for HOLE needs, ranked by text similarity to adapter inventories; `--min-score --top --kind`; `--apply` writes the best per need as a proof (`--dry-run` to preview) | `prodc suggest H-1 --min-score 0.4 --apply` |
 
 ### `status` flags

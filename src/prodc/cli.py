@@ -72,6 +72,7 @@ from .writer import (
     add_role,
     attest,
     capture_source,
+    link_variant_group,
     set_field,
     set_importance,
 )
@@ -1382,6 +1383,8 @@ def _cmd_recurrence(args: argparse.Namespace) -> int:
     if args.suggest:
         threshold = args.threshold if args.threshold is not None else cfg.duplicate_threshold
         groups = variant_suggestions(needs, threshold)
+        if args.apply:
+            return _apply_recurrence(cfg, groups, args)
         if args.json:
             print(json.dumps([_variant_payload(g) for g in groups], indent=2))
         else:
@@ -1412,6 +1415,67 @@ def _cmd_recurrence(args: argparse.Namespace) -> int:
         for r in recs:
             print(f"  {r.count}x  {r.baseline.id}: {r.baseline.text}  [{', '.join(r.clients)}]")
         print(f"recurrence: {len(recs)} shared baseline(s)")
+    return 0
+
+
+def _baseline_text(g: VariantGroup) -> str:
+    """The text for a created baseline: the highest-importance member, ties broken by id."""
+    chosen = sorted(g.members, key=lambda m: (-(m.importance or 0), m.id))[0]
+    return chosen.text
+
+
+def _apply_recurrence(cfg: Config, groups: list[VariantGroup], args: argparse.Namespace) -> int:
+    """Link the top recurrence group to a newly created shared baseline (#56), transactionally.
+
+    A suggested group is always cross-client (the matcher excludes client-less needs), so there
+    is never a baseline to reuse — `--apply` creates one, which needs `--baseline-id` and `--file`.
+    It links the single highest-scoring group per run (one id names one baseline); any remaining
+    groups are reported as still unlinked, to rerun. `--dry-run` previews the diffs without writing.
+    """
+    if not groups:
+        print("recurrence --apply: no unlinked groups to link")
+        return 0
+    if not args.baseline_id or not args.file:
+        print(
+            "prodc: recurrence --apply needs --baseline-id and --file (the baseline to create)",
+            file=sys.stderr,
+        )
+        return 2
+    group = groups[0]  # highest score first (variant_suggestions sorts by -score)
+    try:
+        edits = link_variant_group(
+            cfg,
+            member_ids=[m.id for m in group.members],
+            baseline_id=args.baseline_id,
+            create_baseline=True,
+            baseline_text=_baseline_text(group),
+            baseline_file=args.file,
+            dry_run=args.dry_run,
+        )
+    except WriteError as exc:
+        print(f"prodc: {exc}", file=sys.stderr)
+        return 2
+    verb = "would link" if args.dry_run else "linked"
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "baseline": args.baseline_id,
+                    "members": [m.id for m in group.members],
+                    "dry_run": args.dry_run,
+                    "remaining_groups": len(groups) - 1,
+                    "edits": [{"file": e.path.name, "diff": e.diff} for e in edits],
+                },
+                indent=2,
+            )
+        )
+    else:
+        members = ", ".join(m.id for m in group.members)
+        print(f"{verb} {members} → baseline {args.baseline_id} (in {args.file})")
+        for e in edits:
+            print(e.diff, end="")
+        if len(groups) > 1:
+            print(f"recurrence --apply: {len(groups) - 1} more group(s) unlinked — rerun to link")
     return 0
 
 
@@ -1577,7 +1641,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     st2.set_defaults(func=_cmd_set)
 
-    ad = sub.add_parser("add", help="create a new agent-authored need, or declare a role (writes YAML)")
+    ad = sub.add_parser(
+        "add", help="create a new agent-authored need, or declare a role (writes YAML)"
+    )
     ad.add_argument("noun", choices=["need", "role"], help="what to add (need or role)")
     ad.add_argument("need_id", help="the new need's id (or role id for `add role`), e.g. N-9")
     ad.add_argument("--text", required=True, help="the need text (or the role description)")
@@ -1716,6 +1782,27 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         metavar="FRAC",
         help="similarity for --suggest (0..1); overrides [lint].duplicate_threshold",
+    )
+    rc.add_argument(
+        "--apply",
+        action="store_true",
+        help="with --suggest: link each group to a shared baseline (reuses a client-less "
+        "member, or creates one with --baseline-id/--file) (#56)",
+    )
+    rc.add_argument(
+        "--baseline-id",
+        default=None,
+        metavar="ID",
+        help="id for a baseline to create when a group has no client-less member",
+    )
+    rc.add_argument(
+        "--file",
+        default=None,
+        metavar="PATH",
+        help="file to write a created baseline into (must match a [prodc].needs glob)",
+    )
+    rc.add_argument(
+        "--dry-run", action="store_true", help="with --apply: validate and show diffs, don't write"
     )
     rc.set_defaults(func=_cmd_recurrence)
 

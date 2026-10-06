@@ -124,9 +124,7 @@ def test_suggest_apply_writes_best_proof_per_need(
     assert "web:orders.feature#Export orders to CSV" in h1.proofs
 
 
-def test_suggest_apply_is_idempotent(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_suggest_apply_is_idempotent(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     from prodc.cli import main
     from prodc.config import Config
     from prodc.loader import load

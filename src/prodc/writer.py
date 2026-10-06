@@ -551,3 +551,84 @@ def add_role(
         raise WriteError(f"role {role_id!r} already exists in {target.name}")
     roles.append({"id": role_id, "text": text})
     return _validated(config, target, old_text, _dump(doc), dry_run)
+
+
+def _snapshot(paths: list[Path]) -> dict[Path, str | None]:
+    """Current text of each path, or None when it does not exist — a point to roll back to."""
+    return {p: (p.read_text(encoding="utf-8") if p.exists() else None) for p in paths}
+
+
+def _restore(snapshot: dict[Path, str | None]) -> None:
+    """Put every file back exactly as :func:`_snapshot` found it (absent files removed again)."""
+    for path, text in snapshot.items():
+        if text is None:
+            path.unlink(missing_ok=True)
+        else:
+            path.write_text(text, encoding="utf-8")
+
+
+def _write_baseline(config: Config, need_id: str, text: str, file: str) -> Edit:
+    """Write a new client-less baseline need {id, text} into ``file`` (no reload/commit gate).
+
+    Unlike :func:`add_need`, it attaches no source — a recurrence baseline is a structural roll-up
+    the author evidences later, so it loads flagged as an opinion rather than carrying a fabricated
+    one. Raw write (the caller's transaction validates the whole model once and rolls back on any
+    failure); still refuses a target outside the globs or a duplicate id.
+    """
+    _guard_target(config, config.root / file)
+    target = config.root / file
+    doc, old_text = _read_doc(target) if target.exists() else ({}, "")
+    needs = _need_list(doc, target)
+    if any(
+        isinstance(n, dict) and cast("dict[str, object]", n).get("id") == need_id for n in needs
+    ):
+        raise WriteError(f"baseline id {need_id!r} already exists in {target.name}")
+    needs.append({"id": need_id, "text": text})
+    new_text = _dump(doc)
+    target.write_text(new_text, encoding="utf-8")
+    return Edit(path=target, old_text=old_text, new_text=new_text)
+
+
+def link_variant_group(
+    config: Config,
+    *,
+    member_ids: list[str],
+    baseline_id: str,
+    create_baseline: bool,
+    baseline_text: str | None = None,
+    baseline_file: str | None = None,
+    dry_run: bool,
+) -> list[Edit]:
+    """Point a recurrence group at one shared baseline, atomically across files (#56).
+
+    When ``create_baseline``, a new client-less need (``baseline_id``, ``baseline_text``) is written
+    into ``baseline_file`` first so the members' ``variant_of`` resolves; otherwise ``baseline_id``
+    is an existing client-less member reused in place. Every id in ``member_ids`` then gets
+    ``variant_of=baseline_id`` (a comment-preserving per-need splice). All touched files are
+    snapshotted up front; any rejection — or ``dry_run`` — restores every one, so the group is
+    linked all-or-nothing.
+    """
+    touched = _config_files(config)
+    if create_baseline:
+        if not baseline_file or baseline_text is None:
+            raise WriteError("creating a baseline needs both a file and text")
+        touched = [*touched, config.root / baseline_file]
+    snapshot = _snapshot(sorted(set(touched)))
+    edits: list[Edit] = []
+    try:
+        if create_baseline:
+            assert baseline_file is not None and baseline_text is not None
+            edits.append(_write_baseline(config, baseline_id, baseline_text, baseline_file))
+        for mid in member_ids:
+            edits.append(
+                set_field(config, mid, f"variant_of={baseline_id}", expect_sha=None, dry_run=False)
+            )
+        load(config)  # whole-model gate: variant_of resolves, no variant-of-a-variant chains
+    except BaseException as exc:  # any failure -> roll the whole group back
+        _restore(snapshot)
+        if isinstance(exc, (WriteError, LoaderError)):
+            raise WriteError(f"recurrence --apply rejected: {exc}") from exc
+        raise
+    if dry_run:
+        _restore(snapshot)
+    return edits

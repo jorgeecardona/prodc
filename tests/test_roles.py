@@ -299,8 +299,17 @@ def test_add_role_command_writes_and_loads(
     cfg = tmp_path / "prodc.toml"
     _project(tmp_path, "needs:\n  - id: N-1\n    text: a need\n")
     code = main(
-        ["add", "role", "owner", "--text", "owns it", "--file", "needs/roles.yaml",
-         "--config", str(cfg)]
+        [
+            "add",
+            "role",
+            "owner",
+            "--text",
+            "owns it",
+            "--file",
+            "needs/roles.yaml",
+            "--config",
+            str(cfg),
+        ]
     )
     assert code == 0
     model = load(Config.load(cfg))
@@ -314,6 +323,8 @@ def test_add_need_without_who_is_rejected(
 
     cfg = tmp_path / "prodc.toml"
     _project(tmp_path, "needs:\n  - id: N-1\n    text: a need\n")
-    code = main(["add", "need", "N-2", "--text", "t", "--file", "needs/a.yaml", "--config", str(cfg)])
+    code = main(
+        ["add", "need", "N-2", "--text", "t", "--file", "needs/a.yaml", "--config", str(cfg)]
+    )
     assert code == 2
     assert "requires --who" in capsys.readouterr().err

@@ -127,3 +127,65 @@ def test_lint_surfaces_recurrence_unlinked(
     out = capsys.readouterr().out
     assert code == 0  # unlinked recurrence is a warning, not a hard error
     assert "unlinked cross-client recurrence" in out
+
+
+def test_recurrence_apply_creates_baseline_and_links(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+    from prodc.loader import load
+
+    cfg = _project(tmp_path)
+    code = main(
+        ["recurrence", "--suggest", "--apply", "--baseline-id", "B-ord",
+         "--file", "needs/base.yaml", "--config", str(cfg)]
+    )
+    assert code == 0
+    by_id = {n.id: n for n in load(Config.load(cfg)).needs}
+    assert "B-ord" in by_id and by_id["B-ord"].client is None  # client-agnostic baseline
+    assert by_id["N-1"].variant_of == "B-ord"
+    assert by_id["N-2"].variant_of == "B-ord"
+
+
+def test_recurrence_apply_requires_baseline_id_and_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+
+    cfg = _project(tmp_path)
+    code = main(["recurrence", "--suggest", "--apply", "--config", str(cfg)])
+    assert code == 2
+    assert "--baseline-id and --file" in capsys.readouterr().err
+
+
+def test_recurrence_apply_dry_run_leaves_files_untouched(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+
+    cfg = _project(tmp_path)
+    before = (tmp_path / "needs" / "a.yaml").read_text(encoding="utf-8")
+    code = main(
+        ["recurrence", "--suggest", "--apply", "--dry-run", "--baseline-id", "B-ord",
+         "--file", "needs/base.yaml", "--config", str(cfg)]
+    )
+    assert code == 0
+    assert (tmp_path / "needs" / "a.yaml").read_text(encoding="utf-8") == before
+    assert not (tmp_path / "needs" / "base.yaml").exists()  # created file rolled back
+
+
+def test_recurrence_apply_rolls_back_on_bad_baseline_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+
+    cfg = _project(tmp_path)
+    before = (tmp_path / "needs" / "a.yaml").read_text(encoding="utf-8")
+    # a baseline file outside the globs is refused -> the whole group must roll back
+    code = main(
+        ["recurrence", "--suggest", "--apply", "--baseline-id", "B-ord",
+         "--file", "outside.yaml", "--config", str(cfg)]
+    )
+    assert code == 2
+    assert (tmp_path / "needs" / "a.yaml").read_text(encoding="utf-8") == before  # members untouched
+    assert not (tmp_path / "outside.yaml").exists()
