@@ -22,7 +22,7 @@ who: jordan
 label: "design partner"
 needs:
   - id: N-1
-    text: "When an order is past due, jordan can see it highlighted"
+    text: "see which orders are past due at a glance"
     must: true
     sources:
       - kind: interview
@@ -33,7 +33,7 @@ needs:
       - "web:orders.feature#Past due orders are highlighted"
 
   - id: N-2
-    text: "jordan can export the day's delivery run sheet"
+    text: "export the day's delivery run sheet"
     sources:
       - kind: artifact
         locator: issues.md#N-2

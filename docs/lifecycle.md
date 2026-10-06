@@ -27,7 +27,7 @@ A leaf need (no children) is resolved from its proofs.
 
 | Event | Move | Grounding |
 |---|---|---|
-| `source` | opinion → sourced | **Torres Ch. 2.** An opportunity must come from a specific customer story, not a company want. prodc grades the source: `interview` > `proxy` > `internal`, and warns on an interview with no named person or verbatim quote (behaviour over stated intent). |
+| `source` | opinion → sourced | **Torres Ch. 2.** An opportunity must come from a specific customer story, not a company want. prodc grades the source: `interview` > `artifact` > `proxy` > `internal`, and warns on an interview with no named person or verbatim quote (behaviour over stated intent). |
 | `declare-proof` | → `PENDING` | **Torres Ch. 9.** Name the assumption that must be true and make it testable ("articulated"). A declared proof is the test the need is waiting on. |
 | `proof-passes` | `PENDING` → `DELIVERED` | **Torres Ch. 10**, *with a caveat* (see the gap below). The test meets its success criteria; the assumption is "more known". |
 | `attest` | `DELIVERED` + human sign-off | **Torres Ch. 10.** "Our goal is not to seek truth but to mitigate risk." A human judges that the green proof actually establishes *this* need — the warrant. Only a `DELIVERED` leaf can be attested (enforced as a guard). |

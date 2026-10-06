@@ -1,6 +1,6 @@
 # Model
 
-All nouns live in the files matched by `[prodc].needs`. Any file may carry `needs:`, `goals:`, `releases:`, `argument:`. Cross-references are string ids, checked at load.
+All nouns live in the files matched by `[prodc].needs`. Any file may carry `needs:`, `goals:`, `releases:`, `roles:`, `argument:`. Cross-references are string ids, checked at load.
 
 ## Nouns
 
@@ -11,7 +11,7 @@ All nouns live in the files matched by `[prodc].needs`. Any file may carry `need
 | **Proof** | `<adapter>:<payload>` resolved against the repo | `proofs:` on a need |
 | **Goal** | measurable objective needs trace up to; `id`, `text`, `metric` | `goals:` |
 | **Release** | ship slice; list order = ship order; `id`, `text` | `releases:` |
-| **Role** | a role; `who`+`client` is an instance of it (John@Sincerely is the `owner`); `id`, `text` | `roles:` |
+| **Role** | a named function in the product's world; `who`+`client` is an instance of it (John@Sincerely is the `owner`); `id`, `text` | `roles:` |
 | **ArgNode** | GSN node: `kind` claim/strategy/evidence/context/assumption/justification, `supported_by`, `in_context_of`, `about` | `argument:` |
 | **Attestation** | a review that the proofs establish the need | `attestation:` on a need |
 
