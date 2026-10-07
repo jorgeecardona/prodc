@@ -44,10 +44,10 @@ Each rewrites one YAML file, re-loads the whole model as validation, reverts on 
 | Command | Does | Example |
 |---|---|---|
 | `set <id> key=value` | set one field; `key+=value` appends to `proofs`/`children`; `importance=<n\|label>` is checked against the `[importance]` rubric and stamps `importance_set_at` | `prodc set N-2 importance=needed` |
-| `capture <id> --kind K` | append a source; `--who --date --quote --locator --observed-at` (observed-at defaults to today, for staleness) | `prodc capture N-3 --kind interview --who Ana --date 2026-10-05 --quote "…"` |
+| `capture <id> --kind K` | append a source (`K` = `primary`\|`secondary`\|`assumption`; old `interview`/`artifact`/`proxy`/`internal` still accepted); `--who --date --quote --locator --observed-at` (observed-at defaults to today, for staleness) | `prodc capture N-3 --kind primary --who Ana --date 2026-10-05 --quote "…"` |
 | `accept <id> --who W --date D` | add an `accept:W@D` proof; `--revoke` removes it | `prodc accept N-2 --who jorge --date 2026-10-05` |
 | `attest <id> --by X --date D` | record a review that the proofs establish the need; `--ai --verdict --comment` | `prodc attest N-1 --by claude-fable-5-1 --ai --date 2026-10-05 --verdict pass` |
-| `add need <id> --text T --who W --file F` | new need with agent provenance; `--kind internal\|proxy` (never interview); warns on a possible duplicate, `--strict-dupes` refuses, `--no-dupe-check` skips; `--draft` stages it off the board (promote later with `set <id> draft=false`) | `prodc add need N-9 --text "…" --who bot --file needs/bot.yaml --draft` |
+| `add need <id> --text T --who W --file F` | new need with agent provenance; `--kind assumption\|secondary` (never primary — that's earned by a real user); warns on a possible duplicate, `--strict-dupes` refuses, `--no-dupe-check` skips; `--draft` stages it off the board (promote later with `set <id> draft=false`) | `prodc add need N-9 --text "…" --who bot --file needs/bot.yaml --draft` |
 | `add role <id> --text T --file F` | declare a Role in `F`'s `roles:` list (new file created if needed); duplicate id refused | `prodc add role owner --text "owns the roastery" --file needs/roles.yaml` |
 
 `set` fields: `text who label must importance claim goal release variant_of client product draft`; lists: `proofs children`.

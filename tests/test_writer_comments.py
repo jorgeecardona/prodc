@@ -69,7 +69,7 @@ def test_capture_preserves_comments(tmp_path: Path) -> None:
     capture_source(
         cfg,
         "N-1",
-        kind="artifact",
+        kind="secondary",
         who=None,
         date="2026-10-05",
         quote=None,

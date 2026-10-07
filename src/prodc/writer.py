@@ -44,6 +44,25 @@ _SCALAR_FIELDS = frozenset(
 )
 _LIST_FIELDS = frozenset({"proofs", "children"})
 
+# Source-kind aliases accepted on write (old names → the primary/secondary/assumption ladder),
+# normalised so new files use the current vocabulary even when an author types the old kind.
+# Mirrors the loader's read-side aliases.
+_SOURCE_KIND_ALIASES = {
+    "interview": "primary",
+    "artifact": "secondary",
+    "proxy": "assumption",
+    "internal": "assumption",
+}
+_SOURCE_KINDS = ("primary", "secondary", "assumption")
+
+
+def _canonical_kind(kind: str) -> str:
+    """Normalise a source kind (accepting old aliases) to its canonical ladder value."""
+    k = _SOURCE_KIND_ALIASES.get(kind, kind)
+    if k not in _SOURCE_KINDS:
+        raise WriteError(f"source kind must be one of {', '.join(_SOURCE_KINDS)}, not {kind!r}")
+    return k
+
 
 class WriteError(Exception):
     pass
@@ -342,13 +361,11 @@ def capture_source(
 ) -> Edit:
     """Append a Source to an existing need — the near-zero-friction capture of #24.
 
-    Records evidence as given; the loader's soft hygiene checks (interview needs a quote and a
-    who, artifact needs a locator) still apply on the next read. ``observed_at`` dates when the
-    evidence was recorded, so the board can flag stale needs (#58).
+    Records evidence as given; the loader's soft hygiene checks (a primary source wants a who and a
+    quote-or-locator, a secondary source wants a locator) still apply on the next read.
+    ``observed_at`` dates when the evidence was recorded, so the board can flag stale needs (#58).
     """
-    valid = {"interview", "artifact", "proxy", "internal"}
-    if kind not in valid:
-        raise WriteError(f"source kind must be one of {', '.join(sorted(valid))}, not {kind!r}")
+    kind = _canonical_kind(kind)
     path, _ = _locate(config, need_id)
     doc, old_text = _read_doc(path)
     if expect_sha is not None and _sha256(old_text) != expect_sha:
@@ -488,12 +505,17 @@ def add_need(
 ) -> Edit:
     """Create a new need in ``file`` with an agent-provenance source (never a silent opinion).
 
-    An agent-authored need must carry a source — and never ``interview``, which only a real
-    user signal earns. ``kind`` is restricted to ``proxy``/``internal`` for that reason. A
-    ``draft`` need is staged: it loads but is kept off the counted board until promoted (#60).
+    An agent-authored need must carry a source — and never ``primary``, which only a real user
+    signal earns. ``kind`` is restricted to ``assumption`` (the agent's own guess) or ``secondary``
+    (citing an existing document). A ``draft`` need is staged: it loads but is kept off the counted
+    board until promoted (#60).
     """
-    if kind not in ("proxy", "internal"):
-        raise WriteError(f"agent-authored need source must be proxy or internal, not {kind!r}")
+    kind = _SOURCE_KIND_ALIASES.get(kind, kind)
+    if kind not in ("assumption", "secondary"):
+        raise WriteError(
+            f"agent-authored need source must be assumption or secondary, not {kind!r} "
+            "(never primary — that is earned by a real user signal)"
+        )
     target = config.root / file
     if target.exists():
         doc, old_text = _read_doc(target)

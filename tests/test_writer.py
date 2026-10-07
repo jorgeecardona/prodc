@@ -82,20 +82,22 @@ def test_add_need_carries_agent_provenance(tmp_path: Path) -> None:
         dry_run=False,
     )
     by_id = {n.id: n for n in load(cfg).needs}
-    assert "N-2" in by_id and not by_id["N-2"].is_opinion  # never a silent opinion
+    # It still carries a source — an explicit assumption, not a silent/sourceless need. It is
+    # still an opinion (an assumption is no external evidence), but an *owned, dated* one.
+    assert "N-2" in by_id and by_id["N-2"].only_assumption and by_id["N-2"].is_opinion
     src = by_id["N-2"].sources[0]
     assert src.who == "agent:claude" and src.date == datetime.date.today().isoformat()
 
 
-def test_add_need_rejects_interview_kind(tmp_path: Path) -> None:
+def test_add_need_rejects_primary_kind(tmp_path: Path) -> None:
     cfg = _proj(tmp_path, "needs:\n  - id: N-1\n    text: t\n")
-    with pytest.raises(WriteError, match="proxy or internal"):
+    with pytest.raises(WriteError, match="assumption or secondary"):
         add_need(
             cfg,
             "N-2",
             "t",
             who="agent",
-            kind="interview",
+            kind="primary",
             file="needs/a.yaml",
             expect_sha=None,
             dry_run=False,
@@ -138,7 +140,7 @@ def test_capture_appends_source_turns_opinion_into_sourced(tmp_path: Path) -> No
     capture_source(
         cfg,
         "N-1",
-        kind="interview",
+        kind="primary",
         who="Ana",
         date="2026-10-05",
         quote="we need this",

@@ -89,29 +89,34 @@ _LABEL = {
 
 
 def _warrant(need: Need) -> str:
-    """The warrant column: the strongest source kind, or 'opinion' when unsourced."""
+    """The warrant column: the strongest source kind, or 'opinion' when there is no source at all.
+
+    A `primary` source names its person (`primary:who`); `secondary`/`assumption` show the kind. A
+    need with any source is shown by that kind even if it is an opinion (only an assumption) — the
+    opinion roll-up lives in the gap counts, this column shows the literal evidence tier.
+    """
     strongest = need.strongest_kind  # the one source-strength ranking lives on the model
     if strongest is None:
         return "opinion"
-    if strongest is SourceKind.INTERVIEW:
-        who = next((s.who for s in need.sources if s.kind is SourceKind.INTERVIEW and s.who), None)
-        return f"interview:{who}" if who else "interview"
+    if strongest is SourceKind.PRIMARY:
+        who = next((s.who for s in need.sources if s.kind is SourceKind.PRIMARY and s.who), None)
+        return f"primary:{who}" if who else "primary"
     return strongest.value
 
 
 def _provenance_counts(results: list[NeedResult]) -> dict[str, int]:
-    """How many needs carry each warrant strength (interview/artifact/internal/opinion)."""
-    counts = {"interview": 0, "artifact": 0, "proxy": 0, "internal": 0, "opinion": 0}
+    """How many needs carry each evidence tier (primary/secondary/assumption/opinion)."""
+    counts = {"primary": 0, "secondary": 0, "assumption": 0, "opinion": 0}
     for r in results:
         counts[_warrant(r.need).split(":", 1)[0]] += 1
     return counts
 
 
 def _provenance_line(results: list[NeedResult]) -> str:
-    """Per-role provenance mix — makes internal-only ('0 OPINION' but unvalidated) visible.
+    """Per-role evidence mix — makes assumption-only needs (weak, but not sourceless) visible.
 
-    OPINION (no source) stays distinct from a weak INTERNAL source; the headline a PM
-    wants is how many needs trace to a real user (interview), not just 'has any source'.
+    The headline a PM wants is how many needs trace to a real user (primary), not just 'has any
+    source'; a need resting only on an assumption is an opinion, shown here as its assumption tier.
     """
     counts = _provenance_counts(results)
     return "provenance: " + "  ·  ".join(f"{counts[k]} {k}" for k in counts)
@@ -379,7 +384,7 @@ def _need_payload(r: NeedResult) -> dict[str, object]:
         "total": r.total,
         "declared": r.declared,
         "opinion": need.is_opinion,
-        "only_internal": need.only_internal,
+        "only_assumption": need.only_assumption,
         "evidence_age": evidence_age_days(need, date.today()),
         "last_observed_at": last_observed(need),
         "detail": r.detail,
@@ -873,10 +878,8 @@ def _importance_cell(need: Need) -> str:
     """The importance column; a value entered by a weak-warrant author is flagged a guess."""
     if need.importance is None:
         return ""
-    weak = need.strongest_kind is None or need.strongest_kind in (
-        SourceKind.PROXY,
-        SourceKind.INTERNAL,
-    )
+    # weak = no external evidence (only an assumption, or nothing) — the author is guessing
+    weak = need.is_opinion
     return f"imp={need.importance}{' (guess)' if weak else ''}"
 
 
@@ -908,11 +911,7 @@ def _plan_json(results: list[NeedResult], recurrence_counts: dict[str, int]) -> 
                     "recurrence": recurrence_counts.get(r.need.id, 0),
                     "importance": r.need.importance,
                     "importance_is_guess": (
-                        r.need.importance is not None
-                        and (
-                            r.need.strongest_kind is None
-                            or r.need.strongest_kind in (SourceKind.PROXY, SourceKind.INTERNAL)
-                        )
+                        r.need.importance is not None and r.need.is_opinion
                     ),
                 }
                 for i, r in enumerate(ranked, 1)
@@ -1021,7 +1020,7 @@ def _cmd_set(args: argparse.Namespace) -> int:
 
 
 def _cmd_add(args: argparse.Namespace) -> int:
-    """Create a new need (with a proxy/internal provenance source) or declare a new role (#52)."""
+    """Create a new need (with an assumption/secondary provenance source) or declare a role (#52)."""
     cfg_path = Path(args.config)
     if not cfg_path.exists():
         print(f"prodc: no config at {cfg_path}", file=sys.stderr)
@@ -1199,13 +1198,13 @@ def _repo_row(config_path: str) -> _RepoRow:
 
 
 def _render_portfolio(rows: list[_RepoRow]) -> str:
-    out = [f"  {'repo':<18} {'cov':>4}  {'must-HOLE':>9}  {'BROKEN':>6}   prov intv/art/prx/int/op"]
+    out = [f"  {'repo':<18} {'cov':>4}  {'must-HOLE':>9}  {'BROKEN':>6}   prov prim/sec/asm/op"]
     for row in rows:
         if row.error is not None:
             out.append(f"  {row.repo:<18} error: {row.error}")
             continue
         p = row.provenance
-        prov = f"{p['interview']}/{p['artifact']}/{p['proxy']}/{p['internal']}/{p['opinion']}"
+        prov = f"{p['primary']}/{p['secondary']}/{p['assumption']}/{p['opinion']}"
         cov = f"{round(row.coverage * 100)}%"
         out.append(f"  {row.repo:<18} {cov:>4}  {row.must_hole:>9}  {row.broken:>6}   {prov}")
     return "\n".join(out)
@@ -1703,9 +1702,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     ad.add_argument(
         "--kind",
-        choices=["internal", "proxy"],
-        default="internal",
-        help="need only: provenance source kind (never interview for an agent)",
+        choices=["assumption", "secondary", "internal", "proxy"],
+        default="assumption",
+        help="need only: provenance source kind — assumption (default) or secondary; never "
+        "primary for an agent (internal/proxy accepted as aliases for assumption)",
     )
     ad.add_argument(
         "--file",
@@ -1744,13 +1744,14 @@ def main(argv: list[str] | None = None) -> int:
     cp.add_argument(
         "--kind",
         required=True,
-        choices=["interview", "artifact", "proxy", "internal"],
-        help="source kind (strongest first: interview > artifact > proxy > internal)",
+        choices=["primary", "secondary", "assumption", "interview", "artifact", "proxy", "internal"],
+        help="source kind, strongest first: primary > secondary > assumption "
+        "(interview/artifact/proxy/internal accepted as aliases)",
     )
     cp.add_argument("--who", default=None, help="the person the evidence came from")
     cp.add_argument("--date", default=None, help="when (ISO, e.g. 2026-10-05)")
-    cp.add_argument("--quote", default=None, help="a verbatim quote (for an interview)")
-    cp.add_argument("--locator", default=None, help="a source locator (for an artifact)")
+    cp.add_argument("--quote", default=None, help="a verbatim quote (for a primary source)")
+    cp.add_argument("--locator", default=None, help="a source locator (for a secondary source)")
     cp.add_argument(
         "--observed-at",
         default=None,

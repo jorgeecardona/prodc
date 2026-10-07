@@ -16,7 +16,7 @@ A leaf need (no children) is resolved from its proofs.
 
 | State | Meaning |
 |---|---|
-| *opinion* | no `source` of any kind — an unvalidated desirability assumption |
+| *opinion* | no `primary` or `secondary` source (only an assumption, or none) — an unvalidated desirability assumption |
 | `HOLE` | sourced, but no proof at all — an honest gap, never a failure |
 | `PENDING` | a proof is declared/planned, not yet green |
 | `DELIVERED` | every proof is green |
@@ -27,7 +27,7 @@ A leaf need (no children) is resolved from its proofs.
 
 | Event | Move | Grounding |
 |---|---|---|
-| `source` | opinion → sourced | **Torres Ch. 2.** An opportunity must come from a specific customer story, not a company want. prodc grades the source: `interview` > `artifact` > `proxy` > `internal`, and warns on an interview with no named person or verbatim quote (behaviour over stated intent). |
+| `source` | opinion → sourced | **Torres Ch. 2.** An opportunity must come from a specific customer story, not a company want. prodc grades the source `primary` > `secondary` > `assumption` (the academic primary/secondary split, plus the floor), and warns on a primary source with no named person or no quote/locator (behaviour over stated intent). |
 | `declare-proof` | → `PENDING` | **Torres Ch. 9.** Name the assumption that must be true and make it testable ("articulated"). A declared proof is the test the need is waiting on. |
 | `proof-passes` | `PENDING` → `DELIVERED` | **Torres Ch. 10**, *with a caveat* (see the gap below). The test meets its success criteria; the assumption is "more known". |
 | `attest` | `DELIVERED` + human sign-off | **Torres Ch. 10.** "Our goal is not to seek truth but to mitigate risk." A human judges that the green proof actually establishes *this* need — the warrant. Only a `DELIVERED` leaf can be attested (enforced as a guard). |
@@ -68,7 +68,7 @@ For her, evidence is a **gradient** (importance × evidence), moving incremental
 never "proven", only "sufficiently known". prodc approximates that gradient with three softeners
 rather than pretending `DELIVERED` means *true*:
 
-- **source kind** ranks how strong the backing is (`interview` beats `internal`);
+- **source kind** ranks how strong the backing is (`primary` beats `assumption`);
 - **`importance`** carries the author's ordinal, revisited over time;
 - **`attestation`** records a human warrant — and prodc warns on a `DELIVERED` leaf whose warrant
   no human has reviewed.

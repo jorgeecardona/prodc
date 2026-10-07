@@ -25,7 +25,7 @@ needs:
     text: "see which orders are past due at a glance"
     must: true
     sources:
-      - kind: interview
+      - kind: primary
         who: Jordan
         date: 2026-09-20
         quote: "I lose the past-due ones in the list"
@@ -35,7 +35,7 @@ needs:
   - id: N-2
     text: "export the day's delivery run sheet"
     sources:
-      - kind: artifact
+      - kind: secondary
         locator: issues.md#N-2
         date: 2026-09-21
     # no proofs → HOLE (evidenced, not yet proven)

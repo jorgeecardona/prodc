@@ -104,14 +104,27 @@ def _attestation(raw: object, where: str) -> Attestation | None:
     )
 
 
+# Old source-kind names (pre-0.3.58) mapped to the primary/secondary/assumption ladder, so
+# existing need files keep loading. `interview` was live user contact (primary); `artifact` was a
+# cited document (secondary); `proxy`/`internal` were both unevidenced guesses (assumption).
+_SOURCE_KIND_ALIASES = {
+    "interview": SourceKind.PRIMARY,
+    "artifact": SourceKind.SECONDARY,
+    "proxy": SourceKind.ASSUMPTION,
+    "internal": SourceKind.ASSUMPTION,
+}
+
+
 def _source(raw: object, where: str) -> Source:
     tbl = _as_mapping(raw, where)
-    kind_name = _opt_str(tbl.get("kind"), f"{where}.kind") or SourceKind.INTERNAL.value
-    try:
-        kind = SourceKind(kind_name)
-    except ValueError:
-        kinds = "|".join(k.value for k in SourceKind)
-        raise LoaderError(f"{where}.kind: unknown kind {kind_name!r} ({kinds})") from None
+    kind_name = _opt_str(tbl.get("kind"), f"{where}.kind") or SourceKind.ASSUMPTION.value
+    kind = _SOURCE_KIND_ALIASES.get(kind_name)
+    if kind is None:
+        try:
+            kind = SourceKind(kind_name)
+        except ValueError:
+            kinds = "|".join(k.value for k in SourceKind)
+            raise LoaderError(f"{where}.kind: unknown kind {kind_name!r} ({kinds})") from None
     return Source(
         kind=kind,
         who=_opt_str(tbl.get("who"), f"{where}.who"),

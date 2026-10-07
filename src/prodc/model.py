@@ -13,12 +13,18 @@ from enum import StrEnum
 
 
 class SourceKind(StrEnum):
-    """How a need was evidenced, in descending epistemic weight (Torres, Ch. 5)."""
+    """How strongly a need is evidenced, strongest first — the academic primary/secondary split,
+    plus the floor every need has at least (Torres, Ch. 5).
 
-    INTERVIEW = "interview"  # behavioural evidence: a named customer, a date, a verbatim quote
-    ARTIFACT = "artifact"  # documentary: a ticket, doc or email locator
-    PROXY = "proxy"  # the author is a plausible user of this product, guessing as that user
-    INTERNAL = "internal"  # a team member's own assertion — provenance, but not a customer's
+    PRIMARY and SECONDARY are the two recognised research tiers; ASSUMPTION is our own stated guess.
+    A need with no PRIMARY or SECONDARY source is an *opinion* (see :attr:`Need.is_opinion`) — a
+    belief not yet grounded in the user or the world. "Nothing falls from the sky": a bare need is
+    really an unrecorded assumption, which is why ASSUMPTION is the floor rather than "no source".
+    """
+
+    PRIMARY = "primary"  # straight from the user: an interview, their own email/message/ticket
+    SECONDARY = "secondary"  # existing/mediated material about them: a report, a third-party/internal doc
+    ASSUMPTION = "assumption"  # our own stated belief, no external evidence yet — the floor
 
 
 class ProofState(StrEnum):
@@ -54,12 +60,12 @@ class Source:
     def warnings(self) -> list[str]:
         """Soft, Torres-derived hygiene checks — never fail the build."""
         out: list[str] = []
-        if self.kind is SourceKind.INTERVIEW and not self.quote:
-            out.append("interview source without a verbatim quote")
-        if self.kind is SourceKind.INTERVIEW and not self.who:
-            out.append("interview source without a named person")
-        if self.kind is SourceKind.ARTIFACT and not self.locator:
-            out.append("artifact source without a locator")
+        if self.kind is SourceKind.PRIMARY and not self.who:
+            out.append("primary source without a named person")
+        if self.kind is SourceKind.PRIMARY and not self.quote and not self.locator:
+            out.append("primary source without a verbatim quote or a locator")
+        if self.kind is SourceKind.SECONDARY and not self.locator:
+            out.append("secondary source without a locator")
         if not self.date:
             out.append("source without a date")
         return out
@@ -166,13 +172,21 @@ class Need:
 
     @property
     def is_opinion(self) -> bool:
-        """No source of any kind = opinion (Torres: an unvalidated desirability assumption)."""
-        return len(self.sources) == 0
+        """No external evidence yet — no primary or secondary source, only an assumption or nothing.
+
+        Not "no source": a bare need is an unrecorded assumption, so an opinion is a belief not yet
+        grounded in the user or the world (Torres: an unvalidated desirability assumption).
+        """
+        return not any(
+            s.kind in (SourceKind.PRIMARY, SourceKind.SECONDARY) for s in self.sources
+        )
 
     @property
-    def only_internal(self) -> bool:
-        """Sourced, but only by the team's own assertion — not a customer."""
-        return len(self.sources) > 0 and all(s.kind is SourceKind.INTERNAL for s in self.sources)
+    def only_assumption(self) -> bool:
+        """Has a source, but all of them are assumptions — a stated guess, no external evidence."""
+        return len(self.sources) > 0 and all(
+            s.kind is SourceKind.ASSUMPTION for s in self.sources
+        )
 
     @property
     def strongest_kind(self) -> SourceKind | None:

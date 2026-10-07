@@ -87,12 +87,12 @@ def test_dangling_source_warns_distinct_from_opinion(tmp_path: Path) -> None:
         "issues": FrontmatterAdapter(root=tmp_path, paths=["issues/*.md"])
     }
     good = Need(
-        id="N-1", text="t", sources=(Source(kind=SourceKind.ARTIFACT, locator="issues:reg.md#A-1"),)
+        id="N-1", text="t", sources=(Source(kind=SourceKind.SECONDARY, locator="issues:reg.md#A-1"),)
     )
     bad = Need(
         id="N-2",
         text="t",
-        sources=(Source(kind=SourceKind.ARTIFACT, locator="issues:reg.md#NOPE"),),
+        sources=(Source(kind=SourceKind.SECONDARY, locator="issues:reg.md#NOPE"),),
     )
     results = {r.need.id: r for r in resolve([good, bad], {}, sources)}
     assert not any("BROKEN source" in w for w in results["N-1"].warnings)
@@ -132,8 +132,8 @@ def test_recurrence_sorted_most_shared_first() -> None:
 def test_rank_orders_by_must_state_then_evidence_then_importance() -> None:
     from prodc.status import rank
 
-    interview = Source(kind=SourceKind.INTERVIEW, who="Ana", quote="q", date="2026-01-01")
-    internal = Source(kind=SourceKind.INTERNAL, date="2026-01-01")
+    interview = Source(kind=SourceKind.PRIMARY, who="Ana", quote="q", date="2026-01-01")
+    internal = Source(kind=SourceKind.ASSUMPTION, date="2026-01-01")
     needs = [
         Need(id="D-1", text="delivered", proofs=("x:1",)),  # lowest priority
         Need(id="MH-1", text="must hole", must=True),  # must-HOLE: top

@@ -7,7 +7,7 @@ All nouns live in the files matched by `[prodc].needs`. Any file may carry `need
 | Noun | One line | Key |
 |---|---|---|
 | **Need** | what a named person wants; a flow is a need with `children` | `needs:` |
-| **Source** | where it came from; none = opinion | `sources:` on a need |
+| **Source** | where it came from; `primary`/`secondary`/`assumption` — no primary/secondary = opinion | `sources:` on a need |
 | **Proof** | `<adapter>:<payload>` resolved against the repo | `proofs:` on a need |
 | **Goal** | measurable objective needs trace up to; `id`, `text`, `metric` | `goals:` |
 | **Release** | ship slice; list order = ship order; `id`, `text` | `releases:` |
@@ -59,23 +59,25 @@ File-level `who`, `label`, `client` default every need in that file.
 | Field | Means |
 |---|---|
 | `kind` | see ladder below |
-| `who` | the person (interview needs one) |
+| `who` | the person (a primary source needs one) |
 | `date` | when it was said/written; missing = warned |
-| `quote` | verbatim (interview needs one) |
-| `locator` | ticket/doc ref (artifact needs one); `[sources.*]` adapters check it resolves |
+| `quote` | verbatim (a primary source wants a quote or a locator) |
+| `locator` | ticket/doc ref (a secondary source needs one); `[sources.*]` adapters check it resolves |
 | `observed_at` | ISO date the evidence was recorded; `capture` stamps it. Newest across sources = the need's evidence age (`status --stale`, `[lint].stale_after_days`) |
 
 ## Ladders
 
-Strongest first.
+Strongest first — the academic primary/secondary split, plus the floor.
 
 | Source `kind` | Is |
 |---|---|
-| `interview` | a named user, a date, a verbatim quote |
-| `artifact` | a ticket / doc / email locator |
-| `proxy` | the author is a plausible user, guessing as one |
-| `internal` | a team member's own assertion |
-| *(none)* | opinion |
+| `primary` | straight from the user: an interview, their own email / message / ticket |
+| `secondary` | existing/mediated material about them: a report, a third-party or internal doc |
+| `assumption` | our own stated guess — no external evidence yet (the floor every need has at least) |
+
+A need with **no `primary` or `secondary` source** — only an assumption, or nothing — is an
+**opinion** (nothing from the user or the world yet). Old kind names still load, mapped on:
+`interview`→`primary`, `artifact`→`secondary`, `proxy`/`internal`→`assumption`.
 
 | Attestation `kind` | Is |
 |---|---|

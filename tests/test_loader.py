@@ -63,9 +63,9 @@ def test_source_kind_defaults_to_internal(tmp_path: Path) -> None:
         ),
     )
     (need,) = load_needs(cfg)
-    assert need.sources[0].kind is SourceKind.INTERNAL
+    assert need.sources[0].kind is SourceKind.ASSUMPTION
     assert need.sources[0].date == "2026-08-02"  # bare YAML date coerced to string
-    assert need.sources[1].kind is SourceKind.INTERVIEW
+    assert need.sources[1].kind is SourceKind.PRIMARY
     assert not need.is_opinion
 
 

@@ -26,8 +26,8 @@ gaps: 2 HOLE  ·  1 opinion    coverage 1/3 (33%)
      id        GROUNDS         need                                        WARRANT
 
 jordan (design partner)    1 DELIVERED  ·  2 HOLE
-  !! N-1       DELIVERED* 1/1   see which orders are past due at a glance   interview:Jordan
-     N-2       HOLE             export the day's delivery run sheet         artifact
+  !! N-1       DELIVERED* 1/1   see which orders are past due at a glance   primary:Jordan
+     N-2       HOLE             export the day's delivery run sheet         secondary
      N-3       HOLE             implement a settings page                   opinion
        ⚠ text may be a solution in disguise (starts with 'implement')
 ```

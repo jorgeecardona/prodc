@@ -14,7 +14,7 @@ from prodc.status import evidence_age_days, last_observed
 
 
 def _src(observed_at: str | None) -> Source:
-    return Source(kind=SourceKind.INTERVIEW, who="Ana", observed_at=observed_at)
+    return Source(kind=SourceKind.PRIMARY, who="Ana", observed_at=observed_at)
 
 
 def test_evidence_age_uses_newest_source() -> None:

@@ -12,9 +12,11 @@ text tables.
 
 ## The two rules
 
-1. **A need with no evidence is an opinion.** Every need should trace to who asked for it — an
-   interview, a ticket, an email. A need with no source still loads, but `prodc` flags it as an
-   opinion, because that is what it is until someone outside the room has asked.
+1. **A need with no external evidence is an opinion.** Evidence comes in two tiers: `primary` —
+   straight from the user (an interview, their own email, message, or ticket) — and `secondary` —
+   existing material about them (a report, a doc). A need backed only by an `assumption` (your own
+   guess) or by nothing still loads, but `prodc` flags it as an opinion, because that is what it is
+   until someone outside the room has asked.
 2. **"Done" is a claim the tests back.** You do not mark a need done; you attach a *proof* — a
    locator into the real test suite. `prodc status` resolves those and reports each need as
    DELIVERED, PENDING, HOLE (an honest gap, no proof yet), or BROKEN (a proof that points at
@@ -23,9 +25,9 @@ text tables.
 ## Guardrails — do not break these
 
 - **Never fabricate evidence.** You may only record what actually happened. When *you* create a
-  need, its source is `internal` or `proxy` (your own reasoning as a plausible user) — **never
-  `interview`**. An `interview` source is earned only by a real user actually saying something;
-  recording one you invented is lying to everyone who reads the board.
+  need, its source is an `assumption` (your own reasoning) — **never `primary`**. A `primary`
+  source is earned only by a real user actually saying something; recording one you invented is
+  lying to everyone who reads the board.
 - **A HOLE is honest; leave it visible.** Do not attach a proof that does not really prove the
   need just to turn a row green. An un-evidenced gap you can see beats a false green.
 - **Every write shows a diff, and you can preview it.** Writers print the unified diff of what
@@ -45,8 +47,8 @@ Read first, then act, then check.
    open questions (opinions with no evidence, HOLEs with no proof), so you walk in knowing what to
    ask.
 3. **When someone describes a want**, decide: is there real evidence? If a user said it, capture
-   it. If it is your own inference, record it as `internal`/`proxy` and let it show as the weaker
-   signal it is. Stage anything still half-formed with `add … --draft` — it loads but stays off the
+   it as `primary`. If it is your own inference, record it as an `assumption` and let it show as the
+   weaker signal it is. Stage anything still half-formed with `add … --draft` — it loads but stays off the
    counted board until you promote it with `prodc set <id> draft=false`.
 4. **Find the proof.** For a HOLE need, `prodc suggest <id>` ranks candidate proofs from the test
    suite; `prodc suggest <id> --apply` writes the best one (preview with `--dry-run`).
@@ -65,9 +67,9 @@ Read first, then act, then check.
 | read one need | `prodc show <id>` |
 | rank the backlog | `prodc plan` |
 | prep a client meeting | `prodc brief <client>` |
-| record a new need (with honest provenance) | `prodc add need <id> --text "…" --who <you> --kind internal --file needs/<f>.yaml` |
+| record a new need (with honest provenance) | `prodc add need <id> --text "…" --who <you> --kind assumption --file needs/<f>.yaml` |
 | declare a role (the roster) | `prodc add role <id> --text "…" --file needs/<f>.yaml` |
-| attach evidence after a user said something | `prodc capture <id> --kind interview --who <person> --date <ISO> --quote "…"` |
+| attach evidence after a user said something | `prodc capture <id> --kind primary --who <person> --date <ISO> --quote "…"` |
 | set or append a field | `prodc set <id> key=value` (append a list with `key+=value`, e.g. `proofs+=web:orders.feature#…`) |
 | propose / attach a proof for a HOLE | `prodc suggest <id> [--apply] [--dry-run]` |
 | link a recurring want to a shared baseline | `prodc recurrence --suggest --apply --baseline-id <id> --file needs/<f>.yaml` |
@@ -88,7 +90,7 @@ saved `status --json`). `prodc status` also takes `--goal <id>`, `--columns id,s
   (bad config, unknown id, a rejected write). Branch on the code; do not infer success from text.
 - **Prefer `--json` and parse it** rather than reading the human table.
 - **Do not block on a human for something you must not fabricate.** A HOLE or an opinion left
-  honest is the correct output of a run, never a reason to invent an `interview` to go green.
+  honest is the correct output of a run, never a reason to invent a `primary` source to go green.
 
 ## Reference
 

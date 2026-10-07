@@ -70,11 +70,11 @@ def test_board_shows_summary_and_warrant(
     assert code == 0  # a must-HOLE is an honest gap, never a failure
     assert "gaps:" in out and "coverage 1/3" in out  # leading gap-count line (#2)
     assert "warrant" in out  # the warrant column header (#3)
-    assert "interview:John" in out  # strongest warrant for D-1
+    assert "primary:John" in out  # strongest warrant for D-1
     assert "opinion" in out  # O-1's warrant
     assert "legend:" in out  # glyph legend (#10)
-    # provenance mix (#11): 1 interview, 1 artifact, 0 internal, 1 opinion
-    assert "provenance:" in out and "1 interview" in out and "1 artifact" in out
+    # provenance mix (#11): 1 primary, 1 secondary, 0 assumption, 1 opinion
+    assert "provenance:" in out and "1 primary" in out and "1 secondary" in out
 
 
 def test_json_has_summary_and_grounds_warrant(
@@ -87,7 +87,7 @@ def test_json_has_summary_and_grounds_warrant(
     assert code == 0
     assert payload["summary"]["total"] == 3 and payload["summary"]["must_hole"] == 1
     d1 = next(n for n in payload["needs"] if n["id"] == "D-1")
-    assert d1["grounds"] == "delivered" and d1["warrant"] == "interview:John"
+    assert d1["grounds"] == "delivered" and d1["warrant"] == "primary:John"
 
 
 def test_min_coverage_gate_fails(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -135,7 +135,7 @@ def test_show_single_need(tmp_path: Path, capsys: pytest.CaptureFixture[str]) ->
     out = capsys.readouterr().out
     assert code == 0
     assert "D-1" in out and "a delivered need" in out
-    assert "grounds: DELIVERED" in out and "interview:John" in out
+    assert "grounds: DELIVERED" in out and "primary:John" in out
     assert "I need this" in out  # the source quote
 
 
@@ -144,8 +144,8 @@ def test_show_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
 
     main(["show", "D-1", "--config", str(_project(tmp_path)), "--json"])
     p = json.loads(capsys.readouterr().out)
-    assert p["id"] == "D-1" and p["warrant"] == "interview:John"
-    assert p["sources"][0]["kind"] == "interview" and p["sources"][0]["who"] == "John"
+    assert p["id"] == "D-1" and p["warrant"] == "primary:John"
+    assert p["sources"][0]["kind"] == "primary" and p["sources"][0]["who"] == "John"
 
 
 def test_show_unknown_need_exits_2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -170,7 +170,7 @@ def test_portfolio_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> N
     main(["portfolio", str(_project(tmp_path / "alpha")), "--json"])
     rows = json.loads(capsys.readouterr().out)
     assert rows[0]["repo"] == "alpha" and rows[0]["total"] == 3
-    assert rows[0]["provenance"]["interview"] == 1
+    assert rows[0]["provenance"]["primary"] == 1
 
 
 def test_portfolio_bad_config_exits_2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -203,22 +203,23 @@ def test_diff_reports_new_need(tmp_path: Path, capsys: pytest.CaptureFixture[str
     assert "new" in out and "X-9" in out
 
 
-def test_proxy_source_kind_warrant(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_assumption_source_kind_warrant(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     import json
 
     (tmp_path / "needs").mkdir()
     (tmp_path / "prodc.toml").write_text('[prodc]\nneeds = ["needs/*.yaml"]\n', encoding="utf-8")
+    # `kind: proxy` is the old name; the loader aliases it to `assumption`.
     (tmp_path / "needs" / "a.yaml").write_text(
-        "who: me\nneeds:\n  - id: P-1\n    text: a proxy-sourced need\n"
+        "who: me\nneeds:\n  - id: P-1\n    text: an assumption-sourced need\n"
         "    sources:\n      - kind: proxy\n        who: me\n        date: 2026-01-01\n",
         encoding="utf-8",
     )
     toml = str(tmp_path / "prodc.toml")
     main(["status", "--config", toml, "--json"])
     p = json.loads(capsys.readouterr().out)
-    assert p["needs"][0]["warrant"] == "proxy"  # interview > artifact > proxy > internal
+    assert p["needs"][0]["warrant"] == "assumption"  # primary > secondary > assumption
     main(["status", "--config", toml])
-    assert "1 proxy" in capsys.readouterr().out  # provenance line counts proxy
+    assert "1 assumption" in capsys.readouterr().out  # provenance line counts the assumption
 
 
 _BRIEF_TOML = """
@@ -421,7 +422,7 @@ def test_columns_table_selects_fields(tmp_path: Path, capsys: pytest.CaptureFixt
     out = capsys.readouterr().out
     assert code == 0
     assert "id" in out and "state" in out and "warrant" in out
-    assert "interview:John" in out  # D-1's warrant column
+    assert "primary:John" in out  # D-1's warrant column
     assert "GROUNDS = test proof" not in out  # rich-board legend suppressed in columns mode
 
 
@@ -442,7 +443,7 @@ def test_agent_prints_playbook(capsys: pytest.CaptureFixture[str]) -> None:
     out = capsys.readouterr().out
     assert code == 0
     assert "product-management playbook" in out
-    assert "A need with no evidence is an opinion" in out  # the first rule is present
+    assert "A need with no external evidence is an opinion" in out  # the first rule is present
 
 
 def test_agent_write_creates_file_and_refuses_overwrite(
