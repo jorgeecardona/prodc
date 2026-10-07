@@ -41,6 +41,7 @@ from .model import (
     SourceKind,
     ears_shape,
 )
+from .report import render_markdown
 from .status import (
     Handoff,
     ProofSuggestion,
@@ -1268,6 +1269,32 @@ def _cmd_diff(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_report(args: argparse.Namespace) -> int:
+    """Render the board as a readable markdown document — a file a PM can read, share, or print."""
+    loaded = _load_or_report(args)
+    if loaded is None:
+        return 2
+    cfg, model = loaded
+    if args.client:
+        scoped = applicable_needs(list(model.needs), args.client)
+        model = Model(
+            needs=tuple(scoped),
+            goals=model.goals,
+            releases=model.releases,
+            roles=model.roles,
+            argument=model.argument,
+        )
+    text = render_markdown(cfg, model, client=args.client, rev=_git_rev(cfg.root))
+    if args.output:
+        dest = Path(args.output)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(text, encoding="utf-8")
+        print(f"wrote report to {dest}")
+    else:
+        print(text)
+    return 0
+
+
 def _cmd_agent(args: argparse.Namespace) -> int:
     """Print prodc's agent playbook, or write it into the project.
 
@@ -1868,6 +1895,22 @@ def main(argv: list[str] | None = None) -> int:
         help="similarity to flag (0..1); overrides [lint].duplicate_threshold",
     )
     du.set_defaults(func=_cmd_dupes)
+
+    rp = sub.add_parser(
+        "report", help="render the board as a readable markdown document (for a PM to read/share)"
+    )
+    rp.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    rp.add_argument(
+        "--output",
+        "-o",
+        default=None,
+        metavar="PATH",
+        help="write the report to PATH (e.g. status.md) instead of stdout",
+    )
+    rp.add_argument(
+        "--client", default=None, metavar="ID", help="scope the report to one client (as `status`)"
+    )
+    rp.set_defaults(func=_cmd_report)
 
     ag = sub.add_parser(
         "agent",

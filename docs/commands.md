@@ -17,6 +17,7 @@ Every command takes `--config prodc.toml` (default) and `--json`. `prodc -C DIR 
 | `dupes` | Candidate duplicate need pairs by text similarity; `--threshold` overrides `[lint].duplicate_threshold` | `prodc dupes --threshold 0.7` |
 | `recurrence` | Baselines shared across clients; `--suggest` proposes unlinked cross-client needs that could share one (set `variant_of` or `not_variant_of`); `--suggest --apply --baseline-id ID --file F` creates a shared baseline for the top group and links its members (`--dry-run` to preview); `--threshold` overrides `[lint].duplicate_threshold` | `prodc recurrence --suggest --apply --baseline-id B-1 --file needs/base.yaml` |
 | `suggest [id]` | Candidate proof locators for HOLE needs, ranked by text similarity to adapter inventories; `--min-score --top --kind`; `--apply` writes the best per need as a proof (`--dry-run` to preview) | `prodc suggest H-1 --min-score 0.4 --apply` |
+| `report` | Render the board as a readable markdown document (summary, needs, goals/releases/roster/handoffs, open questions) for a PM to read, share, or print; `-o PATH` writes a file, `--client ID` scopes it | `prodc report -o status.md` |
 | `agent` | Print prodc's agent playbook so a coding agent runs prodc as the project's PM; `--write PATH` writes it into the repo (`--force` to overwrite) | `prodc agent >> AGENTS.md` |
 
 ### `status` flags

@@ -137,8 +137,17 @@ def test_recurrence_apply_creates_baseline_and_links(
 
     cfg = _project(tmp_path)
     code = main(
-        ["recurrence", "--suggest", "--apply", "--baseline-id", "B-ord",
-         "--file", "needs/base.yaml", "--config", str(cfg)]
+        [
+            "recurrence",
+            "--suggest",
+            "--apply",
+            "--baseline-id",
+            "B-ord",
+            "--file",
+            "needs/base.yaml",
+            "--config",
+            str(cfg),
+        ]
     )
     assert code == 0
     by_id = {n.id: n for n in load(Config.load(cfg)).needs}
@@ -166,8 +175,18 @@ def test_recurrence_apply_dry_run_leaves_files_untouched(
     cfg = _project(tmp_path)
     before = (tmp_path / "needs" / "a.yaml").read_text(encoding="utf-8")
     code = main(
-        ["recurrence", "--suggest", "--apply", "--dry-run", "--baseline-id", "B-ord",
-         "--file", "needs/base.yaml", "--config", str(cfg)]
+        [
+            "recurrence",
+            "--suggest",
+            "--apply",
+            "--dry-run",
+            "--baseline-id",
+            "B-ord",
+            "--file",
+            "needs/base.yaml",
+            "--config",
+            str(cfg),
+        ]
     )
     assert code == 0
     assert (tmp_path / "needs" / "a.yaml").read_text(encoding="utf-8") == before
@@ -183,9 +202,20 @@ def test_recurrence_apply_rolls_back_on_bad_baseline_file(
     before = (tmp_path / "needs" / "a.yaml").read_text(encoding="utf-8")
     # a baseline file outside the globs is refused -> the whole group must roll back
     code = main(
-        ["recurrence", "--suggest", "--apply", "--baseline-id", "B-ord",
-         "--file", "outside.yaml", "--config", str(cfg)]
+        [
+            "recurrence",
+            "--suggest",
+            "--apply",
+            "--baseline-id",
+            "B-ord",
+            "--file",
+            "outside.yaml",
+            "--config",
+            str(cfg),
+        ]
     )
     assert code == 2
-    assert (tmp_path / "needs" / "a.yaml").read_text(encoding="utf-8") == before  # members untouched
+    assert (tmp_path / "needs" / "a.yaml").read_text(
+        encoding="utf-8"
+    ) == before  # members untouched
     assert not (tmp_path / "outside.yaml").exists()
