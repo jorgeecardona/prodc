@@ -34,6 +34,19 @@ jordan (design partner)    1 DELIVERED  ·  2 HOLE
 
 GROUNDS = does a test prove it. WARRANT = did a user ask for it. The gap between them is the point.
 
+## Use it with an agent
+
+prodc ships a playbook that teaches a coding agent to run it as the project's product manager —
+read the board, capture evidence, record needs with honest provenance, find proofs, gate before a
+handoff. Drop it where your agent reads project guidance:
+
+```bash
+prodc agent >> AGENTS.md     # or: prodc agent --write AGENTS.md
+```
+
+This is how an engineer vibe-codes their way into product work: the agent does the product
+management from inside the repo, with prodc keeping it honest.
+
 ## Docs
 
 - [Quickstart](docs/quickstart.md) — 60 seconds to a board

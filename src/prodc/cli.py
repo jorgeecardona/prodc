@@ -8,6 +8,7 @@ never fails — it is the honest gap you want people to keep writing.
 from __future__ import annotations
 
 import argparse
+import importlib.resources
 import json
 import os
 import shutil
@@ -1267,6 +1268,27 @@ def _cmd_diff(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_agent(args: argparse.Namespace) -> int:
+    """Print prodc's agent playbook, or write it into the project.
+
+    The playbook ships with prodc, so `prodc agent >> AGENTS.md` (or `--write`) drops the
+    current, versioned guidance into a user's repo where their coding agent reads it — the agent
+    then runs prodc as the project's PM. It improves when prodc improves; nobody hand-copies it.
+    """
+    text = importlib.resources.files("prodc").joinpath("agent.md").read_text(encoding="utf-8")
+    if args.write:
+        dest = Path(args.write)
+        if dest.exists() and not args.force:
+            print(f"prodc: {dest} already exists (use --force to overwrite)", file=sys.stderr)
+            return 2
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(text, encoding="utf-8")
+        print(f"wrote prodc agent playbook to {dest}")
+        return 0
+    print(text, end="")
+    return 0
+
+
 def _git_rev(root: Path) -> str | None:
     head = root / ".git" / "HEAD"
     try:
@@ -1846,6 +1868,19 @@ def main(argv: list[str] | None = None) -> int:
         help="similarity to flag (0..1); overrides [lint].duplicate_threshold",
     )
     du.set_defaults(func=_cmd_dupes)
+
+    ag = sub.add_parser(
+        "agent",
+        help="print prodc's agent playbook (teach a coding agent to run prodc as the project's PM)",
+    )
+    ag.add_argument(
+        "--write",
+        default=None,
+        metavar="PATH",
+        help="write the playbook to PATH instead of stdout (e.g. AGENTS.md)",
+    )
+    ag.add_argument("--force", action="store_true", help="overwrite PATH if it already exists")
+    ag.set_defaults(func=_cmd_agent)
 
     df = sub.add_parser(
         "diff", help="diff the current board against a prior status --json snapshot"

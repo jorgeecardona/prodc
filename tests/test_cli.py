@@ -435,3 +435,24 @@ def test_only_must_filters(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -
     out = capsys.readouterr().out
     assert code == 0
     assert "H-1" in out and "D-1" not in out.split("id")[-1]  # only the must-have H-1 shown
+
+
+def test_agent_prints_playbook(capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(["agent"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "product-management playbook" in out
+    assert "A need with no evidence is an opinion" in out  # the first rule is present
+
+
+def test_agent_write_creates_file_and_refuses_overwrite(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    dest = tmp_path / "sub" / "AGENTS.md"
+    assert main(["agent", "--write", str(dest)]) == 0
+    assert dest.exists() and "prodc" in dest.read_text(encoding="utf-8")
+    capsys.readouterr()
+    # a second write without --force is refused
+    assert main(["agent", "--write", str(dest)]) == 2
+    assert "already exists" in capsys.readouterr().err
+    assert main(["agent", "--write", str(dest), "--force"]) == 0
