@@ -7,7 +7,8 @@ is how an engineer (or an engineer's agent) does product management without leav
 
 `prodc` only records that structure and checks it holds together. It never calls a model or a
 tracker; every command reads the files and the test suite and prints what it finds. Pass `--json`
-to any command for machine-readable output.
+to any command (every one but `agent`) for machine-readable output — parse that, never scrape the
+text tables.
 
 ## The two rules
 
@@ -45,13 +46,16 @@ Read first, then act, then check.
    ask.
 3. **When someone describes a want**, decide: is there real evidence? If a user said it, capture
    it. If it is your own inference, record it as `internal`/`proxy` and let it show as the weaker
-   signal it is.
+   signal it is. Stage anything still half-formed with `add … --draft` — it loads but stays off the
+   counted board until you promote it with `prodc set <id> draft=false`.
 4. **Find the proof.** For a HOLE need, `prodc suggest <id>` ranks candidate proofs from the test
    suite; `prodc suggest <id> --apply` writes the best one (preview with `--dry-run`).
 5. **Check for duplication and recurrence.** `prodc dupes` flags near-duplicate needs;
    `prodc recurrence --suggest` finds the same want across clients that could share one baseline.
-6. **Gate before you hand off.** `prodc lint --strict` is the red gate — a BROKEN proof or a
-   must-have opinion fails it.
+6. **Gate before you hand off.** `prodc lint` is the red gate: it exits non-zero on a BROKEN proof
+   or a must-have opinion. `prodc lint --strict` *also* fails on any hygiene warning (shared proofs,
+   unlinked recurrence, stale evidence). When you want a coverage threshold in CI, `prodc status`
+   carries its own gate flags (`--min-coverage`, `--max-dangling`, `--max-orphans`, `--strict`).
 
 ## The commands you will use most
 
@@ -68,8 +72,27 @@ Read first, then act, then check.
 | propose / attach a proof for a HOLE | `prodc suggest <id> [--apply] [--dry-run]` |
 | link a recurring want to a shared baseline | `prodc recurrence --suggest --apply --baseline-id <id> --file needs/<f>.yaml` |
 | record a human/AI review of the warrant | `prodc attest <id> --by <who> --date <ISO> [--ai]` |
+| record a human acceptance pass | `prodc accept <id> --who <person> --date <ISO>` |
 | gate in CI | `prodc lint --strict` |
 
-Every write command takes `--dry-run` (preview) and `--expect-sha <sha>` (optimistic lock). Run
-`prodc <command> --help` for the full flag list, and read `docs/model.md` for the nouns (Need,
-Role, Goal, Release) and the fields a need can carry.
+Less often: `prodc argument` (the GSN assurance graph and its defects), `prodc portfolio <toml>…`
+(roll up many repos into one scoreboard), and `prodc diff <snapshot.json>` (what changed since a
+saved `status --json`). `prodc status` also takes `--goal <id>`, `--columns id,state,text,warrant`,
+`--wide`, `--include-drafts`, and `--stale <days>`.
+
+## Running non-interactively (CI, or no human in the loop)
+
+- **Exit codes are the contract, not the stdout.** `0` = clean; `1` = a gate failed (a BROKEN
+  proof, a must-have opinion, or a `status`/`lint` threshold you set); `2` = a usage or load error
+  (bad config, unknown id, a rejected write). Branch on the code; do not infer success from text.
+- **Prefer `--json` and parse it** rather than reading the human table.
+- **Do not block on a human for something you must not fabricate.** A HOLE or an opinion left
+  honest is the correct output of a run, never a reason to invent an `interview` to go green.
+
+## Reference
+
+Every write command takes `--dry-run` (preview the diff without writing); the need-editing writers
+(`set`, `add`, `capture`, `attest`, `accept`) also take `--expect-sha <sha>` (optimistic lock —
+refuse the write if the file changed under you). Run `prodc <command> --help` before you first use a
+command for its exact flags, and read `docs/model.md` for the nouns (Need, Source, Proof, Goal,
+Release, Role) and every field a need can carry — proof locators are `<adapter>:<payload>`.
