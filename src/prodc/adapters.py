@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -52,6 +53,61 @@ def _git_head(repo: Path) -> str | None:
         except OSError:
             return None
     return ref[:7]
+
+
+# ---------------------------------------------------------------------------
+# Command hook: resolve a proof or a source via a user-supplied script (#70)
+# ---------------------------------------------------------------------------
+
+#: The token substituted with the need's locator inside a hook command template.
+_LOCATOR_PLACEHOLDER = "{locator}"
+
+#: A hook runner: given the built argv, the working dir, and a timeout, run the command
+#: and return its parsed-JSON stdout — or ``None`` for "could not read" (non-zero exit,
+#: timeout, spawn failure, or unparseable output). Injected in tests so no process spawns.
+_HookRunner = Callable[[list[str], Path, float], object | None]
+
+
+def _hook_argv(command: list[str], locator: str) -> list[str]:
+    """Build the argv for a hook invocation.
+
+    The locator is the need's, never a shell string: it is substituted for every
+    ``{locator}`` placeholder in the configured template, or appended as the final
+    argument when the template has no placeholder. It is passed as an argv element, so
+    it can never inject a command — the command comes only from trusted config (#70).
+    """
+    has_placeholder = any(_LOCATOR_PLACEHOLDER in arg for arg in command)
+    argv = [arg.replace(_LOCATOR_PLACEHOLDER, locator) for arg in command]
+    if not has_placeholder:
+        argv.append(locator)
+    return argv
+
+
+def _run_hook(argv: list[str], cwd: Path, timeout: float) -> object | None:
+    """Run a hook command (no shell), returning parsed-JSON stdout or ``None``.
+
+    ``None`` is the "could not read" signal and must never resolve to a false pass: a
+    non-zero exit, a timeout, a failure to spawn, or unparseable stdout all return it.
+    The process inherits the environment so the hook owns any secrets/network itself.
+    """
+    try:
+        # argv form (no shell); the command is from trusted config, the locator is data.
+        proc = subprocess.run(
+            argv,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        return json.loads(proc.stdout)
+    except ValueError:
+        return None
 
 
 @dataclass(frozen=True)
@@ -430,6 +486,51 @@ class OutcomeAdapter:
         return ProofResult(ProofState.PENDING, False, f"outcome '{payload}' recorded failing")
 
 
+class CommandProof:
+    """Resolves a locator by running a user-supplied command — a proof hook (#70).
+
+    The command comes only from the project config (trusted, like a git hook); the need's
+    locator is passed to it as an argv element (never a shell string, never executed). The
+    hook queries whatever external system it wants, in any language, and prints a small JSON
+    object to stdout::
+
+        {"state": "delivered" | "pending" | "broken" | "unresolved", "detail": "..."}
+
+    A non-zero exit, a timeout, unparseable output, or an unknown ``state`` all resolve to
+    UNRESOLVED ("could not read") — never a false DELIVERED. This lets a team resolve a
+    proof against any tool with a small script, with no per-provider code in prodc, and the
+    core stays dependency-free.
+    """
+
+    def __init__(
+        self,
+        root: Path,
+        command: list[str],
+        timeout: float = 10.0,
+        _runner: _HookRunner | None = None,
+    ) -> None:
+        self._root = root
+        self._command = command
+        self._timeout = timeout
+        self._run: _HookRunner = _runner or _run_hook
+
+    def resolve(self, payload: str) -> ProofResult:
+        data = self._run(_hook_argv(self._command, payload), self._root, self._timeout)
+        if not isinstance(data, dict):
+            return ProofResult(ProofState.UNRESOLVED, False, "hook: could not read")
+        d = cast("dict[str, object]", data)
+        raw_state = d.get("state")
+        raw_detail = d.get("detail")
+        detail = raw_detail if isinstance(raw_detail, str) else ""
+        try:
+            state = ProofState(raw_state) if isinstance(raw_state, str) else None
+        except ValueError:
+            state = None
+        if state is None:
+            return ProofResult(ProofState.UNRESOLVED, False, f"hook: unknown state {raw_state!r}")
+        return ProofResult(state, False, detail or f"hook: {state}")
+
+
 class PrototypeAdapter:
     """Resolves ``ref@who@date`` to a prototype validated with users in discovery.
 
@@ -618,3 +719,53 @@ class GitLabSource:
         if status in (401, 403):
             return SourceResult(True, f"unverified: auth failed (check {self._token_env})")
         return SourceResult(True, f"unverified: unexpected status {status} from GitLab")
+
+
+class CommandSource:
+    """Resolves a Source locator by running a user-supplied command — a source hook (#70).
+
+    The command comes only from the project config (trusted); the locator is passed as an
+    argv element, never executed. The hook resolves the locator against any system and
+    prints a small JSON object to stdout::
+
+        {"exists": true | false, "who": "...", "date": "...", "quote": "..."}
+
+    ``exists: true`` resolves the source (ok=True, provenance in the detail); ``exists:
+    false`` means the cited item is absent — a dangling (BROKEN) source (ok=False). A
+    non-zero exit, a timeout, unparseable output, or a missing ``exists`` resolves to
+    ``unverified`` (ok=True) — a source we could not check is never flagged BROKEN, exactly
+    as the GitLab adapter treats an absent token or an unreachable host.
+    """
+
+    def __init__(
+        self,
+        root: Path,
+        command: list[str],
+        timeout: float = 10.0,
+        _runner: _HookRunner | None = None,
+    ) -> None:
+        self._root = root
+        self._command = command
+        self._timeout = timeout
+        self._run: _HookRunner = _runner or _run_hook
+
+    def resolve(self, payload: str) -> SourceResult:
+        data = self._run(_hook_argv(self._command, payload), self._root, self._timeout)
+        if not isinstance(data, dict):
+            return SourceResult(True, "unverified: hook could not read")
+        d = cast("dict[str, object]", data)
+        exists = d.get("exists")
+        if exists is False:
+            detail = d.get("detail")
+            return SourceResult(False, detail if isinstance(detail, str) else "not found")
+        if exists is not True:
+            return SourceResult(True, "unverified: hook gave no 'exists'")
+        parts = [
+            f"{label} {value}"
+            for label, key in (("by", "who"), ("at", "date"))
+            if isinstance(value := d.get(key), str) and value
+        ]
+        quote = d.get("quote")
+        if isinstance(quote, str) and quote:
+            parts.append(f'"{quote}"')
+        return SourceResult(True, " ".join(parts) if parts else "exists")

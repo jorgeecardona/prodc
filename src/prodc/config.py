@@ -10,6 +10,8 @@ from typing import cast
 from .adapters import (
     AcceptAdapter,
     Adapter,
+    CommandProof,
+    CommandSource,
     CoverageAdapter,
     External,
     FieldAdapter,
@@ -41,6 +43,17 @@ def _as_str_list(value: object, where: str) -> list[str]:
     if not all(isinstance(x, str) for x in items):
         raise ConfigError(f"{where}: expected a list of strings")
     return [x for x in items if isinstance(x, str)]
+
+
+def _hook_command(tbl: dict[str, object], where: str) -> tuple[list[str], float]:
+    """Parse a command hook's ``command = [...]`` and optional ``timeout`` (#70)."""
+    command = _as_str_list(tbl.get("command", []), f"{where}.command")
+    if not command:
+        raise ConfigError(f"{where}: command must be a non-empty list of strings")
+    timeout = tbl.get("timeout", 10.0)
+    if not isinstance(timeout, (int, float)) or isinstance(timeout, bool) or timeout <= 0:
+        raise ConfigError(f"{where}.timeout must be a positive number of seconds")
+    return command, float(timeout)
 
 
 @dataclass
@@ -142,10 +155,13 @@ class Config:
                 if not results_s:
                     raise ConfigError(f"[proofs.{name}]: external needs results = <json file>")
                 inner = OutcomeAdapter(root=proof_root, results=results_s)
+            elif kind == "command":
+                command, timeout = _hook_command(tbl, f"[proofs.{name}]")
+                inner = CommandProof(root=proof_root, command=command, timeout=timeout)
             else:
                 raise ConfigError(
                     f"[proofs.{name}]: unknown kind {kind!r} "
-                    "(gherkin|pytest|files|accept|prototype|coverage|field|external)"
+                    "(gherkin|pytest|files|accept|prototype|coverage|field|external|command)"
                 )
             adapters[name] = (
                 External(inner, root / repo_field) if isinstance(repo_field, str) else inner
@@ -176,8 +192,15 @@ class Config:
                     project=project,
                     token_env=token_env,
                 )
+            elif kind == "command":
+                command, timeout = _hook_command(tbl, f"[sources.{name}]")
+                source_adapters[name] = CommandSource(
+                    root=root, command=command, timeout=timeout
+                )
             else:
-                raise ConfigError(f"[sources.{name}]: unknown kind {kind!r} (frontmatter|gitlab)")
+                raise ConfigError(
+                    f"[sources.{name}]: unknown kind {kind!r} (frontmatter|gitlab|command)"
+                )
 
         lint_tbl = _as_dict(raw.get("lint", {}), "[lint]")
         dup = lint_tbl.get("duplicate_threshold", 0.8)

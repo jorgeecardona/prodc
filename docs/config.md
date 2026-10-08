@@ -42,8 +42,26 @@ A proof is `<name>:<payload>`.
 | `coverage` | category | category is in `catalog` | `catalog` |
 | `field` | field name | field is `surfaced` in `schema` | `schema` |
 | `external` | observable-outcome key | key recorded passing in `results` (a JSON `{key: bool}`); implementation-independent | `results` |
+| `command` | anything your hook understands | your hook prints `{"state": "delivered"}` | `command`, `timeout` |
 
 Any adapter takes `repo = "../sibling"` to resolve against a sibling checkout; absent sibling → UNRESOLVED, not BROKEN. `results` (cucumber-json or junit XML) turns declared states into real ones.
+
+### `command` — the generic hook
+
+Resolve a proof against any system with a script, with no per-provider code in prodc. `command` is an argv list (no shell); the need's locator is substituted for every `{locator}` in it, or appended as the final argument when there is none. The hook prints a JSON object to stdout:
+
+```toml
+[proofs.jira]
+kind = "command"
+command = ["./hooks/jira-proof.sh"]   # invoked as: ./hooks/jira-proof.sh <locator>
+timeout = 10                           # seconds, optional (default 10)
+```
+
+```json
+{"state": "delivered", "detail": "PROJ-7 closed"}
+```
+
+`state` is `delivered` / `pending` / `broken` / `unresolved`; `detail` is optional. The command comes only from this config (trusted); the locator is passed as data, never executed. A non-zero exit, a timeout, unparseable output, or an unknown `state` resolves to UNRESOLVED ("could not read") — never a false DELIVERED. The hook inherits the environment and owns any network/secrets itself.
 
 ## `[sources.<name>]`
 
@@ -51,6 +69,9 @@ Any adapter takes `repo = "../sibling"` to resolve against a sibling checkout; a
 |---|---|---|
 | `frontmatter` | a source `locator` of `file.md#heading` exists | `paths` |
 | `gitlab` | a source `locator` of `#123` (or `group/project#123`) is a real GitLab issue — read-only, token from `token_env`; missing token/offline → unverified, 404 → broken | `base_url`, `project`, `token_env` |
+| `command` | a source `locator` your hook resolves — prints `{"exists": true, "who": ..., "date": ..., "quote": ...}` | `command`, `timeout` |
+
+`command` works the same as the proof hook (argv, `{locator}` or appended, trusted config). `exists: true` resolves the source; `exists: false` flags it BROKEN; a non-zero exit, a timeout, unparseable output, or a missing `exists` → unverified (never a false BROKEN).
 
 ## `[importance]`
 
