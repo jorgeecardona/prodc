@@ -11,18 +11,10 @@ from __future__ import annotations
 
 from datetime import date
 
+from .board import gather
 from .config import Config
 from .model import Model, NeedResult, NeedState
-from .status import (
-    goal_report,
-    handoffs,
-    recurrence,
-    release_report,
-    resolve,
-    role_report,
-    state_priority,
-    summarize,
-)
+from .status import state_priority
 
 _LABEL = {
     NeedState.DELIVERED: "DELIVERED",
@@ -58,14 +50,14 @@ def render_markdown(
     model (so `--client` reuses the same filter the board uses). ``rev`` is an optional short git
     revision to stamp the report, so a printed copy says which state it reflects.
     """
-    needs = list(model.needs)
-    results = resolve(needs, cfg.adapters, cfg.source_adapters)
-    summary = summarize(results)
-    goal_cov, ungoaled = goal_report(results, list(model.goals))
-    rel_cov = release_report(results, list(model.releases))
-    role_cov, unroled = role_report(results, list(model.roles))
-    hos = handoffs(needs)
-    recs = recurrence(needs)
+    board = gather(cfg, model)
+    results = board.results
+    summary = board.summary
+    goal_cov, ungoaled = board.goal_cov, board.ungoaled
+    rel_cov = board.rel_cov
+    role_cov, unroled = board.role_cov, board.unroled
+    hos = board.handoffs
+    recs = board.recurrence
 
     scope = f" — {client}" if client else ""
     stamp = date.today().isoformat() + (f" · {rev}" if rev else "")

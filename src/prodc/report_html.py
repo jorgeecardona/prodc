@@ -12,74 +12,21 @@ from __future__ import annotations
 import json
 from datetime import date
 
+from .board import gather, need_payload
 from .config import Config
-from .model import Model, NeedResult
-from .status import (
-    goal_report,
-    handoffs,
-    recurrence,
-    release_report,
-    resolve,
-    role_report,
-    summarize,
-)
-
-
-def _need_payload(r: NeedResult) -> dict[str, object]:
-    """One need, flattened to the plain JSON the viewer renders a row and its detail from."""
-    need = r.need
-    strongest = need.strongest_kind
-    return {
-        "id": need.id,
-        "text": need.text,
-        "description": need.description,
-        "state": r.state.value,
-        "must": need.must,
-        "who": need.who or "(unassigned)",
-        "label": need.label,
-        "client": need.client,
-        "opinion": need.is_opinion,
-        "warrant": strongest.value if strongest is not None else "opinion",
-        "importance": need.importance,
-        "goal": need.goal,
-        "release": need.release,
-        "claim": need.claim,
-        "proofs": list(need.proofs),
-        "detail": list(r.detail),
-        "warnings": list(r.warnings),
-        "attestation": (
-            {
-                "who": need.attestation.who,
-                "date": need.attestation.date,
-                "kind": need.attestation.kind.value,
-                "verdict": need.attestation.verdict,
-            }
-            if need.attestation
-            else None
-        ),
-        "sources": [
-            {
-                "kind": s.kind.value,
-                "who": s.who,
-                "date": s.date,
-                "quote": s.quote,
-                "locator": s.locator,
-            }
-            for s in need.sources
-        ],
-    }
+from .model import Model
 
 
 def board_payload(
     cfg: Config, model: Model, *, client: str | None = None, rev: str | None = None
 ) -> dict[str, object]:
     """Gather the resolved board into a plain-dict snapshot (the data the viewer renders)."""
-    needs = list(model.needs)
-    results = resolve(needs, cfg.adapters, cfg.source_adapters)
-    summary = summarize(results)
-    goal_cov, ungoaled = goal_report(results, list(model.goals))
-    rel_cov = release_report(results, list(model.releases))
-    role_cov, unroled = role_report(results, list(model.roles))
+    board = gather(cfg, model)
+    results = board.results
+    summary = board.summary
+    goal_cov, ungoaled = board.goal_cov, board.ungoaled
+    rel_cov = board.rel_cov
+    role_cov, unroled = board.role_cov, board.unroled
 
     def _cov(delivered: int, total: int) -> dict[str, object]:
         pct = round(delivered / total * 100) if total else None
@@ -102,7 +49,7 @@ def board_payload(
             "opinion": summary.opinion,
             "coverage_pct": round(summary.coverage * 100),
         },
-        "needs": [_need_payload(r) for r in results if r.need.product],
+        "needs": [need_payload(r, flavor="html") for r in results if r.need.product],
         "goals": [{"id": g.id, "text": g.text, **_cov(s.delivered, s.total)} for g, s in goal_cov],
         "ungoaled": [r.need.id for r in ungoaled],
         "releases": [
@@ -119,7 +66,7 @@ def board_payload(
                 "count": rec.count,
                 "clients": list(rec.clients),
             }
-            for rec in recurrence(needs)
+            for rec in board.recurrence
         ],
         "handoffs": [
             {
@@ -129,7 +76,7 @@ def board_payload(
                 "from_need": h.from_need.id,
                 "to_need": h.to_need.id,
             }
-            for h in handoffs(needs)
+            for h in board.handoffs
         ],
     }
 

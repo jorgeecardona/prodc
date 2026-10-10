@@ -20,6 +20,16 @@ from pathlib import Path
 from typing import cast
 
 from . import __version__
+from .board import (
+    annotate_board_warnings as _annotate_board_warnings,
+)
+from .board import (
+    gather,
+    need_payload,
+)
+from .board import (
+    warrant as _warrant,
+)
 from .callbacks import advance_ledger, fire, read_ledger, transitions, write_ledger
 from .config import Config, ConfigError
 from .dedup import (
@@ -39,7 +49,6 @@ from .model import (
     NeedState,
     Release,
     Role,
-    SourceKind,
     ears_shape,
 )
 from .report import render_markdown
@@ -52,18 +61,10 @@ from .status import (
     applicable_needs,
     argument_defects,
     evidence_age_days,
-    flow_orphan_warnings,
-    goal_report,
-    handoffs,
-    last_observed,
-    orphans,
     proof_suggestions,
     rank,
     recurrence,
-    release_report,
     resolve,
-    role_report,
-    shared_proof_warnings,
     state_priority,
     summarize,
 )
@@ -88,22 +89,6 @@ _LABEL = {
     NeedState.BROKEN: "BROKEN",
     NeedState.UNRESOLVED: "UNRESOLVED",
 }
-
-
-def _warrant(need: Need) -> str:
-    """The warrant column: the strongest source kind, or 'opinion' when there is no source at all.
-
-    A `primary` source names its person (`primary:who`); `secondary`/`assumption` show the kind. A
-    need with any source is shown by that kind even if it is an opinion (only an assumption) — the
-    opinion roll-up lives in the gap counts, this column shows the literal evidence tier.
-    """
-    strongest = need.strongest_kind  # the one source-strength ranking lives on the model
-    if strongest is None:
-        return "opinion"
-    if strongest is SourceKind.PRIMARY:
-        who = next((s.who for s in need.sources if s.kind is SourceKind.PRIMARY and s.who), None)
-        return f"primary:{who}" if who else "primary"
-    return strongest.value
 
 
 def _provenance_counts(results: list[NeedResult]) -> dict[str, int]:
@@ -349,52 +334,6 @@ def _summary_payload(summary: Summary, orphan_map: dict[str, list[str]]) -> dict
     }
 
 
-def _need_payload(r: NeedResult) -> dict[str, object]:
-    """One need's common fields — shared by the board and `show` so the two never drift."""
-    need = r.need
-    return {
-        "id": need.id,
-        "who": need.who,
-        "role": need.role,
-        "text": need.text,
-        "description": need.description,
-        "must": need.must,
-        "state": r.state.value,
-        "grounds": r.state.value,
-        "warrant": _warrant(need),
-        "shape": ears_shape(need.text).value,
-        "client": need.client,
-        "variant_of": need.variant_of,
-        "goal": need.goal,
-        "release": need.release,
-        "product": need.product,
-        "draft": need.draft,
-        "importance": need.importance,
-        "importance_set_at": need.importance_set_at,
-        "claim": need.claim,
-        "attestation": (
-            {
-                "who": need.attestation.who,
-                "date": need.attestation.date,
-                "kind": need.attestation.kind.value,
-                "verdict": need.attestation.verdict,
-                "comment": need.attestation.comment,
-            }
-            if need.attestation
-            else None
-        ),
-        "delivered": r.delivered,
-        "total": r.total,
-        "declared": r.declared,
-        "opinion": need.is_opinion,
-        "only_assumption": need.only_assumption,
-        "evidence_age": evidence_age_days(need, date.today()),
-        "last_observed_at": last_observed(need),
-        "detail": r.detail,
-        "warnings": r.warnings,
-    }
-
-
 def _to_json(
     results: list[NeedResult],
     summary: Summary,
@@ -463,7 +402,7 @@ def _to_json(
             for goal, gsum in goal_cov
         ],
         "ungoaled": [r.need.id for r in ungoaled],
-        "needs": [_need_payload(r) for r in results],
+        "needs": [need_payload(r) for r in results],
     }
     return json.dumps(payload, indent=2)
 
@@ -480,17 +419,6 @@ def _load_or_report(args: argparse.Namespace) -> tuple[Config, Model] | None:
     except (ConfigError, LoaderError) as exc:
         print(f"prodc: {exc}", file=sys.stderr)
         return None
-
-
-def _annotate_board_warnings(results: list[NeedResult], needs: list[Need]) -> None:
-    """Append the cross-need hygiene warnings (shared proofs #45, seam coverage #44)."""
-    shared = shared_proof_warnings(results)
-    flow_orphans = flow_orphan_warnings(needs)
-    for r in results:
-        if r.need.id in shared:
-            r.warnings.append(shared[r.need.id])
-        if r.need.id in flow_orphans:
-            r.warnings.append("belongs to no flow — seam not covered (#44)")
 
 
 def _annotate_duplicate_warnings(
@@ -628,15 +556,15 @@ def _cmd_status(args: argparse.Namespace) -> int:
             for n in needs
             if (age := evidence_age_days(n, today)) is not None and age > args.stale
         ]
-    results = resolve(needs, cfg.adapters, cfg.source_adapters)
-    _annotate_board_warnings(results, needs)
-    summary = summarize(results)
-    orphan_map = orphans(needs, cfg.adapters)
-    recs = recurrence(needs)
-    goal_cov, ungoaled = goal_report(results, list(model.goals))
-    rel_cov = release_report(results, list(model.releases))
-    role_cov, unroled = role_report(results, list(model.roles))
-    hos = handoffs(needs)
+    board = gather(cfg, model, needs=needs, annotate_warnings=True)
+    results = board.results
+    summary = board.summary
+    orphan_map = board.orphans
+    recs = board.recurrence
+    goal_cov, ungoaled = board.goal_cov, board.ungoaled
+    rel_cov = board.rel_cov
+    role_cov, unroled = board.role_cov, board.unroled
+    hos = board.handoffs
 
     if args.columns:
         bad = [c for c in args.columns if c not in _COLUMNS]
@@ -776,7 +704,7 @@ def _render_show(r: NeedResult, importance_label: str | None = None) -> str:
 
 def _show_json(r: NeedResult) -> str:
     need = r.need
-    payload = _need_payload(r)  # the shared core — never drifts from the board
+    payload = need_payload(r)  # the shared core — never drifts from the board
     payload.update(
         {
             "label": need.label,
