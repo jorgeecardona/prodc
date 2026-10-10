@@ -141,6 +141,19 @@ class Attestation:
 
 
 @dataclass(frozen=True)
+class Withdrawal:
+    """A decision not to pursue a need — withdrawn / won't-do (#74).
+
+    Unlike a draft (staged, not yet decided), a withdrawal is a decision *against*: the need is
+    taken off the active board and out of coverage, with its ``reason`` and ``date`` kept on the
+    record as the durable trace (``prodc show`` still renders it). Reinstate to put it back.
+    """
+
+    reason: str
+    date: str
+
+
+@dataclass(frozen=True)
 class Need:
     """What a named person wants, with its provenance and its proofs."""
 
@@ -165,6 +178,7 @@ class Need:
     release: str | None = None  # id of the Release slice this need ships in; None = unslotted
     product: bool = True  # False = infra/NFR/internal, excluded from product coverage (#48)
     draft: bool = False  # True = staged, not yet counted on the board until promoted (#60)
+    withdrawn: Withdrawal | None = None  # a decision against this need — off the board (#74)
     not_duplicate_of: tuple[str, ...] = ()  # ids this need is confirmed NOT a duplicate of (#55)
     not_variant_of: tuple[str, ...] = ()  # ids this need is confirmed NOT a shared variant of (#56)
 
@@ -195,27 +209,36 @@ class Need:
         return next((k for k in order if k in kinds), None)
 
     @property
+    def is_withdrawn(self) -> bool:
+        """A decision has been recorded against this need — withdrawn / won't-do (#74)."""
+        return self.withdrawn is not None
+
+    @property
     def counts_toward_coverage(self) -> bool:
         """Whether this need is a unit of product coverage — what :func:`~prodc.status.summarize`
         counts.
 
-        A leaf product need. A flow (a need with ``children``) is a roll-up of its leaves, so
-        counting it too would double-count (#43); a non-product need (infra/NFR/internal) is
-        excluded from product coverage (#48). Draft staging is a separate, upstream filter
-        (:func:`board_needs`), not part of this rule — so a draft still counts once promoted onto
-        the board (e.g. under ``--include-drafts``).
+        A leaf product need that has not been withdrawn. A flow (a need with ``children``) is a
+        roll-up of its leaves, so counting it too would double-count (#43); a non-product need
+        (infra/NFR/internal) is excluded from product coverage (#48); a withdrawn need is a
+        decision against, so it is out of coverage entirely (#74). Draft staging is a separate,
+        upstream filter (:func:`board_needs`), not part of this rule — so a draft still counts
+        once promoted onto the board (e.g. under ``--include-drafts``).
         """
-        return not self.children and self.product
+        return not self.children and self.product and not self.is_withdrawn
 
     @property
     def excluded_reason(self) -> str | None:
         """Why this need is off the counted board, or ``None`` when it is on it.
 
-        The single home for the lifecycle exclusions, so a new state lands here once: ``"draft"``
-        (staged, not yet promoted, #60) and ``"nonproduct"`` (infra/NFR/internal, #48). A flow is
-        not excluded — it is a roll-up row on the board — so ``children`` is not a reason here
-        (that axis is :attr:`counts_toward_coverage`).
+        The single home for the lifecycle exclusions, so a new state lands here once: ``"withdrawn"``
+        (a decision against, #74), ``"draft"`` (staged, not yet promoted, #60), and ``"nonproduct"``
+        (infra/NFR/internal, #48). Withdrawal is checked first — a decision against overrides
+        staging or scope. A flow is not excluded — it is a roll-up row on the board — so
+        ``children`` is not a reason here (that axis is :attr:`counts_toward_coverage`).
         """
+        if self.is_withdrawn:
+            return "withdrawn"
         if self.draft:
             return "draft"
         if not self.product:
@@ -224,12 +247,16 @@ class Need:
 
 
 def board_needs(needs: list[Need], *, include_drafts: bool) -> list[Need]:
-    """The needs on the counted board: a draft (#60) is staged off it until promoted.
+    """The needs on the active board: a withdrawn need (#74) is always off it, and a draft (#60)
+    is staged off until promoted.
 
-    ``include_drafts`` keeps them on (the ``--include-drafts`` flag). The one place the
-    draft-staging rule lives, shared by ``status`` and ``plan`` so the two never diverge.
+    A withdrawn need is a decision against, so it is dropped unconditionally — there is no
+    ``--include`` flag for it (its durable trace is the YAML record and ``prodc show``). Drafts
+    are kept when ``include_drafts`` (the ``--include-drafts`` flag). The one place the
+    board-membership rule lives, shared by ``status`` and ``plan`` so the two never diverge.
     """
-    return list(needs) if include_drafts else [n for n in needs if not n.draft]
+    kept = [n for n in needs if not n.is_withdrawn]
+    return kept if include_drafts else [n for n in kept if not n.draft]
 
 
 class ArgKind(StrEnum):

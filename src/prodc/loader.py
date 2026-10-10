@@ -28,6 +28,7 @@ from .model import (
     Role,
     Source,
     SourceKind,
+    Withdrawal,
 )
 
 
@@ -104,6 +105,22 @@ def _attestation(raw: object, where: str) -> Attestation | None:
     )
 
 
+def _withdrawal(raw: object, where: str) -> Withdrawal | None:
+    """Parse ``withdrawn: {reason, date}`` into a :class:`Withdrawal` (#74).
+
+    Both fields are required when the key is present — a decision against a need must say why
+    and when, the same way an attestation needs who and when.
+    """
+    if raw is None:
+        return None
+    tbl = _as_mapping(raw, where)
+    reason = _opt_str(tbl.get("reason"), f"{where}.reason")
+    date = _opt_str(tbl.get("date"), f"{where}.date")
+    if not reason or not date:
+        raise LoaderError(f"{where}: a withdrawal needs both 'reason' and 'date'")
+    return Withdrawal(reason=reason, date=date)
+
+
 # Old source-kind names (pre-0.3.58) mapped to the primary/secondary/assumption ladder, so
 # existing need files keep loading. `interview` was live user contact (primary); `artifact` was a
 # cited document (secondary); `proxy`/`internal` were both unevidenced guesses (assumption).
@@ -160,6 +177,7 @@ def _need(
     release = _opt_str(tbl.get("release"), f"{where}.release")
     product = _as_bool(tbl["product"], f"{where}.product") if "product" in tbl else True
     draft = _as_bool(tbl["draft"], f"{where}.draft") if "draft" in tbl else False
+    withdrawn = _withdrawal(tbl.get("withdrawn"), f"{where}.withdrawn")
 
     sources = tuple(
         _source(s, f"{where}.sources[{i}]")
@@ -217,6 +235,7 @@ def _need(
         not_variant_of=not_variant_of,
         importance_set_at=importance_set_at,
         draft=draft,
+        withdrawn=withdrawn,
     )
 
 

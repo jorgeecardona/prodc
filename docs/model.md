@@ -44,6 +44,7 @@ File-level `who`, `label`, `client` default every need in that file.
 | `goal` | Goal id; absent = flagged ungoaled |
 | `release` | Release id |
 | `product` | `false` = infra/NFR, listed but not counted |
+| `withdrawn` | `reason`, `date` — a decision against the need (won't-do): always off the active board and out of coverage, with the record as its trace; set with `withdraw`, cleared with `reinstate` (#74) |
 
 ## States
 

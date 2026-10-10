@@ -26,12 +26,14 @@ from .commands import (
     cmd_plan,
     cmd_portfolio,
     cmd_recurrence,
+    cmd_reinstate,
     cmd_report,
     cmd_set,
     cmd_show,
     cmd_status,
     cmd_suggest,
     cmd_sync,
+    cmd_withdraw,
 )
 
 
@@ -283,6 +285,44 @@ def main(argv: list[str] | None = None) -> int:
         help="refuse if the file's content hash differs (optimistic lock)",
     )
     ac.set_defaults(func=cmd_accept)
+
+    wd = sub.add_parser(
+        "withdraw", help="record a decision against a need — withdrawn / won't-do (#74)"
+    )
+    wd.add_argument("need_id", help="the need id to withdraw")
+    wd.add_argument(
+        "--reason", required=True, help="why it was decided against (kept on the record)"
+    )
+    wd.add_argument("--date", default=None, help="when (ISO, e.g. 2026-10-10; default: today)")
+    wd.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    wd.add_argument("--json", action="store_true", help="machine-readable output")
+    wd.add_argument(
+        "--dry-run", action="store_true", help="validate and show the diff, don't write"
+    )
+    wd.add_argument(
+        "--expect-sha",
+        default=None,
+        metavar="SHA256",
+        help="refuse if the file's content hash differs (optimistic lock)",
+    )
+    wd.set_defaults(func=cmd_withdraw)
+
+    ri = sub.add_parser(
+        "reinstate", help="remove a need's withdrawal, putting it back on the board (#74)"
+    )
+    ri.add_argument("need_id", help="the need id to reinstate")
+    ri.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    ri.add_argument("--json", action="store_true", help="machine-readable output")
+    ri.add_argument(
+        "--dry-run", action="store_true", help="validate and show the diff, don't write"
+    )
+    ri.add_argument(
+        "--expect-sha",
+        default=None,
+        metavar="SHA256",
+        help="refuse if the file's content hash differs (optimistic lock)",
+    )
+    ri.set_defaults(func=cmd_reinstate)
 
     pf = sub.add_parser("portfolio", help="roll up many repos into one scoreboard")
     pf.add_argument("configs", nargs="+", metavar="PRODC_TOML", help="one or more prodc.toml paths")

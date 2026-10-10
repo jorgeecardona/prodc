@@ -429,6 +429,53 @@ def attest(
     return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
 
 
+def withdraw(
+    config: Config,
+    need_id: str,
+    *,
+    reason: str,
+    date: str,
+    expect_sha: str | None,
+    dry_run: bool,
+) -> Edit:
+    """Record a decision against a need — withdrawn / won't-do (#74).
+
+    Writes a ``withdrawn: {reason, date}`` mapping onto the need, which takes it off the active
+    board and out of coverage; the record stays as its durable trace. Replaces any existing
+    withdrawal (re-withdrawing updates the reason/date). Reinstate with :func:`reinstate`.
+    """
+    mark: dict[str, object] = {"reason": reason, "date": date}
+    path, _ = _locate(config, need_id)
+    doc, old_text = _read_doc(path)
+    if expect_sha is not None and _sha256(old_text) != expect_sha:
+        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
+    for raw in _need_list(doc, path):
+        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
+            cast("dict[str, object]", raw)["withdrawn"] = mark
+            break
+    return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
+
+
+def reinstate(config: Config, need_id: str, *, expect_sha: str | None, dry_run: bool) -> Edit:
+    """Remove a need's ``withdrawn`` mark, putting it back on the active board (#74).
+
+    Errors if the need is not currently withdrawn — reinstating a live need is a mistake worth
+    surfacing, not a silent no-op.
+    """
+    path, _ = _locate(config, need_id)
+    doc, old_text = _read_doc(path)
+    if expect_sha is not None and _sha256(old_text) != expect_sha:
+        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
+    for raw in _need_list(doc, path):
+        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
+            need = cast("dict[str, object]", raw)
+            if "withdrawn" not in need:
+                raise WriteError(f"need {need_id!r} is not withdrawn")
+            del need["withdrawn"]
+            break
+    return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
+
+
 def accept(
     config: Config,
     need_id: str,

@@ -75,10 +75,11 @@ def render_markdown(
         "proves yet — not a failure.",
     ]
 
-    # Needs grouped by who, like the board.
+    # Needs grouped by who, like the board. A withdrawn need (#74) is off the active board, so
+    # it is dropped here (its trace is the YAML record and `prodc show`), never shown as a gap.
     groups: dict[str, list[NeedResult]] = {}
     for r in results:
-        if not r.need.product:
+        if not r.need.product or r.need.is_withdrawn:
             continue
         groups.setdefault(r.need.who or "(unassigned)", []).append(r)
     if groups:
@@ -153,7 +154,11 @@ def render_markdown(
 
     # Open questions: the brief — opinions (no evidence) or HOLEs (no proof), must-haves first.
     open_ = [
-        r for r in results if r.need.product and (r.need.is_opinion or r.state is NeedState.HOLE)
+        r
+        for r in results
+        if r.need.product
+        and not r.need.is_withdrawn
+        and (r.need.is_opinion or r.state is NeedState.HOLE)
     ]
     open_.sort(key=lambda r: (not r.need.must, r.need.id))
     out += ["## Open questions", ""]

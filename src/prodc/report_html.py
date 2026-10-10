@@ -49,7 +49,11 @@ def board_payload(
             "opinion": summary.opinion,
             "coverage_pct": round(summary.coverage * 100),
         },
-        "needs": [need_payload(r, flavor="html") for r in results if r.need.product],
+        "needs": [
+            need_payload(r, flavor="html")
+            for r in results
+            if r.need.product and not r.need.is_withdrawn
+        ],
         "goals": [{"id": g.id, "text": g.text, **_cov(s.delivered, s.total)} for g, s in goal_cov],
         "ungoaled": [r.need.id for r in ungoaled],
         "releases": [
