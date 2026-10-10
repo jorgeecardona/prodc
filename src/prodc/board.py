@@ -97,6 +97,7 @@ def need_payload(r: NeedResult, *, flavor: Literal["board", "html"] = "board") -
             "goal": need.goal,
             "release": need.release,
             "claim": need.claim,
+            "answer": need.answer.value if need.answer else None,
             "withdrawn": (
                 {"reason": need.withdrawn.reason, "date": need.withdrawn.date}
                 if need.withdrawn
@@ -143,6 +144,7 @@ def need_payload(r: NeedResult, *, flavor: Literal["board", "html"] = "board") -
         "release": need.release,
         "product": need.product,
         "draft": need.draft,
+        "answer": need.answer.value if need.answer else None,
         "withdrawn": (
             {"reason": need.withdrawn.reason, "date": need.withdrawn.date}
             if need.withdrawn

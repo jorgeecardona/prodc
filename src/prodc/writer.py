@@ -167,6 +167,24 @@ def _item_id(lines: list[str], start: int, item_indent: int) -> str | None:
     return None
 
 
+def _normalize_answer(doc: dict[str, object]) -> None:
+    """Rewrite a need's ``answer`` back to its yes/no string before re-dump.
+
+    YAML 1.1 reads a bare ``answer: no`` as the boolean ``False``, so the raw dict carries a
+    bool; dumping it as-is would write ``answer: false`` — loads fine (the loader coerces it),
+    but a reader sees ``false``, not the authored ``no``. Canonicalise here so the on-disk text
+    stays the research vocabulary, the same spirit as ``_canonical_kind`` for source kinds.
+    """
+    needs = doc.get("needs")
+    if not isinstance(needs, list):
+        return
+    for raw in cast("list[object]", needs):
+        if isinstance(raw, dict):
+            need = cast("dict[str, object]", raw)
+            if isinstance(need.get("answer"), bool):
+                need["answer"] = "yes" if need["answer"] else "no"
+
+
 def _render_edit(old_text: str, doc: dict[str, object], need_id: str) -> str:
     """Re-render after an in-place edit, splicing only the changed need to keep comments (#53).
 
@@ -175,6 +193,7 @@ def _render_edit(old_text: str, doc: dict[str, object], need_id: str) -> str:
     behaviour) when the file's shape is anything the splice isn't sure of — the reload gate in
     :func:`_validated` guards correctness either way.
     """
+    _normalize_answer(doc)
     lines = old_text.splitlines(keepends=True)
     span = _need_block_span(lines, need_id)
     needs = doc.get("needs")

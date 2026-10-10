@@ -45,6 +45,7 @@ File-level `who`, `label`, `client` default every need in that file.
 | `release` | Release id |
 | `product` | `false` = infra/NFR, listed but not counted |
 | `withdrawn` | `reason`, `date` — a decision against the need (won't-do): always off the active board and out of coverage, with the record as its trace; set with `withdraw`, cleared with `reinstate` (#74) |
+| `answer` | `yes`/`no`/`inconclusive` — which way a settled research question resolved. DELIVERED = settled; `answer` is the direction. A settled-NO (e.g. a disproven hypothesis) is DELIVERED and still counts — a result, not a gap. Authored on the need, never computed; a product need leaves it unset. Flagged if set while not DELIVERED |
 
 ## States
 

@@ -273,6 +273,8 @@ def render_show(r: NeedResult, importance_label: str | None = None) -> str:
         f"  grounds: {_LABEL[r.state]}{nm}    warrant: {_warrant(need)}",
         f"  shape: {ears_shape(need.text).value}",
     ]
+    if need.answer:
+        lines.append(f"  answer: {need.answer.value}")
     if need.withdrawn:
         lines.append(f"  withdrawn: {need.withdrawn.reason} ({need.withdrawn.date})")
     if need.description:

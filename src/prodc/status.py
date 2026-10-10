@@ -110,6 +110,23 @@ def _warrant_warnings(need: Need, result: NeedResult) -> list[str]:
     return []
 
 
+def _answer_warnings(need: Need, result: NeedResult) -> list[str]:
+    """Flag an ``answer`` authored on a question that is not settled (research board).
+
+    DELIVERED means settled; ``answer`` records which way it settled. An answer declared while
+    the state is anything but DELIVERED is a claim the proofs do not yet support — surface it.
+    Conservative by design: the check never cross-examines the proof detail against the
+    direction (a ``command:lean/¬P`` counterexample legitimately pairs DELIVERED with ``no``),
+    so only settledness is checked here, not which way.
+    """
+    if need.answer is not None and result.state is not NeedState.DELIVERED:
+        return [
+            f"answer '{need.answer.value}' declared on an unsettled question "
+            f"(state {result.state.value})"
+        ]
+    return []
+
+
 class Resolver:
     def __init__(
         self,
@@ -139,6 +156,7 @@ class Resolver:
             _text_warnings(need)
             + _source_warnings(need, self._source_adapters)
             + _warrant_warnings(need, result)
+            + _answer_warnings(need, result)
             + result.warnings
         )
         self._cache[need_id] = result

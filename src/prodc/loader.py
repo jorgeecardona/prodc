@@ -17,6 +17,7 @@ import yaml
 
 from .config import Config
 from .model import (
+    Answer,
     ArgKind,
     ArgNode,
     Attestation,
@@ -105,6 +106,29 @@ def _attestation(raw: object, where: str) -> Attestation | None:
     )
 
 
+def _answer(raw: object, where: str) -> Answer | None:
+    """Parse ``answer: yes|no|inconclusive`` into an :class:`Answer`, validated like other enums.
+
+    The direction a settled research question resolved; absent on a product need. Same
+    ``Enum(name) except ValueError`` pattern as ``SourceKind``/``ArgKind`` so an unknown value is
+    a :class:`LoaderError` the author owns, not silent junk.
+
+    YAML 1.1 reads a bare ``yes``/``no`` as a boolean, so ``answer: no`` arrives as ``False`` —
+    coerced back to the string here, the same way ``_opt_str`` accepts a bare ``date:`` that
+    parsed as a date. ``inconclusive`` is a plain string and needs no coercion.
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, bool):
+        raw = "yes" if raw else "no"
+    name = _as_str(raw, where)
+    try:
+        return Answer(name)
+    except ValueError:
+        answers = "|".join(a.value for a in Answer)
+        raise LoaderError(f"{where}: unknown answer {name!r} ({answers})") from None
+
+
 def _withdrawal(raw: object, where: str) -> Withdrawal | None:
     """Parse ``withdrawn: {reason, date}`` into a :class:`Withdrawal` (#74).
 
@@ -178,6 +202,7 @@ def _need(
     product = _as_bool(tbl["product"], f"{where}.product") if "product" in tbl else True
     draft = _as_bool(tbl["draft"], f"{where}.draft") if "draft" in tbl else False
     withdrawn = _withdrawal(tbl.get("withdrawn"), f"{where}.withdrawn")
+    answer = _answer(tbl.get("answer"), f"{where}.answer")
 
     sources = tuple(
         _source(s, f"{where}.sources[{i}]")
@@ -236,6 +261,7 @@ def _need(
         importance_set_at=importance_set_at,
         draft=draft,
         withdrawn=withdrawn,
+        answer=answer,
     )
 
 

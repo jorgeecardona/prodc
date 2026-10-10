@@ -48,6 +48,26 @@ class NeedState(StrEnum):
     UNRESOLVED = "unresolved"  # a proof's source could not be read (e.g. sibling repo absent)
 
 
+class Answer(StrEnum):
+    """Which way a settled question resolved — the research board's direction axis.
+
+    A product need has one axis: is the outcome achieved? A research question has two: is it
+    *settled* (DELIVERED, the proof resolved green) and, if so, *which way*. DELIVERED means
+    settled; ``answer`` records the direction. A disproven hypothesis is therefore a settled
+    result that still counts toward coverage — DELIVERED with ``answer: no`` — not a gap.
+
+    Direction is always authored, never computed: an adapter can only map a proof to
+    delivered/pending/broken/unresolved, so no adapter can emit a settled-NO. The act of
+    concluding "this is the answer, and it is no" is the author's decision, so ``answer`` lives
+    on the :class:`Need` (authored lifecycle), not on a proof or need result (computed). A product
+    board never sets it and behaves exactly as before.
+    """
+
+    YES = "yes"  # the question settled affirmatively
+    NO = "no"  # the question settled negatively — a result, not a gap (e.g. a disproven hypothesis)
+    INCONCLUSIVE = "inconclusive"  # settled that the evidence cannot decide it either way
+
+
 @dataclass(frozen=True)
 class Source:
     """Where a need came from. Absence of any Source makes the need an opinion."""
@@ -179,6 +199,7 @@ class Need:
     product: bool = True  # False = infra/NFR/internal, excluded from product coverage (#48)
     draft: bool = False  # True = staged, not yet counted on the board until promoted (#60)
     withdrawn: Withdrawal | None = None  # a decision against this need — off the board (#74)
+    answer: Answer | None = None  # the direction a settled research question resolved; None=product
     not_duplicate_of: tuple[str, ...] = ()  # ids this need is confirmed NOT a duplicate of (#55)
     not_variant_of: tuple[str, ...] = ()  # ids this need is confirmed NOT a shared variant of (#56)
 
