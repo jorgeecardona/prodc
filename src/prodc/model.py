@@ -194,6 +194,43 @@ class Need:
         kinds = {s.kind for s in self.sources}
         return next((k for k in order if k in kinds), None)
 
+    @property
+    def counts_toward_coverage(self) -> bool:
+        """Whether this need is a unit of product coverage — what :func:`~prodc.status.summarize`
+        counts.
+
+        A leaf product need. A flow (a need with ``children``) is a roll-up of its leaves, so
+        counting it too would double-count (#43); a non-product need (infra/NFR/internal) is
+        excluded from product coverage (#48). Draft staging is a separate, upstream filter
+        (:func:`board_needs`), not part of this rule — so a draft still counts once promoted onto
+        the board (e.g. under ``--include-drafts``).
+        """
+        return not self.children and self.product
+
+    @property
+    def excluded_reason(self) -> str | None:
+        """Why this need is off the counted board, or ``None`` when it is on it.
+
+        The single home for the lifecycle exclusions, so a new state lands here once: ``"draft"``
+        (staged, not yet promoted, #60) and ``"nonproduct"`` (infra/NFR/internal, #48). A flow is
+        not excluded — it is a roll-up row on the board — so ``children`` is not a reason here
+        (that axis is :attr:`counts_toward_coverage`).
+        """
+        if self.draft:
+            return "draft"
+        if not self.product:
+            return "nonproduct"
+        return None
+
+
+def board_needs(needs: list[Need], *, include_drafts: bool) -> list[Need]:
+    """The needs on the counted board: a draft (#60) is staged off it until promoted.
+
+    ``include_drafts`` keeps them on (the ``--include-drafts`` flag). The one place the
+    draft-staging rule lives, shared by ``status`` and ``plan`` so the two never diverge.
+    """
+    return list(needs) if include_drafts else [n for n in needs if not n.draft]
+
 
 class ArgKind(StrEnum):
     """A node type in the assurance argument (GSN: Goal Structuring Notation)."""

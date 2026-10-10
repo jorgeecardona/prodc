@@ -49,6 +49,7 @@ from .model import (
     NeedState,
     Release,
     Role,
+    board_needs,
     ears_shape,
 )
 from .report import render_markdown
@@ -541,8 +542,7 @@ def _cmd_status(args: argparse.Namespace) -> int:
     # Draft needs (#60) are staged: kept off the counted board (and coverage, recurrence,
     # orphans) until promoted with `set <id> draft=false`, unless --include-drafts is passed.
     draft_count = sum(1 for n in needs if n.draft)
-    if not args.include_drafts:
-        needs = [n for n in needs if not n.draft]
+    needs = board_needs(needs, include_drafts=args.include_drafts)
     # Scoped coverage (#49): restrict the board + coverage to a subset, so the number people
     # act on (this client, this goal) isn't diluted by the whole mixed board.
     if args.client:
@@ -858,9 +858,7 @@ def _cmd_plan(args: argparse.Namespace) -> int:
     if loaded is None:
         return 2
     cfg, model = loaded
-    needs = list(model.needs)
-    if not args.include_drafts:
-        needs = [n for n in needs if not n.draft]  # drafts aren't backlog until promoted (#60)
+    needs = board_needs(list(model.needs), include_drafts=args.include_drafts)  # drafts off (#60)
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
     recurrence_counts = {rec.baseline.id: rec.count for rec in recurrence(needs)}
     print(
