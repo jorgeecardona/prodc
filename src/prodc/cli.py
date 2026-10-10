@@ -42,6 +42,7 @@ from .model import (
     ears_shape,
 )
 from .report import render_markdown
+from .report_html import render_html
 from .status import (
     Handoff,
     ProofSuggestion,
@@ -1283,7 +1284,10 @@ def _cmd_report(args: argparse.Namespace) -> int:
             roles=model.roles,
             argument=model.argument,
         )
-    text = render_markdown(cfg, model, client=args.client, rev=_git_rev(cfg.root))
+    if args.format == "html":
+        text = render_html(cfg, model, client=args.client, rev=_git_rev(cfg.root))
+    else:
+        text = render_markdown(cfg, model, client=args.client, rev=_git_rev(cfg.root))
     if args.output:
         dest = Path(args.output)
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -1898,15 +1902,21 @@ def main(argv: list[str] | None = None) -> int:
     du.set_defaults(func=_cmd_dupes)
 
     rp = sub.add_parser(
-        "report", help="render the board as a readable markdown document (for a PM to read/share)"
+        "report", help="render the board as a shareable document (markdown, or an interactive HTML)"
     )
     rp.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    rp.add_argument(
+        "--format",
+        choices=["md", "html"],
+        default="md",
+        help="md (default) or html — a self-contained, interactive, read-only viewer (#79)",
+    )
     rp.add_argument(
         "--output",
         "-o",
         default=None,
         metavar="PATH",
-        help="write the report to PATH (e.g. status.md) instead of stdout",
+        help="write the report to PATH (e.g. status.md / status.html) instead of stdout",
     )
     rp.add_argument(
         "--client", default=None, metavar="ID", help="scope the report to one client (as `status`)"

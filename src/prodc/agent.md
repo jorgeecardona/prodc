@@ -75,7 +75,7 @@ Read first, then act, then check.
 | link a recurring want to a shared baseline | `prodc recurrence --suggest --apply --baseline-id <id> --file needs/<f>.yaml` |
 | record a human/AI review of the warrant | `prodc attest <id> --by <who> --date <ISO> [--ai]` |
 | record a human acceptance pass | `prodc accept <id> --who <person> --date <ISO>` |
-| hand a human a readable status file | `prodc report -o status.md` (markdown; `--client ID` to scope) |
+| hand a human a readable status file | `prodc report -o status.md` (markdown; `--format html` for an interactive viewer; `--client ID` to scope) |
 | gate in CI | `prodc lint --strict` |
 
 Less often: `prodc argument` (the GSN assurance graph and its defects), `prodc portfolio <toml>…`
