@@ -1,0 +1,211 @@
+"""JSON serialisers for the ``--json`` output of each read command.
+
+Each builds the machine-readable payload for one command. The per-need record itself comes from
+:func:`prodc.board.need_payload` (the one shared serialiser), so ``status --json`` and the HTML
+viewer never drift; these functions wrap that with the board/plan/brief/argument framing.
+"""
+
+from __future__ import annotations
+
+import json
+
+from ..board import need_payload
+from ..board import warrant as _warrant
+from ..dedup import DupPair, VariantGroup
+from ..model import Goal, Model, NeedResult, NeedState, Release, Role
+from ..status import Handoff, Recurrence, Summary, rank
+from .common import brief_open
+
+
+def _summary_payload(summary: Summary, orphan_map: dict[str, list[str]]) -> dict[str, object]:
+    return {
+        "total": summary.total,
+        "delivered": summary.delivered,
+        "pending": summary.pending,
+        "hole": summary.hole,
+        "must_hole": summary.must_hole,
+        "broken": summary.broken,
+        "unresolved": summary.unresolved,
+        "opinion": summary.opinion,
+        "coverage": round(summary.coverage, 4),
+        "orphans": sum(len(v) for v in orphan_map.values()),
+    }
+
+
+def to_json(
+    results: list[NeedResult],
+    summary: Summary,
+    orphan_map: dict[str, list[str]],
+    recs: list[Recurrence],
+    goal_cov: list[tuple[Goal, Summary]],
+    ungoaled: list[NeedResult],
+    rel_cov: list[tuple[Release, Summary]],
+    role_cov: list[tuple[Role, Summary]],
+    unroled: list[NeedResult],
+    hos: list[Handoff],
+) -> str:
+    payload = {
+        "summary": _summary_payload(summary, orphan_map),
+        "orphans": orphan_map,
+        "roles": [
+            {
+                "id": role.id,
+                "text": role.text,
+                "coverage": round(rsum.coverage, 4),
+                "delivered": rsum.delivered,
+                "total": rsum.total,
+                "orphan": rsum.total == 0,
+            }
+            for role, rsum in role_cov
+        ],
+        "unroled": [r.need.id for r in unroled],
+        "handoffs": [
+            {
+                "flow": h.flow.id,
+                "from_role": h.from_role,
+                "to_role": h.to_role,
+                "from_need": h.from_need.id,
+                "to_need": h.to_need.id,
+            }
+            for h in hos
+        ],
+        "releases": [
+            {
+                "id": rel.id,
+                "text": rel.text,
+                "coverage": round(rsum.coverage, 4),
+                "delivered": rsum.delivered,
+                "total": rsum.total,
+            }
+            for rel, rsum in rel_cov
+        ],
+        "recurrence": [
+            {
+                "baseline": rec.baseline.id,
+                "text": rec.baseline.text,
+                "count": rec.count,
+                "clients": list(rec.clients),
+            }
+            for rec in recs
+        ],
+        "goals": [
+            {
+                "id": goal.id,
+                "text": goal.text,
+                "metric": goal.metric,
+                "coverage": round(gsum.coverage, 4),
+                "delivered": gsum.delivered,
+                "total": gsum.total,
+            }
+            for goal, gsum in goal_cov
+        ],
+        "ungoaled": [r.need.id for r in ungoaled],
+        "needs": [need_payload(r) for r in results],
+    }
+    return json.dumps(payload, indent=2)
+
+
+def show_json(r: NeedResult) -> str:
+    need = r.need
+    payload = need_payload(r)  # the shared core — never drifts from the board
+    payload.update(
+        {
+            "label": need.label,
+            "sources": [
+                {
+                    "kind": s.kind.value,
+                    "who": s.who,
+                    "date": s.date,
+                    "quote": s.quote,
+                    "locator": s.locator,
+                }
+                for s in need.sources
+            ],
+            "proofs": list(need.proofs),
+            "children": list(need.children),
+            "seam": list(need.seam),
+        }
+    )
+    return json.dumps(payload, indent=2)
+
+
+def brief_json(client: str, results: list[NeedResult]) -> str:
+    open_ = brief_open(results)
+    return json.dumps(
+        {
+            "client": client,
+            "open": [
+                {
+                    "id": r.need.id,
+                    "text": r.need.text,
+                    "must": r.need.must,
+                    "opinion": r.need.is_opinion,
+                    "hole": r.state is NeedState.HOLE,
+                    "warrant": _warrant(r.need),
+                }
+                for r in open_
+            ],
+        },
+        indent=2,
+    )
+
+
+def plan_json(results: list[NeedResult], recurrence_counts: dict[str, int]) -> str:
+    ranked = rank(results, recurrence_counts)
+    return json.dumps(
+        {
+            "plan": [
+                {
+                    "rank": i,
+                    "id": r.need.id,
+                    "text": r.need.text,
+                    "must": r.need.must,
+                    "state": r.state.value,
+                    "warrant": _warrant(r.need),
+                    "recurrence": recurrence_counts.get(r.need.id, 0),
+                    "importance": r.need.importance,
+                    "importance_is_guess": (r.need.importance is not None and r.need.is_opinion),
+                }
+                for i, r in enumerate(ranked, 1)
+            ]
+        },
+        indent=2,
+    )
+
+
+def argument_json(model: Model, defects: list[str]) -> str:
+    return json.dumps(
+        {
+            "nodes": [
+                {
+                    "id": n.id,
+                    "kind": n.kind.value,
+                    "text": n.text,
+                    "supported_by": list(n.supported_by),
+                    "in_context_of": list(n.in_context_of),
+                    "about": n.about,
+                }
+                for n in model.argument
+            ],
+            "defects": defects,
+        },
+        indent=2,
+    )
+
+
+def variant_payload(g: VariantGroup) -> dict[str, object]:
+    return {
+        "score": round(g.score, 4),
+        "members": [{"id": m.id, "client": m.client, "text": m.text} for m in g.members],
+    }
+
+
+def dup_payload(p: DupPair) -> dict[str, object]:
+    return {
+        "a": p.a.id,
+        "b": p.b.id,
+        "score": round(p.score, 4),
+        "same_scope": p.same_scope,
+        "a_text": p.a.text,
+        "b_text": p.b.text,
+    }
