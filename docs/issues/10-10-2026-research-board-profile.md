@@ -166,7 +166,9 @@ withdrawn — the concrete reason `answer` is necessary, not cosmetic.
 2. ✅ The `need` (needref) proof adapter — the question→question DAG, cycle-safe for free; reads
    authored `Need.answer` off `Resolver._by_id` for the optional `need:A@yes` directional form.
    Dispatched inside the `Resolver` (`_resolve_needref`), not a config adapter; `need` is reserved.
-3. `profile = "research"` config switch — silences EARS noise, swaps the grammar.
+3. ✅ `profile = "research"` config switch — silences EARS noise, swaps the grammar. *(shipped:
+   `Profile` enum, `[prodc].profile`, `_text_warnings(need, profile)`; research skips the outcome
+   grammar, source hygiene still runs. No claim grammar yet — "or none" taken.)*
 4. `evalgate` adapter (#75).
 5. `citation` adapter (optional; reuse `accept` at first).
 

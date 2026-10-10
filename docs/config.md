@@ -2,9 +2,17 @@
 
 Everything lives in `prodc.toml`. Only `[prodc].needs` is required.
 
+`[prodc].profile` (default `"product"`) chooses which need grammar the text lint speaks. A
+`"product"` board lints need text for EARS shape and solution-verbs (a need is a user-facing
+outcome). A `"research"` board's needs are posed questions or claims ("Prove that π is
+irrational"), which are not outcomes, so that grammar is skipped and the board stays quiet;
+source-hygiene warnings (about evidence, not phrasing) still run. The profile changes no state or
+coverage — only which hygiene warnings apply.
+
 ```toml
 [prodc]
 needs = ["needs/*.yaml"]
+profile = "research"   # or "product" (default)
 
 [proofs.web]
 kind = "gherkin"

@@ -209,7 +209,7 @@ def gather(
     are computed over the resolved ``needs``.
     """
     use_needs = list(model.needs) if needs is None else needs
-    results = resolve(use_needs, cfg.adapters, cfg.source_adapters)
+    results = resolve(use_needs, cfg.adapters, cfg.source_adapters, cfg.profile)
     if annotate_warnings:
         annotate_board_warnings(results, use_needs)
     summary = summarize(results)

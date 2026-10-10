@@ -337,6 +337,20 @@ SOLUTION_VERBS = (
 )
 
 
+class Profile(StrEnum):
+    """Which need grammar a board speaks — `[prodc].profile` (research-board step 3).
+
+    A product board's needs are user-facing outcomes, so the text lint checks EARS shape and
+    flags solution-verbs. A research board's needs are posed questions or claims ("Prove that π
+    is irrational"), which are not outcomes — the product lint would fire soft noise on every
+    one. The profile selects which text lint :func:`~prodc.status._text_warnings` runs; it
+    changes no model or coverage behaviour, only which hygiene warnings apply.
+    """
+
+    PRODUCT = "product"  # the default: EARS + solution-verb lint on user-facing outcomes
+    RESEARCH = "research"  # posed questions / claims — skip the outcome grammar
+
+
 class EarsShape(StrEnum):
     """The EARS clause a need's text follows (Easy Approach to Requirements Syntax)."""
 

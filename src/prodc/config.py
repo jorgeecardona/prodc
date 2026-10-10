@@ -25,7 +25,7 @@ from .adapters import (
     SourceAdapter,
 )
 from .callbacks import Callback
-from .model import NeedState
+from .model import NeedState, Profile
 
 
 class ConfigError(Exception):
@@ -105,6 +105,7 @@ def _callbacks(raw: dict[str, object]) -> tuple[tuple[Callback, ...], str]:
 class Config:
     root: Path
     need_globs: list[str]  # the prodc files; each may carry any noun list (needs:, goals:, …)
+    profile: Profile = Profile.PRODUCT  # [prodc].profile — which need grammar the lint speaks
     adapters: dict[str, Adapter] = field(default_factory=dict[str, Adapter])
     source_adapters: dict[str, SourceAdapter] = field(default_factory=dict[str, SourceAdapter])
     duplicate_threshold: float = 0.8  # [lint].duplicate_threshold — dupe score to flag (#55)
@@ -155,6 +156,15 @@ class Config:
         need_globs = _as_str_list(prodc_tbl.get("needs", []), "[prodc].needs")
         if not need_globs:
             raise ConfigError("[prodc].needs must list at least one glob")
+
+        profile_name = prodc_tbl.get("profile", Profile.PRODUCT.value)
+        try:
+            profile = Profile(profile_name)
+        except ValueError:
+            profiles = "|".join(p.value for p in Profile)
+            raise ConfigError(
+                f"[prodc].profile: unknown profile {profile_name!r} ({profiles})"
+            ) from None
 
         adapters: dict[str, Adapter] = {}
         proofs = _as_dict(raw.get("proofs", {}), "[proofs]")
@@ -289,6 +299,7 @@ class Config:
         return cls(
             root=root,
             need_globs=need_globs,
+            profile=profile,
             adapters=adapters,
             source_adapters=source_adapters,
             duplicate_threshold=float(dup),
