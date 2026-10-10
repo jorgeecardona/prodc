@@ -32,6 +32,7 @@ def _need_payload(r: NeedResult) -> dict[str, object]:
     return {
         "id": need.id,
         "text": need.text,
+        "description": need.description,
         "state": r.state.value,
         "must": need.must,
         "who": need.who or "(unassigned)",
@@ -390,6 +391,7 @@ function renderNeed(n) {
 function renderDetail(n) {
   const rows = [];
   const push = (k, v) => { if (v) rows.push(`<dt>${k}</dt><dd>${v}</dd>`); };
+  if (n.description) push("detail", esc(n.description));
   push("who", esc(n.who) + (n.label ? ` <span class="meta">(${esc(n.label)})</span>` : ""));
   if (n.client) push("client", esc(n.client));
   if (n.goal) push("goal", esc(n.goal));

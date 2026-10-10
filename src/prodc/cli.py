@@ -356,6 +356,7 @@ def _need_payload(r: NeedResult) -> dict[str, object]:
         "who": need.who,
         "role": need.role,
         "text": need.text,
+        "description": need.description,
         "must": need.must,
         "state": r.state.value,
         "grounds": r.state.value,
@@ -725,6 +726,8 @@ def _render_show(r: NeedResult, importance_label: str | None = None) -> str:
         f"  grounds: {_LABEL[r.state]}{nm}    warrant: {_warrant(need)}",
         f"  shape: {ears_shape(need.text).value}",
     ]
+    if need.description:
+        lines.append(f"  description: {need.description}")
     if need.importance is not None:
         label = f" ({importance_label})" if importance_label else ""
         seen = f", set {need.importance_set_at}" if need.importance_set_at else ""

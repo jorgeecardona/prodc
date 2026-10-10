@@ -28,6 +28,7 @@ from .loader import LoaderError, load
 _SCALAR_FIELDS = frozenset(
     {
         "text",
+        "description",
         "who",
         "role",
         "label",

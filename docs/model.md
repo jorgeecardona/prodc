@@ -23,6 +23,7 @@ File-level `who`, `label`, `client` default every need in that file.
 |---|---|
 | `id` | unique across all files |
 | `text` | the need; EARS shape (`When …, who can …`) is checked softly |
+| `description` | optional free-form markdown detail (edge cases, rationale, a worked scenario); **not** EARS-checked — keeps the one-line `text` scannable (#73) |
 | `who` | the person (free text — John, Jacob) |
 | `role` | Role id — the role `who` plays; checked against declared `roles:` |
 | `label` | free text for `who` |

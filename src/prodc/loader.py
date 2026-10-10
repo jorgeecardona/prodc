@@ -145,6 +145,7 @@ def _need(
     tbl = _as_mapping(raw, where)
     nid = _as_str(tbl.get("id"), f"{where}.id")
     text = _as_str(tbl.get("text"), f"{where}.text")
+    description = _opt_str(tbl.get("description"), f"{where}.description")
     must = _as_bool(tbl["must"], f"{where}.must") if "must" in tbl else False
     who = _opt_str(tbl.get("who"), f"{where}.who") or file_who
     role = _opt_str(tbl.get("role"), f"{where}.role")
@@ -195,6 +196,7 @@ def _need(
     return Need(
         id=nid,
         text=text,
+        description=description,
         who=who,
         role=role,
         must=must,

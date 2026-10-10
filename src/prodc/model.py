@@ -144,6 +144,7 @@ class Need:
 
     id: str
     text: str
+    description: str | None = None  # optional free-form markdown detail; not EARS-checked (#73)
     who: str | None = None
     role: str | None = None  # id of the Role (role) this need's `who` plays (#52)
     must: bool = False
