@@ -50,6 +50,7 @@ A proof is `<name>:<payload>`.
 | `coverage` | category | category is in `catalog` | `catalog` |
 | `field` | field name | field is `surfaced` in `schema` | `schema` |
 | `external` | observable-outcome key | key recorded passing in `results` (a JSON `{key: bool}`); implementation-independent | `results` |
+| `evalgate` | `metric>=threshold` (`>=`/`<=`/`>`/`<`) | the recorded score meets the gate; score in `results` as `{metric: {score: N}}` or `{metric: N}` | `results` |
 | `command` | anything your hook understands | your hook prints `{"state": "delivered"}` | `command`, `timeout` |
 | `need` | `other-need-id` or `other-need-id@yes\|no\|inconclusive` | the referenced need is settled (DELIVERED); the `@answer` form also requires its authored `answer` to match | — (built in; not configured) |
 

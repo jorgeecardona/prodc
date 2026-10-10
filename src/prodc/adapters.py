@@ -40,6 +40,23 @@ def _steps_passed(steps: list[object]) -> bool:
     return True
 
 
+def _as_score(val: object) -> float | None:
+    """A numeric eval score from a results value: a bare number, or ``{"score": N}``.
+
+    ``bool`` is a subclass of ``int`` but is a pass/fail, not a score, so it is rejected — a
+    boolean result belongs to :class:`OutcomeAdapter`, not the gate.
+    """
+    if isinstance(val, bool):
+        return None
+    if isinstance(val, (int, float)):
+        return float(val)
+    if isinstance(val, dict):
+        inner = cast("dict[str, object]", val).get("score")
+        if isinstance(inner, (int, float)) and not isinstance(inner, bool):
+            return float(inner)
+    return None
+
+
 def _git_head(repo: Path) -> str | None:
     """Short git rev of a checked-out repo, read from .git/HEAD (no git binary needed)."""
     head = repo / ".git" / "HEAD"
@@ -484,6 +501,79 @@ class OutcomeAdapter:
         if data[payload]:
             return ProofResult(ProofState.DELIVERED, False, f"outcome '{payload}' recorded passing")
         return ProofResult(ProofState.PENDING, False, f"outcome '{payload}' recorded failing")
+
+
+#: Comparators an evalgate locator may use, strongest-looking first so ``>=``/``<=`` match
+#: before the bare ``>``/``<`` when scanning the locator.
+_EVAL_OPS: dict[str, Callable[[float, float], bool]] = {
+    ">=": lambda s, t: s >= t,
+    "<=": lambda s, t: s <= t,
+    ">": lambda s, t: s > t,
+    "<": lambda s, t: s < t,
+}
+_EVAL_RE = re.compile(r"^(?P<key>.+?)(?P<op><=|>=|<|>)(?P<thr>[^<>=]+)$")
+
+
+class EvalGateAdapter:
+    """Resolves ``metric>=threshold`` against a recorded eval score (#75).
+
+    A scored sibling of :class:`OutcomeAdapter`: where that reads a pass/fail bool, this reads a
+    numeric score and gates it against a threshold carried in the locator (``accuracy>=0.9``), so
+    one adapter serves many metrics and cutoffs (``>=``, ``<=``, ``>``, ``<`` — ``<=`` for a loss
+    you want below a bound). The score is produced by an eval harness *outside* prodc and recorded
+    in a JSON file (``{"accuracy": {"score": 0.82}}`` or the bare ``{"accuracy": 0.82}``); prodc
+    only reads it — records-only, never runs the eval.
+
+    DELIVERED when the comparison holds; PENDING when the score is recorded but does not meet the
+    gate, or the metric is absent from a present file (recorded-below and not-yet-recorded are both
+    "not green", as in :class:`OutcomeAdapter`); BROKEN when the results file is absent or the
+    locator is malformed. The score, comparator and threshold go in the detail so the board shows
+    how far off it is.
+    """
+
+    def __init__(self, root: Path, results: str) -> None:
+        self._path = root / results
+        self._data: dict[str, float] | None = None
+        self._loaded = False
+
+    def _load(self) -> dict[str, float] | None:
+        if not self._loaded:
+            self._loaded = True
+            if self._path.exists():
+                out: dict[str, float] = {}
+                raw: object = json.loads(self._path.read_text(encoding="utf-8"))
+                if isinstance(raw, dict):
+                    for key, val in cast("dict[str, object]", raw).items():
+                        score = _as_score(val)
+                        if score is not None:
+                            out[key] = score
+                self._data = out
+        return self._data
+
+    def resolve(self, payload: str) -> ProofResult:
+        m = _EVAL_RE.match(payload.strip())
+        if not m:
+            return ProofResult(
+                ProofState.BROKEN, False, f"malformed evalgate '{payload}' (want metric>=threshold)"
+            )
+        key = m.group("key").strip()
+        op = m.group("op")
+        try:
+            threshold = float(m.group("thr").strip())
+        except ValueError:
+            return ProofResult(
+                ProofState.BROKEN, False, f"evalgate threshold not a number '{payload}'"
+            )
+        data = self._load()
+        if data is None:
+            return ProofResult(ProofState.BROKEN, False, f"no results file '{self._path.name}'")
+        if key not in data:
+            return ProofResult(ProofState.PENDING, False, f"metric '{key}' not in results")
+        score = data[key]
+        passed = _EVAL_OPS[op](score, threshold)
+        verdict = "pass" if passed else "below gate"
+        detail = f"{key} {score:g} {op} {threshold:g} ({verdict})"
+        return ProofResult(ProofState.DELIVERED if passed else ProofState.PENDING, False, detail)
 
 
 class CommandProof:

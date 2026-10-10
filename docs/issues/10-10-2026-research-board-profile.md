@@ -169,7 +169,10 @@ withdrawn — the concrete reason `answer` is necessary, not cosmetic.
 3. ✅ `profile = "research"` config switch — silences EARS noise, swaps the grammar. *(shipped:
    `Profile` enum, `[prodc].profile`, `_text_warnings(need, profile)`; research skips the outcome
    grammar, source hygiene still runs. No claim grammar yet — "or none" taken.)*
-4. `evalgate` adapter (#75).
+4. ✅ `evalgate` adapter (#75). *(shipped: threshold in the locator `evalgate:metric>=0.9`
+   — per-need, consistent with every adapter — not in config. `>=`/`<=`/`>`/`<`. Absent metric in a
+   present file → PENDING, not UNRESOLVED as sketched above: the file WAS read, so PENDING matches
+   OutcomeAdapter and keeps UNRESOLVED meaning "source unreadable".)*
 5. `citation` adapter (optional; reuse `accept` at first).
 
 Items 3–5 need almost no model change — they are the "adapters are pluggable proof kinds" promise

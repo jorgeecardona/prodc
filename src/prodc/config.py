@@ -13,6 +13,7 @@ from .adapters import (
     CommandProof,
     CommandSource,
     CoverageAdapter,
+    EvalGateAdapter,
     External,
     FieldAdapter,
     FilesAdapter,
@@ -212,13 +213,17 @@ class Config:
                 if not results_s:
                     raise ConfigError(f"[proofs.{name}]: external needs results = <json file>")
                 inner = OutcomeAdapter(root=proof_root, results=results_s)
+            elif kind == "evalgate":
+                if not results_s:
+                    raise ConfigError(f"[proofs.{name}]: evalgate needs results = <json file>")
+                inner = EvalGateAdapter(root=proof_root, results=results_s)
             elif kind == "command":
                 command, timeout = _hook_command(tbl, f"[proofs.{name}]")
                 inner = CommandProof(root=proof_root, command=command, timeout=timeout)
             else:
                 raise ConfigError(
                     f"[proofs.{name}]: unknown kind {kind!r} "
-                    "(gherkin|pytest|files|accept|prototype|coverage|field|external|command)"
+                    "(gherkin|pytest|files|accept|prototype|coverage|field|external|evalgate|command)"
                 )
             adapters[name] = (
                 External(inner, root / repo_field) if isinstance(repo_field, str) else inner
