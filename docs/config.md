@@ -47,6 +47,7 @@ A proof is `<name>:<payload>`.
 | `files` | `path/to/script` | file exists (declared) | `root` |
 | `accept` | `who@date` | always (a human sign-off, declared) | — |
 | `prototype` | `ref@who@date` | always (validated with a user, declared) | — |
+| `citation` | `ref@author@year` | always (a cited published result, declared) — records *what settles it*, vs `accept`'s *who signed off* | — |
 | `coverage` | category | category is in `catalog` | `catalog` |
 | `field` | field name | field is `surfaced` in `schema` | `schema` |
 | `external` | observable-outcome key | key recorded passing in `results` (a JSON `{key: bool}`); implementation-independent | `results` |

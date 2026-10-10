@@ -10,6 +10,7 @@ from typing import cast
 from .adapters import (
     AcceptAdapter,
     Adapter,
+    CitationAdapter,
     CommandProof,
     CommandSource,
     CoverageAdapter,
@@ -201,6 +202,8 @@ class Config:
                 inner = AcceptAdapter()
             elif kind == "prototype":
                 inner = PrototypeAdapter()
+            elif kind == "citation":
+                inner = CitationAdapter()
             elif kind == "coverage":
                 cat = tbl.get("catalog", "")
                 inner = CoverageAdapter(
@@ -223,7 +226,7 @@ class Config:
             else:
                 raise ConfigError(
                     f"[proofs.{name}]: unknown kind {kind!r} "
-                    "(gherkin|pytest|files|accept|prototype|coverage|field|external|evalgate|command)"
+                    "(gherkin|pytest|files|accept|prototype|citation|coverage|field|external|evalgate|command)"
                 )
             adapters[name] = (
                 External(inner, root / repo_field) if isinstance(repo_field, str) else inner

@@ -639,6 +639,27 @@ class PrototypeAdapter:
         return ProofResult(ProofState.DELIVERED, True, detail)
 
 
+class CitationAdapter:
+    """Resolves ``ref@author@year`` to a cited published result — a declared DELIVERED (#75).
+
+    A research question can be settled by citing a result a human vouches for and prodc cannot
+    check (a published paper, a textbook theorem). Modelled on :class:`PrototypeAdapter`: a
+    *declared* DELIVERED (``*``), never BROKEN, because it is an assertion, like a tag. Kept
+    distinct from ``accept`` on purpose — ``accept`` records *who signed off*; a citation records
+    *what external result settles it*, and ``ref`` (the thing a reader follows to check the claim)
+    is the load-bearing payload ``accept`` has no slot for: ``accept:Smith2019@jorge@...`` would
+    read as "jorge accepted it", hiding that the truth is "Smith 2019 shows it".
+    """
+
+    def resolve(self, payload: str) -> ProofResult:
+        ref, _, rest = payload.partition("@")
+        author, _, year = rest.partition("@")
+        detail = "cites " + (ref or "?")
+        detail += f" by {author}" if author else ""
+        detail += f" ({year})" if year else ""
+        return ProofResult(ProofState.DELIVERED, True, detail)
+
+
 class External:
     """Wraps a proof adapter that resolves against a sibling repo checked out at ``repo``.
 

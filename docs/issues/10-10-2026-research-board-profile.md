@@ -173,7 +173,10 @@ withdrawn — the concrete reason `answer` is necessary, not cosmetic.
    — per-need, consistent with every adapter — not in config. `>=`/`<=`/`>`/`<`. Absent metric in a
    present file → PENDING, not UNRESOLVED as sketched above: the file WAS read, so PENDING matches
    OutcomeAdapter and keeps UNRESOLVED meaning "source unreadable".)*
-5. `citation` adapter (optional; reuse `accept` at first).
+5. ✅ `citation` adapter. *(shipped: its own kind after all — `citation:ref@author@year`, declared
+   DELIVERED on the `prototype` shape. Kept separate from `accept` because `ref` is load-bearing
+   (what settles it, vs who signed off); `accept:Smith2019@jorge` would read as "jorge accepted
+   it". Decided with a Fable second opinion citing the `prototype` precedent.)*
 
 Items 3–5 need almost no model change — they are the "adapters are pluggable proof kinds" promise
 paying off. The research board is ~80% reinterpretation plus two genuine additions: `answer` and
