@@ -92,3 +92,23 @@ timeout = 10                           # seconds, optional (default 10)
 | Key | Means | Default |
 |---|---|---|
 | `default_draft` | `add need` stages as `draft: true` unless told otherwise | `false` |
+
+## `[callbacks]` — lifecycle callbacks (#71)
+
+`prodc sync` runs a command when a need's state changes (e.g. a proof turns green). Same trust model as the command hook: the command is from this config, never from need data; the changed need + board context are piped to it as JSON on **stdin**, never executed.
+
+```toml
+[callbacks]
+state_file = ".prodc/state.json"   # the state ledger (default); gitignore it — it is local state
+
+[[callbacks.hooks]]
+on = "state_change"                # the only event today (capture/report/pre_gate are follow-ups)
+to = ["delivered"]                 # fire only on transitions INTO these states (optional; empty = any)
+from = ["pending", "hole"]         # fire only on transitions OUT OF these states (optional; empty = any)
+command = ["./hooks/notify.sh"]    # argv (no shell); receives the JSON payload on stdin
+timeout = 30                       # seconds (optional, default 30)
+```
+
+The stdin payload is `{"event", "from", "to", "need": {id, text, state, who, client, must, goal, release, warrant}, "board": {coverage_pct, delivered, total}}`. A need is DELIVERED-green when `to == "delivered"`; use that to update the external tracker, notify the owner, or append to a changelog.
+
+`sync` resolves the board, compares it to the ledger, fires the matching callbacks, and writes the ledger forward. The **first run** records a baseline and fires nothing (everything would look new). A callback that fails (non-zero exit, timeout, or spawn failure) is reported, makes `sync` exit non-zero, and its need is left un-advanced in the ledger so the next `sync` retries it. `--dry-run` shows which transitions would fire without running anything or writing the ledger.

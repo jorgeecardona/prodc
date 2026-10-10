@@ -195,9 +195,7 @@ def test_real_hook_garbage_stdout_is_unresolved(tmp_path: Path) -> None:
 
 
 def test_real_hook_missing_binary_is_unresolved(tmp_path: Path) -> None:
-    r = CommandProof(
-        root=tmp_path, command=[str(tmp_path / "does-not-exist")]
-    ).resolve("x")
+    r = CommandProof(root=tmp_path, command=[str(tmp_path / "does-not-exist")]).resolve("x")
     assert r.state is ProofState.UNRESOLVED
 
 

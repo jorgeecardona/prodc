@@ -82,9 +82,7 @@ def test_report_writes_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]) 
     assert dest.exists() and "product status" in dest.read_text(encoding="utf-8")
 
 
-def test_report_client_scope_in_heading(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_report_client_scope_in_heading(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     code = main(["report", "--config", str(_project(tmp_path)), "--client", "jordan"])
     out = capsys.readouterr().out
     assert code == 0

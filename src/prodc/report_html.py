@@ -103,26 +103,32 @@ def board_payload(
             "coverage_pct": round(summary.coverage * 100),
         },
         "needs": [_need_payload(r) for r in results if r.need.product],
-        "goals": [
-            {"id": g.id, "text": g.text, **_cov(s.delivered, s.total)} for g, s in goal_cov
-        ],
+        "goals": [{"id": g.id, "text": g.text, **_cov(s.delivered, s.total)} for g, s in goal_cov],
         "ungoaled": [r.need.id for r in ungoaled],
         "releases": [
             {"id": rel.id, "text": rel.text, **_cov(s.delivered, s.total)} for rel, s in rel_cov
         ],
         "roles": [
-            {"id": role.id, "text": role.text, **_cov(s.delivered, s.total)}
-            for role, s in role_cov
+            {"id": role.id, "text": role.text, **_cov(s.delivered, s.total)} for role, s in role_cov
         ],
         "unroled": [r.need.id for r in unroled],
         "recurrence": [
-            {"id": rec.baseline.id, "text": rec.baseline.text, "count": rec.count,
-             "clients": list(rec.clients)}
+            {
+                "id": rec.baseline.id,
+                "text": rec.baseline.text,
+                "count": rec.count,
+                "clients": list(rec.clients),
+            }
             for rec in recurrence(needs)
         ],
         "handoffs": [
-            {"flow": h.flow.id, "from_role": h.from_role, "to_role": h.to_role,
-             "from_need": h.from_need.id, "to_need": h.to_need.id}
+            {
+                "flow": h.flow.id,
+                "from_role": h.from_role,
+                "to_role": h.to_role,
+                "from_need": h.from_need.id,
+                "to_need": h.to_need.id,
+            }
             for h in handoffs(needs)
         ],
     }

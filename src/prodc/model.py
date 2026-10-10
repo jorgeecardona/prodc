@@ -23,7 +23,9 @@ class SourceKind(StrEnum):
     """
 
     PRIMARY = "primary"  # straight from the user: an interview, their own email/message/ticket
-    SECONDARY = "secondary"  # existing/mediated material about them: a report, a third-party/internal doc
+    SECONDARY = (
+        "secondary"  # existing/mediated material about them: a report, a third-party/internal doc
+    )
     ASSUMPTION = "assumption"  # our own stated belief, no external evidence yet — the floor
 
 
@@ -178,16 +180,12 @@ class Need:
         Not "no source": a bare need is an unrecorded assumption, so an opinion is a belief not yet
         grounded in the user or the world (Torres: an unvalidated desirability assumption).
         """
-        return not any(
-            s.kind in (SourceKind.PRIMARY, SourceKind.SECONDARY) for s in self.sources
-        )
+        return not any(s.kind in (SourceKind.PRIMARY, SourceKind.SECONDARY) for s in self.sources)
 
     @property
     def only_assumption(self) -> bool:
         """Has a source, but all of them are assumptions — a stated guess, no external evidence."""
-        return len(self.sources) > 0 and all(
-            s.kind is SourceKind.ASSUMPTION for s in self.sources
-        )
+        return len(self.sources) > 0 and all(s.kind is SourceKind.ASSUMPTION for s in self.sources)
 
     @property
     def strongest_kind(self) -> SourceKind | None:

@@ -76,6 +76,7 @@ Read first, then act, then check.
 | record a human/AI review of the warrant | `prodc attest <id> --by <who> --date <ISO> [--ai]` |
 | record a human acceptance pass | `prodc accept <id> --who <person> --date <ISO>` |
 | hand a human a readable status file | `prodc report -o status.md` (markdown; `--format html` for an interactive viewer; `--client ID` to scope) |
+| act on a need going green (notify a tracker, etc.) | `prodc sync` — runs the `[callbacks]` commands for needs whose state changed since the last sync (`--dry-run` to preview) |
 | gate in CI | `prodc lint --strict` |
 
 Less often: `prodc argument` (the GSN assurance graph and its defects), `prodc portfolio <toml>…`

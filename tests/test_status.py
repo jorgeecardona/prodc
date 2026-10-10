@@ -87,7 +87,9 @@ def test_dangling_source_warns_distinct_from_opinion(tmp_path: Path) -> None:
         "issues": FrontmatterAdapter(root=tmp_path, paths=["issues/*.md"])
     }
     good = Need(
-        id="N-1", text="t", sources=(Source(kind=SourceKind.SECONDARY, locator="issues:reg.md#A-1"),)
+        id="N-1",
+        text="t",
+        sources=(Source(kind=SourceKind.SECONDARY, locator="issues:reg.md#A-1"),),
     )
     bad = Need(
         id="N-2",

@@ -29,7 +29,9 @@ def test_opinion_is_no_external_evidence() -> None:
 def test_strongest_kind_orders_primary_secondary_assumption() -> None:
     n = _n("A", SourceKind.ASSUMPTION, SourceKind.SECONDARY, SourceKind.PRIMARY)
     assert n.strongest_kind is SourceKind.PRIMARY
-    assert _n("B", SourceKind.ASSUMPTION, SourceKind.SECONDARY).strongest_kind is SourceKind.SECONDARY
+    assert (
+        _n("B", SourceKind.ASSUMPTION, SourceKind.SECONDARY).strongest_kind is SourceKind.SECONDARY
+    )
 
 
 def _project(tmp_path: Path, needs: str) -> Config:
@@ -69,8 +71,15 @@ def test_capture_normalises_alias_to_canonical(tmp_path: Path) -> None:
     cfg = _project(tmp_path, "needs:\n  - id: N-1\n    text: t\n")
     # author types the old name; it is stored as the canonical ladder value
     capture_source(
-        cfg, "N-1", kind="interview", who="Jordan", date="2026-01-01",
-        quote="I need it", locator=None, dry_run=False, expect_sha=None,
+        cfg,
+        "N-1",
+        kind="interview",
+        who="Jordan",
+        date="2026-01-01",
+        quote="I need it",
+        locator=None,
+        dry_run=False,
+        expect_sha=None,
     )
     n = next(n for n in load(cfg).needs if n.id == "N-1")
     assert n.sources[0].kind is SourceKind.PRIMARY and not n.is_opinion

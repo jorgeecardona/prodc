@@ -24,6 +24,8 @@ from .adapters import (
     PytestAdapter,
     SourceAdapter,
 )
+from .callbacks import Callback
+from .model import NeedState
 
 
 class ConfigError(Exception):
@@ -56,6 +58,49 @@ def _hook_command(tbl: dict[str, object], where: str) -> tuple[list[str], float]
     return command, float(timeout)
 
 
+def _state_filter(tbl: dict[str, object], key: str, where: str) -> frozenset[str]:
+    """A ``from``/``to`` transition filter: a list of valid need-state names (empty = any)."""
+    vals = _as_str_list(tbl.get(key, []), f"{where}.{key}")
+    valid = {s.value for s in NeedState}
+    bad = [v for v in vals if v not in valid]
+    if bad:
+        raise ConfigError(
+            f"{where}.{key}: unknown state(s) {', '.join(bad)} (one of {', '.join(sorted(valid))})"
+        )
+    return frozenset(vals)
+
+
+def _callbacks(raw: dict[str, object]) -> tuple[tuple[Callback, ...], str]:
+    """Parse ``[callbacks]``: the state ledger path and the ``[[callbacks.hooks]]`` list (#71)."""
+    cb_tbl = _as_dict(raw.get("callbacks", {}), "[callbacks]")
+    state_file = cb_tbl.get("state_file", ".prodc/state.json")
+    if not isinstance(state_file, str):
+        raise ConfigError("[callbacks].state_file must be a string")
+    hooks_raw = cb_tbl.get("hooks", [])
+    if not isinstance(hooks_raw, list):
+        raise ConfigError("[callbacks.hooks] must be a list of tables")
+    out: list[Callback] = []
+    for i, h in enumerate(cast("list[object]", hooks_raw)):
+        where = f"[[callbacks.hooks]][{i}]"
+        tbl = _as_dict(h, where)
+        event = tbl.get("on")
+        if event != "state_change":
+            raise ConfigError(
+                f"{where}.on must be 'state_change' (the only event supported), not {event!r}"
+            )
+        command, timeout = _hook_command(tbl, where)
+        out.append(
+            Callback(
+                event="state_change",
+                command=tuple(command),
+                timeout=timeout,
+                on_from=_state_filter(tbl, "from", where),
+                on_to=_state_filter(tbl, "to", where),
+            )
+        )
+    return tuple(out), state_file
+
+
 @dataclass
 class Config:
     root: Path
@@ -69,6 +114,8 @@ class Config:
     )  # [importance].levels — ordinal → (label, meaning); empty = no rubric declared (#59)
     importance_revisit_days: int | None = None  # [lint].importance_revisit_days (#59)
     default_draft: bool = False  # [add].default_draft — `add` stages as draft by default (#60)
+    callbacks: tuple[Callback, ...] = ()  # [[callbacks.hooks]] — lifecycle callbacks (#71)
+    callback_state_file: str = ".prodc/state.json"  # [callbacks].state_file — the state ledger
 
     def importance_label(self, level: int | None) -> str | None:
         """The declared label for an importance level, or None if unset/undeclared (#59)."""
@@ -194,9 +241,7 @@ class Config:
                 )
             elif kind == "command":
                 command, timeout = _hook_command(tbl, f"[sources.{name}]")
-                source_adapters[name] = CommandSource(
-                    root=root, command=command, timeout=timeout
-                )
+                source_adapters[name] = CommandSource(root=root, command=command, timeout=timeout)
             else:
                 raise ConfigError(
                     f"[sources.{name}]: unknown kind {kind!r} (frontmatter|gitlab|command)"
@@ -239,6 +284,8 @@ class Config:
         if not isinstance(default_draft, bool):
             raise ConfigError("[add].default_draft must be true or false")
 
+        callbacks, callback_state_file = _callbacks(raw)
+
         return cls(
             root=root,
             need_globs=need_globs,
@@ -249,4 +296,6 @@ class Config:
             importance_levels=importance_levels,
             importance_revisit_days=revisit,
             default_draft=default_draft,
+            callbacks=callbacks,
+            callback_state_file=callback_state_file,
         )

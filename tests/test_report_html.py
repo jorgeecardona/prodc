@@ -83,13 +83,11 @@ def test_html_is_self_contained_document(
     assert out.lstrip().startswith("<!doctype html>")
     assert "<title>" in out and "</html>" in out.rstrip()[-10:]
     # No external assets: nothing is fetched over the network.
-    assert 'src="http' not in out and "href=\"http" not in out
+    assert 'src="http' not in out and 'href="http' not in out
     assert "<link" not in out  # no external stylesheet
 
 
-def test_html_embeds_resolved_board(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_html_embeds_resolved_board(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     data = _payload(_render(tmp_path, capsys))
     assert len(data["needs"]) == 3  # type: ignore[arg-type]
     assert data["summary"]["coverage_pct"] == 33  # type: ignore[index]  # 1 of 3 delivered
@@ -140,9 +138,13 @@ def test_html_written_to_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     dest = tmp_path / "out" / "status.html"
     code = main(
         [
-            "report", "--format", "html",
-            "--config", str(_project(tmp_path)),
-            "-o", str(dest),
+            "report",
+            "--format",
+            "html",
+            "--config",
+            str(_project(tmp_path)),
+            "-o",
+            str(dest),
         ]
     )
     assert code == 0

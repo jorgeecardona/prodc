@@ -53,17 +53,13 @@ def test_description_is_not_ears_checked(tmp_path: Path) -> None:
     # Nothing in the model runs ears_warnings over description — the field is exempt by design.
 
 
-def test_show_renders_description(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_show_renders_description(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     code = main(["show", "N-1", "--config", str(_project(tmp_path))])
     assert code == 0
     assert "description:" in capsys.readouterr().out
 
 
-def test_show_json_carries_description(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_show_json_carries_description(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     code = main(["show", "N-1", "--json", "--config", str(_project(tmp_path))])
     assert code == 0
     payload = json.loads(capsys.readouterr().out)

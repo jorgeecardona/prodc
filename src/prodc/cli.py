@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import cast
 
 from . import __version__
+from .callbacks import advance_ledger, fire, read_ledger, transitions, write_ledger
 from .config import Config, ConfigError
 from .dedup import (
     DupPair,
@@ -914,9 +915,7 @@ def _plan_json(results: list[NeedResult], recurrence_counts: dict[str, int]) -> 
                     "warrant": _warrant(r.need),
                     "recurrence": recurrence_counts.get(r.need.id, 0),
                     "importance": r.need.importance,
-                    "importance_is_guess": (
-                        r.need.importance is not None and r.need.is_opinion
-                    ),
+                    "importance_is_guess": (r.need.importance is not None and r.need.is_opinion),
                 }
                 for i, r in enumerate(ranked, 1)
             ]
@@ -1299,6 +1298,68 @@ def _cmd_report(args: argparse.Namespace) -> int:
     else:
         print(text)
     return 0
+
+
+def _cmd_sync(args: argparse.Namespace) -> int:
+    """Fire lifecycle callbacks for needs whose state changed since the last sync (#71).
+
+    Resolves the board, diffs it against the state ledger, runs the configured callbacks for each
+    transition (the need + board context piped as JSON on stdin), and writes the ledger forward.
+    The first run records a baseline and fires nothing; a failed callback is reported and its need
+    is left un-advanced so the next sync retries it. `--dry-run` shows what would fire.
+    """
+    loaded = _load_or_report(args)
+    if loaded is None:
+        return 2
+    cfg, model = loaded
+    needs = list(model.needs)
+    results = resolve(needs, cfg.adapters, cfg.source_adapters)
+    current = {r.need.id: r.state.value for r in results}
+    summary = summarize(results)
+    board: dict[str, object] = {
+        "coverage_pct": round(summary.coverage * 100),
+        "delivered": summary.delivered,
+        "total": summary.total,
+    }
+    ledger_path = cfg.root / cfg.callback_state_file
+    ledger = read_ledger(ledger_path)
+
+    if ledger is None:  # first run: establish the baseline, never fire (all would look new)
+        if not args.dry_run:
+            write_ledger(ledger_path, current)
+        n = len(current)
+        print(
+            f"sync: baseline recorded ({n} need{'s' if n != 1 else ''}) — no callbacks fired on first run"
+        )
+        return 0
+
+    trans = transitions(ledger, current)
+    if not trans:
+        if current != ledger and not args.dry_run:
+            write_ledger(ledger_path, current)  # pick up added/removed needs silently
+        print("sync: no state changes")
+        return 0
+
+    if args.dry_run:
+        for t in trans:
+            n = sum(
+                1 for c in cfg.callbacks if c.event == "state_change" and c.matches(t.frm, t.to)
+            )
+            print(f"  {t.need_id}: {t.frm} → {t.to} ({n} callback(s) would fire)")
+        print(f"sync --dry-run: {len(trans)} transition(s); ledger not written")
+        return 0
+
+    context = {r.need.id: r.need for r in results}
+    fired = fire(list(trans), list(cfg.callbacks), context=context, board=board, cwd=cfg.root)
+    write_ledger(ledger_path, advance_ledger(current, ledger, fired))
+
+    for t in trans:
+        print(f"  {t.need_id}: {t.frm} → {t.to}")
+    for f in fired:
+        print(f"    → {' '.join(f.command)}: {'ok' if f.ok else 'FAILED'} ({f.detail})")
+    failures = [f for f in fired if not f.ok]
+    print(f"sync: {len(trans)} transition(s), {len(fired)} callback run(s), {len(failures)} failed")
+    return 1 if failures else 0
 
 
 def _cmd_agent(args: argparse.Namespace) -> int:
@@ -1751,7 +1812,15 @@ def main(argv: list[str] | None = None) -> int:
     cp.add_argument(
         "--kind",
         required=True,
-        choices=["primary", "secondary", "assumption", "interview", "artifact", "proxy", "internal"],
+        choices=[
+            "primary",
+            "secondary",
+            "assumption",
+            "interview",
+            "artifact",
+            "proxy",
+            "internal",
+        ],
         help="source kind, strongest first: primary > secondary > assumption "
         "(interview/artifact/proxy/internal accepted as aliases)",
     )
@@ -1925,6 +1994,18 @@ def main(argv: list[str] | None = None) -> int:
         "--client", default=None, metavar="ID", help="scope the report to one client (as `status`)"
     )
     rp.set_defaults(func=_cmd_report)
+
+    sy = sub.add_parser(
+        "sync",
+        help="run lifecycle callbacks for needs whose state changed since the last sync (#71)",
+    )
+    sy.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    sy.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="show which transitions would fire callbacks; don't run them or write the ledger",
+    )
+    sy.set_defaults(func=_cmd_sync)
 
     ag = sub.add_parser(
         "agent",
