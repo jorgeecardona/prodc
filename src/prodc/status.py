@@ -15,6 +15,7 @@ from .adapters import Adapter, Enumerable, Inventoried, ProofResult, SourceAdapt
 from .dedup import similarity
 from .model import (
     SOLUTION_VERBS,
+    Answer,
     ArgKind,
     ArgNode,
     AttestationKind,
@@ -28,6 +29,11 @@ from .model import (
     SourceKind,
     ears_warnings,
 )
+
+#: Reserved proof-adapter name for a need→need edge (#research-board step 2): a proof whose
+#: payload is another need id. Resolved by the :class:`Resolver` itself, not a config adapter,
+#: so it never appears in ``[proofs.*]``; a ``[proofs.need]`` block would be shadowed by this.
+_NEEDREF = "need"
 
 
 def _text_warnings(need: Need) -> list[str]:
@@ -167,10 +173,73 @@ class Resolver:
             return self._aggregate_children(need)
         return self._resolve_leaf(need)
 
+    def _resolve_one(self, locator: str) -> ProofResult:
+        """Resolve one leaf proof locator, routing ``need:`` to the needref edge.
+
+        Every other adapter reads a repo; a needref reads another need's resolution, which only
+        the resolver can do — so it is dispatched here, not via :func:`_resolve_proof`.
+        """
+        name, sep, payload = locator.partition(":")
+        if sep and name == _NEEDREF:
+            return self._resolve_needref(payload)
+        return _resolve_proof(locator, self._adapters)
+
+    def _resolve_needref(self, payload: str) -> ProofResult:
+        """Resolve ``need:<id>`` (or ``need:<id>@<answer>``) against another need (#research step 2).
+
+        A research question can depend on a peer: "B cannot be posed until A is settled." That
+        edge is itself a proof — B delivers iff A is settled — so it rides the ``proofs`` tuple
+        with no new field, and the resolver's own cycle detection and memoization cover A→B→A for
+        free (a back-edge hits the ``_visiting`` guard and returns BROKEN). ``need:A`` resolves on
+        A's *settledness* (DELIVERED); the optional ``need:A@yes`` form additionally requires A's
+        authored :attr:`~prodc.model.Need.answer` to match. B never inherits A's answer — the
+        dependency only requires A settled, optionally in a given direction.
+        """
+        ref_id, sep, direction = payload.partition("@")
+        ref_id = ref_id.strip()
+        if ref_id not in self._by_id:
+            return ProofResult(ProofState.BROKEN, False, f"need '{ref_id}' is not a known need id")
+        want: Answer | None = None
+        if sep:
+            try:
+                want = Answer(direction.strip())
+            except ValueError:
+                answers = "|".join(a.value for a in Answer)
+                return ProofResult(
+                    ProofState.BROKEN, False, f"unknown answer '{direction}' ({answers})"
+                )
+        cr = self.resolve(ref_id)  # cycle-safe via the _visiting guard in resolve()
+        if cr.state is NeedState.BROKEN:
+            return ProofResult(ProofState.BROKEN, False, f"need '{ref_id}' unresolved (broken)")
+        if cr.state is NeedState.UNRESOLVED:
+            return ProofResult(ProofState.UNRESOLVED, False, f"need '{ref_id}' could not be read")
+        if cr.state is not NeedState.DELIVERED:
+            return ProofResult(
+                ProofState.PENDING, False, f"need '{ref_id}' not settled ({cr.state.value})"
+            )
+        if want is None:
+            return ProofResult(ProofState.DELIVERED, cr.declared, f"need '{ref_id}' settled")
+        answer = self._by_id[ref_id].answer
+        if answer is None:
+            return ProofResult(
+                ProofState.PENDING,
+                False,
+                f"need '{ref_id}' settled, no answer recorded, awaiting '{want.value}'",
+            )
+        if answer is want:
+            return ProofResult(
+                ProofState.DELIVERED, cr.declared, f"need '{ref_id}' settled: {answer.value}"
+            )
+        return ProofResult(
+            ProofState.PENDING,
+            False,
+            f"need '{ref_id}' settled {answer.value}, awaiting '{want.value}'",
+        )
+
     def _resolve_leaf(self, need: Need) -> NeedResult:
         if not need.proofs:
             return NeedResult(need, NeedState.HOLE)
-        results = [_resolve_proof(p, self._adapters) for p in need.proofs]
+        results = [self._resolve_one(p) for p in need.proofs]
         detail = [
             f"{p} → {r.state.value}{'*' if r.declared else ''} ({r.detail})"
             for p, r in zip(need.proofs, results, strict=True)

@@ -160,11 +160,12 @@ withdrawn — the concrete reason `answer` is necessary, not cosmetic.
 
 ## Build order
 
-1. `Answer` StrEnum + `Need.answer` — the settled-vs-achieved pivot, authored on the need (not on
+1. ✅ `Answer` StrEnum + `Need.answer` — the settled-vs-achieved pivot, authored on the need (not on
    `ProofResult`/`NeedResult`). Loader validation + `board.need_payload` + #53 splice + the
-   conservative honesty warning. Model change; show the diff; patch bump.
-2. The `need` (needref) proof adapter — the question→question DAG, cycle-safe for free; reads
+   conservative honesty warning. Model change; show the diff; patch bump. *(shipped 0.3.67)*
+2. ✅ The `need` (needref) proof adapter — the question→question DAG, cycle-safe for free; reads
    authored `Need.answer` off `Resolver._by_id` for the optional `need:A@yes` directional form.
+   Dispatched inside the `Resolver` (`_resolve_needref`), not a config adapter; `need` is reserved.
 3. `profile = "research"` config switch — silences EARS noise, swaps the grammar.
 4. `evalgate` adapter (#75).
 5. `citation` adapter (optional; reuse `accept` at first).

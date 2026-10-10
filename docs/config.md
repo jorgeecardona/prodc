@@ -43,8 +43,11 @@ A proof is `<name>:<payload>`.
 | `field` | field name | field is `surfaced` in `schema` | `schema` |
 | `external` | observable-outcome key | key recorded passing in `results` (a JSON `{key: bool}`); implementation-independent | `results` |
 | `command` | anything your hook understands | your hook prints `{"state": "delivered"}` | `command`, `timeout` |
+| `need` | `other-need-id` or `other-need-id@yes\|no\|inconclusive` | the referenced need is settled (DELIVERED); the `@answer` form also requires its authored `answer` to match | — (built in; not configured) |
 
 Any adapter takes `repo = "../sibling"` to resolve against a sibling checkout; absent sibling → UNRESOLVED, not BROKEN. `results` (cucumber-json or junit XML) turns declared states into real ones.
+
+`need` is a need→need edge for the question→question DAG ("B can't be posed until A settles"): a proof whose payload is another need id. It is resolved by prodc itself, not a configured adapter, so it needs no `[proofs.need]` block (one would be shadowed). Cycles (A→B→A) resolve to BROKEN, not an infinite loop. B does not inherit A's answer — the dependency only requires A settled, optionally in a given direction.
 
 ### `command` — the generic hook
 
