@@ -548,7 +548,7 @@ wheels = [
 
 [[package]]
 name = "prodc"
-version = "0.3.71"
+version = "0.3.72"
 source = { editable = "." }
 dependencies = [
     { name = "pyyaml" },

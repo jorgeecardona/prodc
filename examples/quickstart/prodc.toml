@@ -1,7 +1,8 @@
 # A minimal, runnable prodc project. From this directory:
 #   uv run prodc status
 # N-1 shows DELIVERED (a tagged scenario proves it), N-2 is a sourced HOLE
-# (evidence exists, no test yet), N-3 is an opinion with a solution-in-disguise warning.
+# (evidence exists, no test yet), N-3 is an opinion with a solution-in-disguise warning,
+# N-4 is a shipped hypothesis that settled NO (DELIVERED + answer: no — a result, not a gap).
 
 [prodc]
 needs = ["needs/*.yaml"]
@@ -11,3 +12,6 @@ kind = "gherkin"
 paths = ["features/*.feature"]
 delivered = ["@implemented"]
 pending = ["@pending"]
+
+[proofs.ship]
+kind = "accept"  # a human records that an experiment ran and concluded (declared)

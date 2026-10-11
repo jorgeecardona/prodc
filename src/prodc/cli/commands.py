@@ -150,7 +150,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
         return 2
     cfg, model = loaded
     needs = list(model.needs)
-    results = resolve(needs, cfg.adapters, cfg.source_adapters, cfg.profile)
+    results = resolve(needs, cfg.adapters, cfg.source_adapters)
     _annotate_board_warnings(results, needs)
     _annotate_duplicate_warnings(results, needs, cfg.duplicate_threshold)
     by_id = {r.need.id: r for r in results}

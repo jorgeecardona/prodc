@@ -22,3 +22,19 @@ needs:
 
   - id: N-3
     text: "implement a settings page"  # opinion (no source) + solution-in-disguise warning
+
+  # A product need is a hypothesis, same as a research question. Stating the `claim` (the warrant
+  # the bet would establish) silences the EARS/solution-verb lint — the honest act, not a mode.
+  # The experiment shipped and settled the question NO: DELIVERED + answer: no. It stays on the
+  # board and counts as a result — unlike `withdrawn`, which would hide that something was learned.
+  - id: N-4
+    text: "pin the daily summary to the top of the dashboard"
+    claim: "pinning the summary lifts next-day return visits"
+    sources:
+      - kind: primary
+        who: Jordan
+        date: 2026-09-22
+        quote: "I never scroll back up to the summary"
+    proofs:
+      - "ship:jordan@2026-10-05"  # the A/B experiment ran and concluded
+    answer: no  # return visits did not move — the bet is settled, and the answer is no

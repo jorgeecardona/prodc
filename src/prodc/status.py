@@ -23,7 +23,6 @@ from .model import (
     Need,
     NeedResult,
     NeedState,
-    Profile,
     ProofState,
     Release,
     Role,
@@ -37,17 +36,21 @@ from .model import (
 _NEEDREF = "need"
 
 
-def _text_warnings(need: Need, profile: Profile = Profile.PRODUCT) -> list[str]:
+def _text_warnings(need: Need) -> list[str]:
     out: list[str] = []
-    # The outcome grammar (EARS + solution-verb) is product-only: a research question or claim
-    # is not a user-facing outcome, so the profile gates it and leaves a research board quiet.
-    if profile is Profile.PRODUCT:
+    # The outcome-shape lint (EARS + solution-verb) fires only until the author states the
+    # warrant. A need with `claim` set has already articulated the proposition the lint was
+    # prodding toward — "what delivering this establishes" — so it is silenced. This is what
+    # unifies a product board and a research board without a mode: "When a roaster opens the
+    # queue, she can see today's orders" and "π is irrational" are the same claim-under-uncertainty
+    # at different altitudes; EARS is just one falsifiable-claim grammar, a stated `claim` another.
+    if need.claim is None:
         first = need.text.strip().split(" ", 1)[0].lower().rstrip(":")
         if first in SOLUTION_VERBS:
             out.append(f"text may be a solution in disguise (starts with '{first}')")
         else:
             out.extend(ears_warnings(need.text))  # EARS shape check (redundant on solution verbs)
-    # Source hygiene is universal (it is about evidence, not phrasing) — run it in every profile.
+    # Source hygiene is universal (it is about evidence, not phrasing) — always run it.
     for src in need.sources:
         out.extend(src.warnings())
     return out
@@ -144,12 +147,10 @@ class Resolver:
         needs: list[Need],
         adapters: dict[str, Adapter],
         source_adapters: dict[str, SourceAdapter] | None = None,
-        profile: Profile = Profile.PRODUCT,
     ) -> None:
         self._by_id = {n.id: n for n in needs}
         self._adapters = adapters
         self._source_adapters = source_adapters or {}
-        self._profile = profile
         self._cache: dict[str, NeedResult] = {}
         self._visiting: set[str] = set()
 
@@ -166,7 +167,7 @@ class Resolver:
         result = self._compute(need)
         self._visiting.discard(need_id)
         result.warnings = (
-            _text_warnings(need, self._profile)
+            _text_warnings(need)
             + _source_warnings(need, self._source_adapters)
             + _warrant_warnings(need, result)
             + _answer_warnings(need, result)
@@ -308,10 +309,9 @@ def resolve(
     needs: list[Need],
     adapters: dict[str, Adapter],
     source_adapters: dict[str, SourceAdapter] | None = None,
-    profile: Profile = Profile.PRODUCT,
 ) -> list[NeedResult]:
     """Resolve every need to a :class:`NeedResult`."""
-    return Resolver(needs, adapters, source_adapters, profile).resolve_all()
+    return Resolver(needs, adapters, source_adapters).resolve_all()
 
 
 @dataclass(frozen=True)
