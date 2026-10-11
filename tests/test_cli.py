@@ -162,21 +162,65 @@ def test_portfolio_rolls_up_many_repos(tmp_path: Path, capsys: pytest.CaptureFix
     assert code == 0
     assert "alpha" in out and "beta" in out
     assert "33%" in out  # each repo is 1/3 delivered
+    assert "TOTAL (2 boards)" in out and "2/6 delivered" in out  # the aggregate footer
 
 
 def test_portfolio_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     import json
 
     main(["portfolio", str(_project(tmp_path / "alpha")), "--json"])
-    rows = json.loads(capsys.readouterr().out)
-    assert rows[0]["repo"] == "alpha" and rows[0]["total"] == 3
-    assert rows[0]["provenance"]["primary"] == 1
+    payload = json.loads(capsys.readouterr().out)
+    boards = payload["boards"]
+    assert boards[0]["repo"] == "alpha" and boards[0]["total"] == 3
+    assert boards[0]["provenance"]["primary"] == 1
+    assert payload["totals"]["boards"] == 1 and payload["totals"]["total"] == 3
 
 
 def test_portfolio_bad_config_exits_2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     code = main(["portfolio", str(tmp_path / "nope.toml")])
     capsys.readouterr()
     assert code == 2
+
+
+def test_portfolio_discovers_boards_under_a_directory(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # a projects/ folder with two boards, one nested a level deeper
+    root = tmp_path / "projects"
+    _project(root / "crm")
+    _project(root / "lingua" / "app")
+    code = main(["portfolio", str(root)])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "crm" in out and "app" in out  # both discovered, each its own row
+    assert "TOTAL (2 boards)" in out
+
+
+def test_portfolio_discovery_prunes_vcs_and_vendor_dirs(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import json
+
+    root = tmp_path / "projects"
+    _project(root / "real")
+    # boards buried in dirs that must never be descended into
+    _project(root / ".git" / "hooks-board")
+    _project(root / "node_modules" / "dep")
+    _project(root / "real" / ".venv" / "pkg")
+    main(["portfolio", str(root), "--json"])
+    names = {b["repo"] for b in json.loads(capsys.readouterr().out)["boards"]}
+    assert names == {"real"}  # the pruned boards are invisible to discovery
+
+
+def test_portfolio_discovery_respects_max_depth(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import json
+
+    root = tmp_path / "projects"
+    _project(root / "a" / "b" / "c" / "deep")  # 4 dirs below root
+    main(["portfolio", str(root), "--max-depth", "2", "--json"])
+    assert json.loads(capsys.readouterr().out)["boards"] == []  # too deep to find
 
 
 def test_diff_no_changes(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

@@ -22,7 +22,7 @@ from ..model import (
     ears_shape,
 )
 from ..status import Handoff, Recurrence, Summary, rank, state_priority
-from .common import RepoRow, brief_open
+from .common import PortfolioTotals, RepoRow, brief_open
 
 _LABEL = {
     NeedState.DELIVERED: "DELIVERED",
@@ -380,7 +380,9 @@ def render_argument(model: Model, defects: list[str]) -> str:
     return "\n".join(out)
 
 
-def render_portfolio(rows: list[RepoRow]) -> str:
+def render_portfolio(rows: list[RepoRow], totals: PortfolioTotals | None = None) -> str:
+    if not rows:
+        return "  no boards found"
     out = [f"  {'repo':<18} {'cov':>4}  {'must-HOLE':>9}  {'BROKEN':>6}   prov prim/sec/asm/op"]
     for row in rows:
         if row.error is not None:
@@ -390,4 +392,12 @@ def render_portfolio(rows: list[RepoRow]) -> str:
         prov = f"{p['primary']}/{p['secondary']}/{p['assumption']}/{p['opinion']}"
         cov = f"{round(row.coverage * 100)}%"
         out.append(f"  {row.repo:<18} {cov:>4}  {row.must_hole:>9}  {row.broken:>6}   {prov}")
+    if totals is not None:
+        cov = f"{round(totals.coverage * 100)}%"
+        label = f"TOTAL ({totals.boards} boards)"
+        out.append(f"  {'─' * 48}")
+        out.append(
+            f"  {label:<18} {cov:>4}  {totals.must_hole:>9}  {totals.broken:>6}   "
+            f"{totals.delivered}/{totals.total} delivered"
+        )
     return "\n".join(out)

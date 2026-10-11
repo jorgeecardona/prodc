@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -100,3 +101,79 @@ class RepoRow:
     coverage: float
     provenance: dict[str, int]
     error: str | None = None
+
+
+@dataclass(frozen=True)
+class PortfolioTotals:
+    """The aggregate across every board in a portfolio — a footer, not a merged board.
+
+    Error rows are excluded (a board that would not load contributes no counts). ``coverage`` is
+    the pooled ``delivered / total``, which is not the mean of the per-board percentages.
+    """
+
+    boards: int  # how many boards loaded cleanly and are summed here
+    delivered: int
+    total: int
+    must_hole: int
+    broken: int
+    coverage: float
+
+
+def portfolio_totals(rows: list[RepoRow]) -> PortfolioTotals:
+    """Sum the clean rows into a :class:`PortfolioTotals` footer."""
+    ok = [r for r in rows if r.error is None]
+    delivered = sum(r.delivered for r in ok)
+    total = sum(r.total for r in ok)
+    return PortfolioTotals(
+        boards=len(ok),
+        delivered=delivered,
+        total=total,
+        must_hole=sum(r.must_hole for r in ok),
+        broken=sum(r.broken for r in ok),
+        coverage=round(delivered / total, 4) if total else 0.0,
+    )
+
+
+# Directory names never descended into during board discovery: VCS, virtualenvs, dependency and
+# build trees. Any name starting with "." is pruned too (handled in the walk), so a vendored or
+# example prodc.toml buried in one of these is never mistaken for a board.
+_PRUNE_DIRS = frozenset(
+    {
+        ".git",
+        "node_modules",
+        ".venv",
+        "venv",
+        "__pycache__",
+        "dist",
+        "build",
+        "target",
+        ".tox",
+        ".mypy_cache",
+        ".ruff_cache",
+        "site-packages",
+        "vendor",
+    }
+)
+
+
+def discover_configs(root: Path, *, max_depth: int = 4) -> list[Path]:
+    """Every ``prodc.toml`` under ``root``, for the portfolio roll-up — bounded so it can't run away.
+
+    A plain recursive scan is a footgun: it descends into ``.git``/``node_modules``/build trees and
+    picks up vendored or example configs. So this prunes those (and every ``.``-prefixed dir) and
+    caps the descent at ``max_depth`` directories below ``root``. Returns sorted, de-duplicated
+    paths; a board is the directory that holds the ``prodc.toml``.
+    """
+    root = root.resolve()
+    found: set[Path] = set()
+    for dirpath, dirnames, filenames in os.walk(root):
+        if "prodc.toml" in filenames:
+            found.add(Path(dirpath) / "prodc.toml")
+        depth = len(Path(dirpath).relative_to(root).parts)
+        # Prune in place so os.walk never descends into the skipped dirs, then stop at the depth cap.
+        dirnames[:] = (
+            []
+            if depth >= max_depth
+            else [d for d in dirnames if d not in _PRUNE_DIRS and not d.startswith(".")]
+        )
+    return sorted(found)

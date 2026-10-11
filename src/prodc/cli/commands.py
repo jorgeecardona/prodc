@@ -56,7 +56,15 @@ from ..writer import (
     set_importance,
     withdraw,
 )
-from .common import RepoRow, emit_edit, exit_code, git_rev, load_or_report
+from .common import (
+    RepoRow,
+    discover_configs,
+    emit_edit,
+    exit_code,
+    git_rev,
+    load_or_report,
+    portfolio_totals,
+)
 from .render import (
     COLUMNS,
     provenance_counts,
@@ -582,12 +590,33 @@ def _repo_row(config_path: str) -> RepoRow:
 
 
 def cmd_portfolio(args: argparse.Namespace) -> int:
-    """Roll up many repos into one scoreboard — coverage, must-HOLEs, provenance per repo."""
-    rows = [_repo_row(path) for path in args.configs]
+    """Roll up many boards into one scoreboard — coverage, must-HOLEs, provenance per board.
+
+    Each argument is a ``prodc.toml`` path or a directory to discover boards under (every
+    ``prodc.toml`` beneath it, pruning VCS/vendor/build and hidden dirs, capped at ``--max-depth``).
+    Boards stay separate rows; a totals footer aggregates the clean ones. Never a merged board.
+    """
+    paths: list[str] = []
+    for arg in args.configs:
+        p = Path(arg)
+        if p.is_dir():
+            paths.extend(str(c) for c in discover_configs(p, max_depth=args.max_depth))
+        else:
+            paths.append(arg)
+    seen: set[str] = set()
+    unique: list[str] = []
+    for path in paths:
+        key = str(Path(path).resolve())
+        if key not in seen:
+            seen.add(key)
+            unique.append(path)
+    rows = [_repo_row(path) for path in unique]
+    totals = portfolio_totals(rows)
     if args.json:
-        print(json.dumps([asdict(r) for r in rows], indent=2))
+        payload = {"boards": [asdict(r) for r in rows], "totals": asdict(totals)}
+        print(json.dumps(payload, indent=2))
     else:
-        print(render_portfolio(rows))
+        print(render_portfolio(rows, totals))
     return 2 if any(r.error is not None for r in rows) else 0
 
 

@@ -324,8 +324,19 @@ def main(argv: list[str] | None = None) -> int:
     )
     ri.set_defaults(func=cmd_reinstate)
 
-    pf = sub.add_parser("portfolio", help="roll up many repos into one scoreboard")
-    pf.add_argument("configs", nargs="+", metavar="PRODC_TOML", help="one or more prodc.toml paths")
+    pf = sub.add_parser("portfolio", help="roll up many boards into one scoreboard")
+    pf.add_argument(
+        "configs",
+        nargs="+",
+        metavar="PATH",
+        help="prodc.toml paths and/or directories to discover boards under",
+    )
+    pf.add_argument(
+        "--max-depth",
+        type=int,
+        default=4,
+        help="how deep to descend when discovering boards under a directory (default 4)",
+    )
     pf.add_argument("--json", action="store_true", help="machine-readable output")
     pf.set_defaults(func=cmd_portfolio)
 
