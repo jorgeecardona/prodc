@@ -11,11 +11,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from musil import Action, Model, check
+from musil import Action, Model, check, explore, reaches
 
 from prodc.adapters import Adapter, ProofResult
-from prodc.model import Need, NeedState, ProofState
-from prodc.status import Resolver
+from prodc.model import Decision, Need, NeedState, ProofState, Withdrawal, board_needs
+from prodc.status import Resolver, active_decisions
 
 
 class _Stub:
@@ -211,6 +211,79 @@ FLOW_MODEL = Model(
 )
 
 
+# --- draft / withdrawn lifecycle (shared by Need and Decision) -----------------------
+# The board-membership state machine the writer verbs move an item through: a thing is staged
+# (draft), promoted (draft cleared), withdrawn (a decision against — off the board, record kept),
+# or reinstated. Every invariant derives from prodc's REAL rules (counts_toward_coverage /
+# board_needs / active_decisions), so a drift between this model and those rules is a failed check.
+# Note the asymmetry it pins down: coverage/board exclude a *withdrawn* item unconditionally, but a
+# *draft* only until promoted — and active_decisions excludes both.
+
+
+@dataclass(frozen=True)
+class Life:
+    draft: bool = True  # starts staged (proposed); promote clears it
+    withdrawn: bool = False
+
+
+def _life_actions() -> list[Action[Life]]:
+    return [
+        Action("promote", lambda s: s.draft and not s.withdrawn, lambda s: replace(s, draft=False)),
+        Action("withdraw", lambda s: not s.withdrawn, lambda s: replace(s, withdrawn=True)),
+        Action("reinstate", lambda s: s.withdrawn, lambda s: replace(s, withdrawn=False)),
+    ]
+
+
+def _w(s: Life) -> Withdrawal | None:
+    return Withdrawal(reason="r", date="2026-01-01") if s.withdrawn else None
+
+
+def _life_need(s: Life) -> Need:
+    return Need(id="n", text="x", draft=s.draft, withdrawn=_w(s))
+
+
+def _life_decision(s: Life) -> Decision:
+    return Decision(id="D", text="x", needs=("n",), draft=s.draft, withdrawn=_w(s))
+
+
+def _on_board(s: Life) -> bool:
+    return not s.draft and not s.withdrawn
+
+
+def _life_coverage_counts_iff_not_withdrawn(s: Life) -> bool:
+    """A leaf product need counts toward coverage exactly when not withdrawn — draft is orthogonal."""
+    return _life_need(s).counts_toward_coverage == (not s.withdrawn)
+
+
+def _life_board_default_excludes_draft_and_withdrawn(s: Life) -> bool:
+    """The counted board (no --include-drafts) holds the item iff it is neither draft nor withdrawn."""
+    on = _life_need(s).id in {n.id for n in board_needs([_life_need(s)], include_drafts=False)}
+    return on == _on_board(s)
+
+
+def _life_board_with_drafts_excludes_only_withdrawn(s: Life) -> bool:
+    """--include-drafts holds the item iff it is not withdrawn (a draft is kept, withdrawn never)."""
+    on = _life_need(s).id in {n.id for n in board_needs([_life_need(s)], include_drafts=True)}
+    return on == (not s.withdrawn)
+
+
+def _life_decision_active_iff_on_board(s: Life) -> bool:
+    """A decision is in force iff neither a draft nor withdrawn — stricter than need coverage."""
+    return (active_decisions([_life_decision(s)]) == [_life_decision(s)]) == _on_board(s)
+
+
+LIFE_MODEL = Model(
+    init=Life(),
+    actions=_life_actions(),
+    invariants={
+        "coverage-counts-iff-not-withdrawn": _life_coverage_counts_iff_not_withdrawn,
+        "board-default-excludes-draft-and-withdrawn": _life_board_default_excludes_draft_and_withdrawn,
+        "board-with-drafts-excludes-only-withdrawn": _life_board_with_drafts_excludes_only_withdrawn,
+        "decision-active-iff-on-board": _life_decision_active_iff_on_board,
+    },
+)
+
+
 # --- the gate ------------------------------------------------------------------------
 def test_leaf_lifecycle_safety() -> None:
     r = check(LEAF_MODEL)
@@ -220,6 +293,21 @@ def test_leaf_lifecycle_safety() -> None:
 def test_flow_rollup_safety() -> None:
     r = check(FLOW_MODEL)
     assert r.ok, f"{r.invariant}: {r.trace}"
+
+
+def test_lifecycle_safety() -> None:
+    r = check(LIFE_MODEL)
+    assert r.ok, f"{r.invariant}: {r.trace}"
+
+
+def test_lifecycle_board_always_recoverable() -> None:
+    """No reachable state is permanently stuck off the board: reinstate + promote always lead back.
+
+    The liveness counterpart to the safety invariants — it proves a withdrawn or staged item can
+    never get trapped off the active board (an item is never a one-way trip).
+    """
+    g = explore(LIFE_MODEL)
+    assert reaches(g, _on_board) == set(g.states)
 
 
 def test_checker_bites() -> None:
