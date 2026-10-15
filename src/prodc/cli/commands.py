@@ -33,11 +33,13 @@ from ..report import render_markdown
 from ..report_html import render_html
 from ..status import (
     ProofSuggestion,
+    RelinkSuggestion,
     applicable_needs,
     argument_defects,
     evidence_age_days,
     proof_suggestions,
     recurrence,
+    relink_suggestions,
     resolve,
     summarize,
 )
@@ -53,6 +55,7 @@ from ..writer import (
     delete_need,
     link_variant_group,
     reinstate,
+    relink_proof,
     set_field,
     set_importance,
     withdraw,
@@ -954,7 +957,7 @@ def cmd_agent(args: argparse.Namespace) -> int:
 
 
 def cmd_suggest(args: argparse.Namespace) -> int:
-    """Propose candidate proof locators for HOLE needs from the adapters' inventories (#54)."""
+    """Propose candidate proof locators for HOLE needs (or relink BROKEN ones) from the inventories (#54)."""
     loaded = load_or_report(args)
     if loaded is None:
         return 2
@@ -966,6 +969,8 @@ def cmd_suggest(args: argparse.Namespace) -> int:
         if not results:
             print(f"prodc: no need '{args.need_id}'", file=sys.stderr)
             return 2
+    if args.relink:
+        return _cmd_relink(cfg, results, args)
     suggestions = proof_suggestions(
         results, cfg.adapters, min_score=args.min_score, top=args.top, kind=args.kind
     )
@@ -1041,6 +1046,88 @@ def _apply_suggestions(
             print(f"{verb} {s.locator} → {s.need.id} ({s.score:.2f}) in {edit.path.name}")
             print(edit.diff, end="")
         print(f"suggest --apply: {verb} {len(applied)} proof(s) at min-score {args.min_score:.2f}")
+    return 0
+
+
+def _cmd_relink(cfg: Config, results: list[NeedResult], args: argparse.Namespace) -> int:
+    """Propose (or --apply) a live inventory entry to replace each BROKEN proof locator (#54)."""
+    suggestions = relink_suggestions(
+        results, cfg.adapters, min_score=args.min_score, top=args.top, kind=args.kind
+    )
+    if args.apply:
+        return _apply_relinks(cfg, suggestions, args)
+    if args.json:
+        print(
+            json.dumps(
+                [
+                    {
+                        "need": s.need.id,
+                        "adapter": s.adapter,
+                        "broken": s.broken,
+                        "locator": s.locator,
+                        "score": round(s.score, 4),
+                    }
+                    for s in suggestions
+                ],
+                indent=2,
+            )
+        )
+    else:
+        last = None
+        for s in suggestions:
+            if s.need.id != last:
+                print(f"{s.need.id}: {s.need.text}")
+                last = s.need.id
+            print(f"    {s.score:.2f}  {s.broken} → {s.locator}")
+        print(f"suggest --relink: {len(suggestions)} candidate(s) at min-score {args.min_score:.2f}")
+    return 0
+
+
+def _apply_relinks(
+    cfg: Config, suggestions: list[RelinkSuggestion], args: argparse.Namespace
+) -> int:
+    """Apply the best relink per broken locator, printing each need's diff (#54 relink).
+
+    Keyed by ``(need, broken locator)`` so a need with two broken proofs relinks both to their own
+    best candidate. Each is one reload-gated single-file edit (:func:`relink_proof`), applied in a
+    stable order; a rejected write aborts with a non-zero exit (earlier writes stand).
+    """
+    best: dict[tuple[str, str], RelinkSuggestion] = {}
+    for s in suggestions:
+        best.setdefault((s.need.id, s.broken), s)
+    applied: list[tuple[RelinkSuggestion, Edit]] = []
+    for key in sorted(best):
+        s = best[key]
+        try:
+            edit = relink_proof(cfg, s.need.id, s.broken, s.locator, dry_run=args.dry_run)
+        except WriteError as exc:
+            print(f"prodc: {exc}", file=sys.stderr)
+            return 2
+        applied.append((s, edit))
+    if args.json:
+        print(
+            json.dumps(
+                [
+                    {
+                        "need": s.need.id,
+                        "broken": s.broken,
+                        "locator": s.locator,
+                        "score": round(s.score, 4),
+                        "file": edit.path.name,
+                        "dry_run": args.dry_run,
+                        "diff": edit.diff,
+                    }
+                    for s, edit in applied
+                ],
+                indent=2,
+            )
+        )
+    else:
+        verb = "would relink" if args.dry_run else "relinked"
+        for s, edit in applied:
+            print(f"{verb} {s.broken} → {s.locator} on {s.need.id} ({s.score:.2f}) in {edit.path.name}")
+            print(edit.diff, end="")
+        print(f"suggest --relink --apply: {verb} {len(applied)} locator(s)")
     return 0
 
 

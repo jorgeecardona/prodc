@@ -445,6 +445,62 @@ def proof_suggestions(
     return out
 
 
+@dataclass(frozen=True)
+class RelinkSuggestion:
+    """A candidate replacement for a BROKEN proof locator — a renamed test, relinkable (#54)."""
+
+    need: Need
+    adapter: str  # the adapter the broken locator (and the replacement) resolve through
+    broken: str  # the locator currently on the need that no longer resolves
+    locator: str  # the proposed replacement, "<adapter>:<inventory id>"
+    score: float
+
+
+def relink_suggestions(
+    results: list[NeedResult],
+    adapters: dict[str, Adapter],
+    *,
+    min_score: float,
+    top: int,
+    kind: str | None = None,
+) -> list[RelinkSuggestion]:
+    """Propose the nearest live inventory entry for each BROKEN proof locator (#54 relink).
+
+    A relink is for a locator whose adapter still exists but whose id no longer resolves — a test
+    that was renamed. So it only proposes within the *same* adapter (the kind is stable, the id
+    drifted), scoring each inventory entry by the similarity of its matchable part to the broken
+    id's matchable part, falling back to the need text. A locator whose adapter is absent entirely
+    cannot be relinked (there is no inventory to match against) and is skipped. Read-only.
+    """
+    out: list[RelinkSuggestion] = []
+    for r in results:
+        if r.state is not NeedState.BROKEN or r.need.children:
+            continue
+        for proof in r.need.proofs:
+            if _resolve_proof(proof, adapters).state is not ProofState.BROKEN:
+                continue
+            name, _, payload = proof.partition(":")
+            if kind is not None and name != kind:
+                continue
+            ad = adapters.get(name)
+            if not isinstance(ad, Inventoried):
+                continue  # adapter gone, or can't enumerate — nothing to relink against
+            scored: list[RelinkSuggestion] = []
+            for inv in ad.inventory():
+                candidate = f"{name}:{inv}"
+                if candidate in r.need.proofs:
+                    continue  # already on the need
+                score = max(
+                    similarity(_matchable(payload), _matchable(inv)),
+                    similarity(r.need.text, _matchable(inv)),
+                )
+                if score >= min_score:
+                    scored.append(RelinkSuggestion(r.need, name, proof, candidate, score))
+            scored.sort(key=lambda s: (-s.score, s.locator))
+            out.extend(scored[:top])
+    return out
+
+
 _STATE_RANK = {
     NeedState.BROKEN: 1,
     NeedState.PENDING: 2,

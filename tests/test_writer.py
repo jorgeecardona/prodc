@@ -15,6 +15,7 @@ from prodc.writer import (
     add_role,
     capture_source,
     delete_need,
+    relink_proof,
     set_field,
 )
 
@@ -301,6 +302,27 @@ def test_delete_need_dry_run_leaves_file(tmp_path: Path) -> None:
     edit = delete_need(cfg, "N-1", dry_run=True)
     assert _a_yaml(cfg) == before  # nothing written
     assert "N-1" in edit.diff and edit.diff.startswith("---")
+
+
+def test_relink_proof_swaps_locator(tmp_path: Path) -> None:
+    cfg = _proj(tmp_path, "needs:\n  - id: N-1\n    text: t\n    proofs: ['web:a#Old']\n")
+    relink_proof(cfg, "N-1", "web:a#Old", "web:a#New", dry_run=False)
+    assert load(cfg).needs[0].proofs == ("web:a#New",)
+
+
+def test_relink_proof_rejects_absent_old(tmp_path: Path) -> None:
+    cfg = _proj(tmp_path, "needs:\n  - id: N-1\n    text: t\n    proofs: ['web:a#Old']\n")
+    with pytest.raises(WriteError, match="is not a proof on 'N-1'"):
+        relink_proof(cfg, "N-1", "web:a#Missing", "web:a#New", dry_run=False)
+
+
+def test_relink_proof_dedupes_when_new_already_present(tmp_path: Path) -> None:
+    cfg = _proj(
+        tmp_path,
+        "needs:\n  - id: N-1\n    text: t\n    proofs: ['web:a#Old', 'web:a#New']\n",
+    )
+    relink_proof(cfg, "N-1", "web:a#Old", "web:a#New", dry_run=False)
+    assert load(cfg).needs[0].proofs == ("web:a#New",)  # broken dropped, no duplicate
 
 
 def test_add_draft_stamps_draft_added(tmp_path: Path) -> None:

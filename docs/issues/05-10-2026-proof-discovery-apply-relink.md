@@ -24,6 +24,15 @@ area: adapters
 
 2. **More adapter inventories** — pytest (collect node ids), files (glob the script dirs). Pytest
    needs a real collection step; files needs the configured globs. Both are cheap-ish but out of
-   this slice.
-3. **BROKEN relink** — when a locator no longer resolves (a renamed test), propose the nearest
-   inventory entry and let `--apply` relink it. Depends on #1.
+   this slice. (Still deferred — demand-driven.)
+
+## Also done (0.3.x)
+
+3. ✅ **BROKEN relink** — `prodc suggest --relink` proposes, for each BROKEN leaf need, the nearest
+   live inventory entry to replace each broken locator (`status.relink_suggestions` +
+   `RelinkSuggestion`). Scores each candidate by the similarity of its matchable part to the broken
+   id's (a renamed test: old title → new title), falling back to the need text; proposes only
+   within the *same* adapter (the kind is stable, the id drifted), and skips a locator whose
+   adapter is absent entirely (no inventory to match against). `--relink --apply` writes the best
+   per broken locator via a new `writer.relink_proof` (swap-in-place + de-dupe, one reload-gated
+   single-file splice); `--dry-run`/`--json`/`--min-score`/`--top`/`--kind` all carry over.

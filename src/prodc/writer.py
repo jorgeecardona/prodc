@@ -603,6 +603,46 @@ def add_proof(
     return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
 
 
+def relink_proof(
+    config: Config,
+    need_id: str,
+    old_locator: str,
+    new_locator: str,
+    *,
+    expect_sha: str | None = None,
+    dry_run: bool,
+) -> Edit:
+    """Replace one (broken) proof locator with a proposed one, in place — the relink of #54.
+
+    The write path for ``suggest --relink --apply``: a renamed test keeps its adapter kind but
+    gets a new id, so this swaps ``old_locator`` for ``new_locator`` on the need and de-duplicates
+    (if the replacement already sits on the need, the broken one is simply dropped). Errors if the
+    old locator is not actually on the need. One reload-gated single-file splice, like
+    :func:`add_proof`.
+    """
+    path, _ = _locate(config, need_id)
+    doc, old_text = _read_doc(path)
+    if expect_sha is not None and _sha256(old_text) != expect_sha:
+        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
+    for raw in _need_list(doc, path):
+        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
+            need = cast("dict[str, object]", raw)
+            current = need.get("proofs", [])
+            if not isinstance(current, list):
+                raise WriteError(f"{path.name}: 'proofs' is not a list")
+            proofs = list(cast("list[object]", current))
+            if old_locator not in proofs:
+                raise WriteError(f"{old_locator!r} is not a proof on {need_id!r}")
+            swapped = [new_locator if p == old_locator else p for p in proofs]
+            deduped: list[object] = []
+            for p in swapped:
+                if p not in deduped:
+                    deduped.append(p)
+            need["proofs"] = deduped
+            break
+    return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
+
+
 def add_need(
     config: Config,
     need_id: str,

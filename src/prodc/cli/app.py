@@ -434,9 +434,14 @@ def main(argv: list[str] | None = None) -> int:
         "--kind", default=None, metavar="ADAPTER", help="only suggest from this adapter name"
     )
     sg.add_argument(
+        "--relink",
+        action="store_true",
+        help="BROKEN-need mode: propose a live inventory entry to replace each broken locator (#54)",
+    )
+    sg.add_argument(
         "--apply",
         action="store_true",
-        help="write the best suggestion per need as a proof (#54); honours --min-score",
+        help="write the best suggestion per need as a proof (relink: replace the broken one) (#54)",
     )
     sg.add_argument(
         "--dry-run",

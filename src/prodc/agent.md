@@ -75,6 +75,7 @@ Read first, then act, then check.
 | attach evidence after a user said something | `prodc capture <id> --kind primary --who <person> [--role <id>] --date <ISO> --quote "…"` (`--role` records which declared role vouched for it) |
 | set or append a field | `prodc set <id> key=value` (append a list with `key+=value`, e.g. `proofs+=web:orders.feature#…`) |
 | propose / attach a proof for a HOLE | `prodc suggest <id> [--apply] [--dry-run]` |
+| relink a BROKEN proof (renamed test) | `prodc suggest --relink [<id>] [--apply] [--dry-run]` — proposes the nearest live inventory entry to replace the broken locator |
 | link a recurring want to a shared baseline | `prodc recurrence --suggest --apply --baseline-id <id> --file needs/<f>.yaml` |
 | record a human/AI review of the warrant | `prodc attest <id> --by <who> --date <ISO> [--ai]` |
 | record a human acceptance pass | `prodc accept <id> --who <person> --date <ISO>` |
