@@ -162,6 +162,33 @@ class Principle:
     sources: tuple[Source, ...] = ()  # the signals that surfaced it — provenance, not validation
 
 
+@dataclass(frozen=True)
+class Decision:
+    """How a need gets built: the solution chosen for it, and the alternatives rejected.
+
+    Not an ADR (an engineer's record) but the Opportunity-Solution-Tree node (Torres): a need is
+    the opportunity, and a decision is *the solution picked for it over the ones considered*. prodc
+    pushes solutions out of :class:`Need` (the solution-verb lint), so this is their only honest
+    home. ``text`` is the chosen solution; ``alternatives`` are what was rejected — without them a
+    decision is a memo, not a choice. ``needs`` is required (a decision with no need it serves is
+    engineering with no product reason, which the loader refuses), and ``principles`` ties the
+    choice to the vision it rests on, so revising a principle after ``decided_at`` flags the
+    decision stale — the same ripple a withdrawal gets. Like a Principle it never enters coverage,
+    the plan, or the opinion check; its lifecycle reuses the Need verbs (``draft`` = proposed,
+    ``withdrawn`` = superseded, keeping the record) rather than a status enum of its own.
+    """
+
+    id: str
+    text: str  # the chosen solution
+    needs: tuple[str, ...]  # the needs this decision serves — required, validated at load
+    alternatives: tuple[str, ...] = ()  # the options rejected — what makes it a choice, not a memo
+    consequences: str | None = None  # what the choice costs / rules out
+    principles: tuple[str, ...] = ()  # the principle(s) it rests on; revising one ripples to here
+    decided_at: str | None = None  # ISO date decided — the comparand for the principle ripple
+    draft: bool = False  # proposed, not yet committed (reuses the Need draft lifecycle)
+    withdrawn: Withdrawal | None = None  # superseded / abandoned — the record stays as its trace
+
+
 class AttestationKind(StrEnum):
     """Who reviewed the warrant — a ladder of strength, human strongest (cf. SourceKind)."""
 
@@ -375,6 +402,7 @@ class Model:
     releases: tuple[Release, ...] = ()  # in declared order = ship sequence
     roles: tuple[Role, ...] = ()  # the roles needs' `who` play (#52)
     principles: tuple[Principle, ...] = ()  # the product vision, held as given
+    decisions: tuple[Decision, ...] = ()  # the solutions chosen for needs (OST), with alternatives
     argument: tuple[ArgNode, ...] = ()  # the GSN assurance graph (#28)
 
 

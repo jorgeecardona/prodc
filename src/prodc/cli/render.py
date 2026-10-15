@@ -12,6 +12,7 @@ from collections.abc import Callable
 
 from ..board import warrant as _warrant
 from ..model import (
+    Decision,
     Goal,
     Model,
     Need,
@@ -21,7 +22,15 @@ from ..model import (
     Role,
     ears_shape,
 )
-from ..status import Handoff, PrincipleReport, Recurrence, Summary, rank, state_priority
+from ..status import (
+    Handoff,
+    PrincipleReport,
+    Recurrence,
+    Summary,
+    orphaned_decisions,
+    rank,
+    state_priority,
+)
 from .common import PortfolioTotals, RepoRow, brief_open
 
 _LABEL = {
@@ -280,7 +289,34 @@ def render_principles(reports: list[PrincipleReport]) -> str:
     return "\n".join(out)
 
 
-def render_show(r: NeedResult, importance_label: str | None = None) -> str:
+def render_decisions(decisions: list[Decision], needs: list[Need]) -> str:
+    """The solution chosen for each need (OST), what it rejected, and the needs it serves.
+
+    Shows the decisions still in force (a superseded one is off the board, its record kept). A
+    decision left serving only withdrawn/non-product needs is flagged orphaned — the 'how' lost its
+    'what'.
+    """
+    orphans = {d.id for d in orphaned_decisions(decisions, needs)}
+    active = sorted((d for d in decisions if d.withdrawn is None), key=lambda x: x.id)
+    out = ["\ndecisions (the solution chosen for a need — how it gets built):"]
+    for d in active:
+        tag = " (proposed)" if d.draft else ""
+        out.append(f"  {d.id:<6}{tag} {d.text}")
+        out.append(f"        serves: {', '.join(d.needs)}")
+        if d.alternatives:
+            out.append(f"        over: {', '.join(d.alternatives)}")
+        if d.principles:
+            out.append(f"        rests on: {', '.join(d.principles)}")
+        if d.id in orphans:
+            out.append("        ⚠ serves only withdrawn/non-product needs — re-tie or withdraw")
+    return "\n".join(out)
+
+
+def render_show(
+    r: NeedResult,
+    importance_label: str | None = None,
+    decisions: list[Decision] | None = None,
+) -> str:
     """One need as a citable answer — the artifact you drop into a thread."""
     need = r.need
     who = (need.who + (f" ({need.label})" if need.label else "")) if need.who else "(unassigned)"
@@ -349,6 +385,11 @@ def render_show(r: NeedResult, importance_label: str | None = None) -> str:
         lines += [f"    - {d}" for d in r.detail]
     elif not need.children:
         lines.append("  proofs: (none — HOLE)")
+    if decisions:
+        lines.append("  decisions (how it's built):")
+        for d in decisions:
+            alt = f"  (over {', '.join(d.alternatives)})" if d.alternatives else ""
+            lines.append(f"    - {d.id}: {d.text}{alt}")
     lines += [f"  ⚠ {w}" for w in r.warnings]
     return "\n".join(lines)
 

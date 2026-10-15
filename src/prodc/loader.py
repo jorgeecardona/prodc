@@ -22,6 +22,7 @@ from .model import (
     ArgNode,
     Attestation,
     AttestationKind,
+    Decision,
     Goal,
     Model,
     Need,
@@ -326,6 +327,39 @@ def _principle(raw: object, where: str) -> Principle:
     )
 
 
+def _decision(raw: object, where: str) -> Decision:
+    """Parse one ``decisions:`` entry — the solution chosen for a need, and what was rejected.
+
+    ``needs`` is required and must be non-empty: a decision with no need it serves is engineering
+    with no product reason, refused here rather than nagged at by a soft lint. ``withdrawn`` reuses
+    the Need withdrawal (a superseded decision keeps its record).
+    """
+    tbl = _as_mapping(raw, where)
+    needs = tuple(
+        _as_str(n, f"{where}.needs[{i}]")
+        for i, n in enumerate(_as_list(tbl.get("needs"), f"{where}.needs"))
+    )
+    if not needs:
+        raise LoaderError(f"{where}: a decision must serve at least one need (needs: [...])")
+    return Decision(
+        id=_as_str(tbl.get("id"), f"{where}.id"),
+        text=_as_str(tbl.get("text"), f"{where}.text"),
+        needs=needs,
+        alternatives=tuple(
+            _as_str(a, f"{where}.alternatives[{i}]")
+            for i, a in enumerate(_as_list(tbl.get("alternatives"), f"{where}.alternatives"))
+        ),
+        consequences=_opt_str(tbl.get("consequences"), f"{where}.consequences"),
+        principles=tuple(
+            _as_str(p, f"{where}.principles[{i}]")
+            for i, p in enumerate(_as_list(tbl.get("principles"), f"{where}.principles"))
+        ),
+        decided_at=_opt_str(tbl.get("decided_at"), f"{where}.decided_at"),
+        draft=_as_bool(tbl["draft"], f"{where}.draft") if "draft" in tbl else False,
+        withdrawn=_withdrawal(tbl.get("withdrawn"), f"{where}.withdrawn"),
+    )
+
+
 def _arg_node(raw: object, where: str) -> ArgNode:
     tbl = _as_mapping(raw, where)
     kind_name = _as_str(tbl.get("kind"), f"{where}.kind")
@@ -359,6 +393,7 @@ class _Loaded:
     releases: list[Release] = field(default_factory=list[Release])
     roles: list[Role] = field(default_factory=list[Role])
     principles: list[Principle] = field(default_factory=list[Principle])
+    decisions: list[Decision] = field(default_factory=list[Decision])
     argument: list[ArgNode] = field(default_factory=list[ArgNode])
 
 
@@ -403,6 +438,10 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
         principle = _principle(raw, f"{where}.principles[{i}]")
         _unique("principle", principle.id)
         out.principles.append(principle)
+    for i, raw in enumerate(_as_list(tbl.get("decisions"), f"{where}.decisions")):
+        decision = _decision(raw, f"{where}.decisions[{i}]")
+        _unique("decision", decision.id)
+        out.decisions.append(decision)
     for i, raw in enumerate(_as_list(tbl.get("argument"), f"{where}.argument")):
         node = _arg_node(raw, f"{where}.argument[{i}]")
         _unique("argument node", node.id)
@@ -427,6 +466,7 @@ def load(config: Config) -> Model:
         "release": {},
         "role": {},
         "principle": {},
+        "decision": {},
         "argument node": {},
     }
     for pattern in config.need_globs:
@@ -437,6 +477,7 @@ def load(config: Config) -> Model:
             acc.releases.extend(f.releases)
             acc.roles.extend(f.roles)
             acc.principles.extend(f.principles)
+            acc.decisions.extend(f.decisions)
             acc.argument.extend(f.argument)
     _check_variants(acc.needs)
     _check_children(acc.needs)
@@ -451,6 +492,7 @@ def load(config: Config) -> Model:
         {a.id for a in acc.principles},
     )
     _check_source_roles(acc.needs, acc.principles, {p.id for p in acc.roles})
+    _check_decisions(acc.decisions, {n.id for n in acc.needs}, {p.id for p in acc.principles})
     _check_argument(acc.argument)
     acc.needs = _symmetrize_contradicts(acc.needs)
     return Model(
@@ -459,6 +501,7 @@ def load(config: Config) -> Model:
         releases=tuple(acc.releases),
         roles=tuple(acc.roles),
         principles=tuple(acc.principles),
+        decisions=tuple(acc.decisions),
         argument=tuple(acc.argument),
     )
 
@@ -519,6 +562,31 @@ def _check_children(needs: list[Need]) -> None:
         for cid in need.children:
             if cid not in known:
                 raise LoaderError(f"need {need.id!r}: child {cid!r} is not a known need id")
+
+
+def _check_decisions(
+    decisions: list[Decision], known_needs: set[str], known_principles: set[str]
+) -> None:
+    """Every ``needs`` / ``principles`` id on a decision must name a known need / principle.
+
+    ``needs`` is already guaranteed non-empty by :func:`_decision`; here each id is checked to
+    exist, the same hard-error treatment the other cross-references get. A superseded decision's
+    ``withdrawn.principle`` is checked too, so a stale citation cannot hide on a retired record.
+    """
+    for d in decisions:
+        for nid in d.needs:
+            if nid not in known_needs:
+                raise LoaderError(f"decision {d.id!r}: needs {nid!r} is not a known need id")
+        for pid in d.principles:
+            if pid not in known_principles:
+                raise LoaderError(
+                    f"decision {d.id!r}: principle {pid!r} is not a known principle id"
+                )
+        if d.withdrawn and d.withdrawn.principle and d.withdrawn.principle not in known_principles:
+            raise LoaderError(
+                f"decision {d.id!r}: withdrawn principle {d.withdrawn.principle!r} "
+                "is not a known principle id"
+            )
 
 
 def _check_contradicts(needs: list[Need]) -> None:

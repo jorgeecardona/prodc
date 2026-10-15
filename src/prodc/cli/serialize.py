@@ -12,9 +12,33 @@ import json
 from ..board import need_payload
 from ..board import warrant as _warrant
 from ..dedup import DupPair, VariantGroup
-from ..model import Goal, Model, NeedResult, NeedState, Release, Role
+from ..model import Decision, Goal, Model, NeedResult, NeedState, Release, Role
 from ..status import Handoff, PrincipleReport, Recurrence, Summary, rank
 from .common import brief_open
+
+
+def _decision_payload(d: Decision) -> dict[str, object]:
+    """One decision as a JSON record — the OST chosen-solution node and its edges."""
+    return {
+        "id": d.id,
+        "text": d.text,
+        "needs": list(d.needs),
+        "alternatives": list(d.alternatives),
+        "consequences": d.consequences,
+        "principles": list(d.principles),
+        "decided_at": d.decided_at,
+        "draft": d.draft,
+        "withdrawn": (
+            {
+                "reason": d.withdrawn.reason,
+                "date": d.withdrawn.date,
+                "kind": d.withdrawn.kind.value,
+                "principle": d.withdrawn.principle,
+            }
+            if d.withdrawn
+            else None
+        ),
+    }
 
 
 def _summary_payload(summary: Summary, orphan_map: dict[str, list[str]]) -> dict[str, object]:
@@ -44,6 +68,7 @@ def to_json(
     unroled: list[NeedResult],
     hos: list[Handoff],
     principles: list[PrincipleReport] | None = None,
+    decisions: list[Decision] | None = None,
 ) -> str:
     payload = {
         "summary": _summary_payload(summary, orphan_map),
@@ -111,17 +136,19 @@ def to_json(
             }
             for rep in (principles or [])
         ],
+        "decisions": [_decision_payload(d) for d in (decisions or [])],
         "needs": [need_payload(r) for r in results],
     }
     return json.dumps(payload, indent=2)
 
 
-def show_json(r: NeedResult) -> str:
+def show_json(r: NeedResult, decisions: list[Decision] | None = None) -> str:
     need = r.need
     payload = need_payload(r)  # the shared core — never drifts from the board
     payload.update(
         {
             "label": need.label,
+            "decisions": [_decision_payload(d) for d in (decisions or [])],
             "sources": [
                 {
                     "kind": s.kind.value,

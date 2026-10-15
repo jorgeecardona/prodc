@@ -167,12 +167,12 @@ def main(argv: list[str] | None = None) -> int:
 
     ad = sub.add_parser(
         "add",
-        help="create a new agent-authored need, or declare a role or a principle (writes YAML)",
+        help="create a need, or declare a role, a principle, or a decision (writes YAML)",
     )
-    ad.add_argument("noun", choices=["need", "role", "principle"], help="what to add")
+    ad.add_argument("noun", choices=["need", "role", "principle", "decision"], help="what to add")
     ad.add_argument(
         "need_id",
-        help="the new need's id (or role id for `add role`, principle id for `add principle`), e.g. N-9",
+        help="the new item's id — need (N-9), role, principle (P-1), or decision (D-1)",
     )
     ad.add_argument(
         "--text",
@@ -186,6 +186,39 @@ def main(argv: list[str] | None = None) -> int:
         metavar="ID",
         help="principle only: promote a need into a principle — copy its text (unless --text "
         "overrides) and its sources as the provenance that surfaced it; the need stays on the board",
+    )
+    ad.add_argument(
+        "--needs",
+        default=None,
+        metavar="IDS",
+        help="decision only: comma-separated ids of the needs this decision serves (required; "
+        "validated at load)",
+    )
+    ad.add_argument(
+        "--alternative",
+        action="append",
+        default=None,
+        dest="alternatives",
+        metavar="TEXT",
+        help="decision only: an option that was rejected (repeatable) — what makes it a choice",
+    )
+    ad.add_argument(
+        "--consequences",
+        default=None,
+        help="decision only: what the chosen solution costs / rules out",
+    )
+    ad.add_argument(
+        "--principles",
+        default=None,
+        metavar="IDS",
+        help="decision only: comma-separated principle ids the decision rests on (validated); "
+        "revising one flags the decision stale",
+    )
+    ad.add_argument(
+        "--date",
+        default=None,
+        metavar="ISO",
+        help="decision only: when it was decided (default: today) — the comparand for the ripple",
     )
     ad.add_argument(
         "--who",

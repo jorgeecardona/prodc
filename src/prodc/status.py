@@ -19,6 +19,7 @@ from .model import (
     ArgKind,
     ArgNode,
     AttestationKind,
+    Decision,
     Goal,
     Need,
     NeedResult,
@@ -676,6 +677,55 @@ def principle_report(needs: list[Need], principles: list[Principle]) -> list[Pri
             if n.withdrawn is not None and _decided_before(n.withdrawn.date, a.revised_at)
         ]
         out.append(PrincipleReport(a, tuple(declined), tuple(stale)))
+    return out
+
+
+def active_decisions(decisions: list[Decision]) -> list[Decision]:
+    """The decisions still in force — neither superseded (``withdrawn``) nor a staged ``draft``."""
+    return [d for d in decisions if d.withdrawn is None and not d.draft]
+
+
+def decisions_for(need_id: str, decisions: list[Decision]) -> list[Decision]:
+    """The in-force decisions whose chosen solution serves ``need_id`` — the 'how' behind a need."""
+    return [d for d in active_decisions(decisions) if need_id in d.needs]
+
+
+def stale_decisions(
+    decisions: list[Decision], principles: list[Principle]
+) -> list[tuple[Decision, str]]:
+    """Each in-force decision paired with a principle it cites that was revised after it was decided.
+
+    The same ripple a withdrawal gets (:func:`principle_report`), the other way round: a solution
+    chosen under an older statement of a principle comes back up when the principle moves. Reuses
+    :func:`_decided_before`; an undated decision or principle never counts (nothing to compare).
+    """
+    revised = {p.id: p.revised_at for p in principles}
+    out: list[tuple[Decision, str]] = []
+    for d in active_decisions(decisions):
+        for pid in d.principles:
+            if pid in revised and _decided_before(d.decided_at or "", revised[pid]):
+                out.append((d, pid))
+    return out
+
+
+def orphaned_decisions(decisions: list[Decision], needs: list[Need]) -> list[Decision]:
+    """In-force decisions whose every served need is withdrawn or non-product — the real orphan.
+
+    A decision must name a need at load, but that need can later be withdrawn (``out_of_scope``) or
+    marked non-product. A decision left serving only such needs is engineering with no live product
+    reason — re-tie it to a live need, or withdraw it. (A need not in ``needs`` at all is a load
+    error, never reached here.)
+    """
+    by_id = {n.id: n for n in needs}
+    out: list[Decision] = []
+    for d in active_decisions(decisions):
+        live = [
+            nid
+            for nid in d.needs
+            if (n := by_id.get(nid)) is not None and not n.is_withdrawn and n.product
+        ]
+        if not live:
+            out.append(d)
     return out
 
 

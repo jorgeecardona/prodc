@@ -858,6 +858,57 @@ def revise_principle(
     return _validated(config, path, old_text, new_text, dry_run)
 
 
+def add_decision(
+    config: Config,
+    decision_id: str,
+    text: str,
+    *,
+    file: str,
+    needs: tuple[str, ...],
+    decided_at: str,
+    alternatives: tuple[str, ...] = (),
+    consequences: str | None = None,
+    principles: tuple[str, ...] = (),
+    draft: bool = False,
+    expect_sha: str | None = None,
+    dry_run: bool,
+) -> Edit:
+    """Declare a new Decision (the solution chosen for ``needs``) in ``file``'s ``decisions:`` list.
+
+    Mirrors :func:`add_principle` (whole-file re-dump, reload-gated, duplicate id refused). ``needs``
+    is required — the loader rejects a decision that serves none, and the reload gate rejects an id
+    that is not a known need. Empty optional lists are omitted so the written block stays clean.
+    """
+    target = config.root / file
+    if target.exists():
+        doc, old_text = _read_doc(target)
+    else:
+        doc, old_text = {}, ""
+    if expect_sha is not None and _sha256(old_text) != expect_sha:
+        raise WriteError(f"{target.name} changed since it was read (optimistic lock)")
+    raw = doc.setdefault("decisions", [])
+    if not isinstance(raw, list):
+        raise WriteError(f"{target.name}: 'decisions' is not a list")
+    decisions = cast("list[object]", raw)
+    if any(
+        isinstance(d, dict) and cast("dict[str, object]", d).get("id") == decision_id
+        for d in decisions
+    ):
+        raise WriteError(f"decision {decision_id!r} already exists in {target.name}")
+    entry: dict[str, object] = {"id": decision_id, "text": text, "needs": list(needs)}
+    if alternatives:
+        entry["alternatives"] = list(alternatives)
+    if consequences is not None:
+        entry["consequences"] = consequences
+    if principles:
+        entry["principles"] = list(principles)
+    entry["decided_at"] = decided_at
+    if draft:
+        entry["draft"] = True
+    decisions.append(entry)
+    return _validated(config, target, old_text, _dump(doc), dry_run)
+
+
 def _snapshot(paths: list[Path]) -> dict[Path, str | None]:
     """Current text of each path, or None when it does not exist — a point to roll back to."""
     return {p: (p.read_text(encoding="utf-8") if p.exists() else None) for p in paths}

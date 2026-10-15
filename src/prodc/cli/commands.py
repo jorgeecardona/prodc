@@ -37,19 +37,23 @@ from ..status import (
     applicable_needs,
     argument_defects,
     contradictions,
+    decisions_for,
     evidence_age_days,
     importance_revisit_due,
+    orphaned_decisions,
     principle_report,
     proof_suggestions,
     recurrence,
     relink_suggestions,
     resolve,
+    stale_decisions,
     summarize,
 )
 from ..writer import (
     Edit,
     WriteError,
     accept,
+    add_decision,
     add_need,
     add_principle,
     add_proof,
@@ -81,6 +85,7 @@ from .render import (
     render_argument,
     render_brief,
     render_columns,
+    render_decisions,
     render_goals,
     render_handoffs,
     render_orphans,
@@ -263,6 +268,24 @@ def cmd_lint(args: argparse.Namespace) -> int:
     warnings = [
         (r.need.id, w) for r in sorted(results, key=lambda x: x.need.id) for w in r.warnings
     ]
+    # Decision drift (keyed by the decision id, not a need): a decision left serving only
+    # withdrawn/non-product needs is engineering with no live product reason; a decision decided
+    # under a principle that was revised later comes back up (the same ripple a withdrawal gets).
+    decisions = list(model.decisions)
+    for d in orphaned_decisions(decisions, needs):
+        warnings.append(
+            (
+                d.id,
+                "decision serves only withdrawn/non-product needs — re-tie it to a live need or withdraw it",
+            )
+        )
+    for d, pid in stale_decisions(decisions, list(model.principles)):
+        warnings.append(
+            (
+                d.id,
+                f"decided {d.decided_at} under principle {pid}, revised later — re-review this solution",
+            )
+        )
     if args.json:
         print(
             json.dumps(
@@ -346,6 +369,7 @@ def cmd_status(args: argparse.Namespace) -> int:
                 unroled,
                 hos,
                 principles=board.principles,
+                decisions=list(model.decisions),
             )
         )
     else:
@@ -380,6 +404,8 @@ def cmd_status(args: argparse.Namespace) -> int:
             print(render_recurrence(recs))
         if model.principles:
             print(render_principles(board.principles))
+        if model.decisions:
+            print(render_decisions(list(model.decisions), needs=list(model.needs)))
         if orphan_map:
             print(render_orphans(orphan_map))
 
@@ -397,7 +423,12 @@ def cmd_show(args: argparse.Namespace) -> int:
     if r is None:
         print(f"prodc: no need '{args.need_id}'", file=sys.stderr)
         return 2
-    print(show_json(r) if args.json else render_show(r, cfg.importance_label(r.need.importance)))
+    decisions = decisions_for(args.need_id, list(model.decisions))  # the 'how' behind this need
+    print(
+        show_json(r, decisions=decisions)
+        if args.json
+        else render_show(r, cfg.importance_label(r.need.importance), decisions=decisions)
+    )
     return 0
 
 
@@ -539,6 +570,38 @@ def cmd_add(args: argparse.Namespace) -> int:
                 file=args.file,
                 revised_at=date.today().isoformat(),
                 sources=sources,
+                expect_sha=args.expect_sha,
+                dry_run=args.dry_run,
+            )
+        except (ConfigError, LoaderError, WriteError) as exc:
+            print(f"prodc: {exc}", file=sys.stderr)
+            return 2
+        return emit_edit(edit, args.dry_run, args.json)
+    if args.noun == "decision":
+        if args.text is None:
+            print("prodc: add decision requires --text (the chosen solution)", file=sys.stderr)
+            return 2
+        needs = tuple(n.strip() for n in (args.needs or "").split(",") if n.strip())
+        if not needs:
+            print(
+                "prodc: add decision requires --needs (the need(s) the solution serves)",
+                file=sys.stderr,
+            )
+            return 2
+        principles = tuple(p.strip() for p in (args.principles or "").split(",") if p.strip())
+        try:
+            cfg = Config.load(cfg_path)
+            edit = add_decision(
+                cfg,
+                args.need_id,
+                args.text,
+                file=args.file,
+                needs=needs,
+                decided_at=args.date or date.today().isoformat(),
+                alternatives=tuple(args.alternatives or ()),
+                consequences=args.consequences,
+                principles=principles,
+                draft=args.draft,
                 expect_sha=args.expect_sha,
                 dry_run=args.dry_run,
             )
