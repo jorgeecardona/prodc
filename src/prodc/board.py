@@ -28,6 +28,7 @@ from .model import (
 )
 from .status import (
     Handoff,
+    PrincipleReport,
     Recurrence,
     Summary,
     evidence_age_days,
@@ -36,6 +37,7 @@ from .status import (
     handoffs,
     last_observed,
     orphans,
+    principle_report,
     recurrence,
     release_report,
     resolve,
@@ -106,6 +108,7 @@ def need_payload(r: NeedResult, *, flavor: Literal["board", "html"] = "board") -
                     "reason": need.withdrawn.reason,
                     "date": need.withdrawn.date,
                     "kind": need.withdrawn.kind.value,
+                    "principle": need.withdrawn.principle,
                 }
                 if need.withdrawn
                 else None
@@ -158,6 +161,7 @@ def need_payload(r: NeedResult, *, flavor: Literal["board", "html"] = "board") -
                 "reason": need.withdrawn.reason,
                 "date": need.withdrawn.date,
                 "kind": need.withdrawn.kind.value,
+                "principle": need.withdrawn.principle,
             }
             if need.withdrawn
             else None
@@ -202,6 +206,7 @@ class ResolvedBoard:
     handoffs: list[Handoff]
     recurrence: list[Recurrence]
     orphans: dict[str, list[str]]
+    principles: list[PrincipleReport]  # over the whole model — declined needs are off the board
 
 
 def gather(
@@ -218,7 +223,8 @@ def gather(
     appends the cross-need board warnings (#44/#45) to the results, as ``prodc status`` does —
     the markdown/HTML reports leave it off, exactly as they did before this was factored out.
     The declared goals/releases/roles come from ``model``; the recurrence/handoffs/orphans views
-    are computed over the resolved ``needs``.
+    are computed over the resolved ``needs``. The principle report reads the whole ``model.needs``:
+    the needs declined under a principle are withdrawn, so the filtered ``needs`` never holds them.
     """
     use_needs = list(model.needs) if needs is None else needs
     results = resolve(use_needs, cfg.adapters, cfg.source_adapters)
@@ -239,4 +245,5 @@ def gather(
         handoffs=handoffs(use_needs),
         recurrence=recurrence(use_needs),
         orphans=orphans(use_needs, cfg.adapters),
+        principles=principle_report(list(model.needs), list(model.principles)),
     )

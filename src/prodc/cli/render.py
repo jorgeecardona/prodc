@@ -21,7 +21,7 @@ from ..model import (
     Role,
     ears_shape,
 )
-from ..status import Handoff, Recurrence, Summary, rank, state_priority
+from ..status import Handoff, PrincipleReport, Recurrence, Summary, rank, state_priority
 from .common import PortfolioTotals, RepoRow, brief_open
 
 _LABEL = {
@@ -261,6 +261,25 @@ def render_recurrence(recs: list[Recurrence]) -> str:
     return "\n".join(out)
 
 
+def render_principles(reports: list[PrincipleReport]) -> str:
+    """The product vision as principles, with the decisions resting on each and which have gone stale.
+
+    An principle is held as given, not validated; ``declined`` are the needs withdrawn citing it, and
+    ``stale`` (the ripple) are those decided before its latest ``revised_at`` — flagged to re-review.
+    """
+    out = ["\nprinciples (the product vision — held as given):"]
+    for rep in reports:
+        a = rep.principle
+        rev = f"revised {a.revised_at}" if a.revised_at else "undated"
+        out.append(f"  {a.id:<6} {rev}  {a.text}")
+        if rep.declined:
+            out.append(f"        declined: {', '.join(n.id for n in rep.declined)}")
+        if rep.stale:
+            ids = ", ".join(n.id for n in rep.stale)
+            out.append(f"        ⚠ decided before the latest revision: {ids} — re-review")
+    return "\n".join(out)
+
+
 def render_show(r: NeedResult, importance_label: str | None = None) -> str:
     """One need as a citable answer — the artifact you drop into a thread."""
     need = r.need
@@ -278,7 +297,8 @@ def render_show(r: NeedResult, importance_label: str | None = None) -> str:
     if need.withdrawn:
         w = need.withdrawn
         tag = "" if w.kind.value == "wont_do" else f" [{w.kind.value}]"
-        lines.append(f"  withdrawn{tag}: {w.reason} ({w.date})")
+        per = f" per {w.principle}" if w.principle else ""
+        lines.append(f"  withdrawn{tag}{per}: {w.reason} ({w.date})")
     if need.description:
         lines.append(f"  description: {need.description}")
     if need.importance is not None:

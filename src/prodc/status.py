@@ -23,6 +23,7 @@ from .model import (
     Need,
     NeedResult,
     NeedState,
+    Principle,
     ProofState,
     Release,
     Role,
@@ -629,6 +630,53 @@ def role_report(
             unroled.append(r)
     coverage = [(p, summarize(by_role[p.id])) for p in roles]
     return coverage, unroled
+
+
+@dataclass(frozen=True)
+class PrincipleReport:
+    """One principle and the decisions that rest on it — the ripple, made visible."""
+
+    principle: Principle
+    declined: tuple[Need, ...]  # needs withdrawn citing this principle
+    stale: tuple[Need, ...]  # of those, decided before the principle's latest revision — re-review
+
+
+def _decided_before(decided: str, revised: str | None) -> bool:
+    """True when a decision dated ``decided`` predates a principle revised on ``revised``.
+
+    Both are ISO dates. An undated principle, or a malformed date on either side, is never stale —
+    there is no revision to compare against, and the loader does not own date format here.
+    """
+    if revised is None:
+        return False
+    try:
+        return date.fromisoformat(decided) < date.fromisoformat(revised)
+    except ValueError:
+        return False
+
+
+def principle_report(needs: list[Need], principles: list[Principle]) -> list[PrincipleReport]:
+    """Each declared principle with the needs withdrawn under it, and which of those are stale.
+
+    Reads the *whole* need list, withdrawn needs included — a declined need is off the board, so
+    the board-filtered list would hide exactly what this reports. A decision is stale when the
+    withdrawal is dated before the principle's ``revised_at``: the frame it was judged against has
+    changed since, so it comes back up for re-review. Records-only — prodc flags, the PM re-decides.
+    """
+    by_principle: dict[str, list[Need]] = {a.id: [] for a in principles}
+    for n in needs:
+        if n.withdrawn is not None and n.withdrawn.principle in by_principle:
+            by_principle[n.withdrawn.principle].append(n)
+    out: list[PrincipleReport] = []
+    for a in principles:
+        declined = sorted(by_principle[a.id], key=lambda n: n.id)
+        stale = [
+            n
+            for n in declined
+            if n.withdrawn is not None and _decided_before(n.withdrawn.date, a.revised_at)
+        ]
+        out.append(PrincipleReport(a, tuple(declined), tuple(stale)))
+    return out
 
 
 @dataclass(frozen=True)

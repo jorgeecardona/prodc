@@ -29,6 +29,7 @@ from .commands import (
     cmd_reinstate,
     cmd_report,
     cmd_review,
+    cmd_revise,
     cmd_set,
     cmd_show,
     cmd_status,
@@ -165,11 +166,15 @@ def main(argv: list[str] | None = None) -> int:
     st2.set_defaults(func=cmd_set)
 
     ad = sub.add_parser(
-        "add", help="create a new agent-authored need, or declare a role (writes YAML)"
+        "add",
+        help="create a new agent-authored need, or declare a role or a principle (writes YAML)",
     )
-    ad.add_argument("noun", choices=["need", "role"], help="what to add (need or role)")
-    ad.add_argument("need_id", help="the new need's id (or role id for `add role`), e.g. N-9")
-    ad.add_argument("--text", required=True, help="the need text (or the role description)")
+    ad.add_argument("noun", choices=["need", "role", "principle"], help="what to add")
+    ad.add_argument(
+        "need_id",
+        help="the new need's id (or role id for `add role`, principle id for `add principle`), e.g. N-9",
+    )
+    ad.add_argument("--text", required=True, help="the need text (or the role / principle text)")
     ad.add_argument(
         "--who",
         default=None,
@@ -315,6 +320,13 @@ def main(argv: list[str] | None = None) -> int:
         "or duplicate (#74)",
     )
     wd.add_argument("--date", default=None, help="when (ISO, e.g. 2026-10-10; default: today)")
+    wd.add_argument(
+        "--principle",
+        default=None,
+        metavar="ID",
+        help="the product principle this decision rests on (validated against principles:) — revising it "
+        "later flags this decision for re-review",
+    )
     wd.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     wd.add_argument("--json", action="store_true", help="machine-readable output")
     wd.add_argument(
@@ -344,6 +356,32 @@ def main(argv: list[str] | None = None) -> int:
         help="refuse if the file's content hash differs (optimistic lock)",
     )
     ri.set_defaults(func=cmd_reinstate)
+
+    rvz = sub.add_parser(
+        "revise", help="revise a product principle in place — new text and/or a fresh revised_at"
+    )
+    rvz.add_argument("noun", choices=["principle"], help="what to revise (principle)")
+    rvz.add_argument("principle_id", help="the principle id to revise, e.g. P-1")
+    rvz.add_argument(
+        "--text", default=None, help="new principle text (optional; omit to only re-date it)"
+    )
+    rvz.add_argument(
+        "--date",
+        default=None,
+        help="the new revised_at (ISO, e.g. 2026-10-15; default: today) — fires the ripple",
+    )
+    rvz.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    rvz.add_argument("--json", action="store_true", help="machine-readable output")
+    rvz.add_argument(
+        "--dry-run", action="store_true", help="validate and show the diff, don't write"
+    )
+    rvz.add_argument(
+        "--expect-sha",
+        default=None,
+        metavar="SHA256",
+        help="refuse if the file's content hash differs (optimistic lock)",
+    )
+    rvz.set_defaults(func=cmd_revise)
 
     rv = sub.add_parser(
         "review", help="triage staged drafts: list them, or --promote / --drop a batch (#60)"

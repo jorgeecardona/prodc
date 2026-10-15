@@ -13,7 +13,7 @@ from ..board import need_payload
 from ..board import warrant as _warrant
 from ..dedup import DupPair, VariantGroup
 from ..model import Goal, Model, NeedResult, NeedState, Release, Role
-from ..status import Handoff, Recurrence, Summary, rank
+from ..status import Handoff, PrincipleReport, Recurrence, Summary, rank
 from .common import brief_open
 
 
@@ -43,6 +43,7 @@ def to_json(
     role_cov: list[tuple[Role, Summary]],
     unroled: list[NeedResult],
     hos: list[Handoff],
+    principles: list[PrincipleReport] | None = None,
 ) -> str:
     payload = {
         "summary": _summary_payload(summary, orphan_map),
@@ -100,6 +101,16 @@ def to_json(
             for goal, gsum in goal_cov
         ],
         "ungoaled": [r.need.id for r in ungoaled],
+        "principles": [
+            {
+                "id": rep.principle.id,
+                "text": rep.principle.text,
+                "revised_at": rep.principle.revised_at,
+                "declined": [n.id for n in rep.declined],
+                "stale": [n.id for n in rep.stale],
+            }
+            for rep in (principles or [])
+        ],
         "needs": [need_payload(r) for r in results],
     }
     return json.dumps(payload, indent=2)

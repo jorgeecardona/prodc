@@ -25,6 +25,7 @@ from .model import (
     Goal,
     Model,
     Need,
+    Principle,
     Release,
     Role,
     Source,
@@ -131,12 +132,13 @@ def _answer(raw: object, where: str) -> Answer | None:
 
 
 def _withdrawal(raw: object, where: str) -> Withdrawal | None:
-    """Parse ``withdrawn: {reason, date, kind?}`` into a :class:`Withdrawal` (#74).
+    """Parse ``withdrawn: {reason, date, kind?, principle?}`` into a :class:`Withdrawal` (#74).
 
     ``reason`` and ``date`` are required when the key is present — a decision against a need must
     say why and when, the same way an attestation needs who and when. ``kind`` is optional and
     defaults to ``wont_do``; it is validated with the same ``Enum(name) except ValueError`` pattern
-    as ``SourceKind``, so an unknown kind is a :class:`LoaderError` the author owns.
+    as ``SourceKind``, so an unknown kind is a :class:`LoaderError` the author owns. ``principle`` is
+    an optional Principle id, checked against the declared principles once every file is loaded.
     """
     if raw is None:
         return None
@@ -153,7 +155,8 @@ def _withdrawal(raw: object, where: str) -> Withdrawal | None:
         raise LoaderError(
             f"{where}.kind: unknown withdrawal kind {kind_name!r} ({kinds})"
         ) from None
-    return Withdrawal(reason=reason, date=date, kind=kind)
+    principle = _opt_str(tbl.get("principle"), f"{where}.principle")
+    return Withdrawal(reason=reason, date=date, kind=kind, principle=principle)
 
 
 # Old source-kind names (pre-0.3.58) mapped to the primary/secondary/assumption ladder, so
@@ -304,6 +307,20 @@ def _role(raw: object, where: str) -> Role:
     )
 
 
+def _principle(raw: object, where: str) -> Principle:
+    """Parse one ``principles:`` entry — a product commitment with its provenance."""
+    tbl = _as_mapping(raw, where)
+    return Principle(
+        id=_as_str(tbl.get("id"), f"{where}.id"),
+        text=_as_str(tbl.get("text"), f"{where}.text"),
+        revised_at=_opt_str(tbl.get("revised_at"), f"{where}.revised_at"),
+        sources=tuple(
+            _source(s, f"{where}.sources[{i}]")
+            for i, s in enumerate(_as_list(tbl.get("sources"), f"{where}.sources"))
+        ),
+    )
+
+
 def _arg_node(raw: object, where: str) -> ArgNode:
     tbl = _as_mapping(raw, where)
     kind_name = _as_str(tbl.get("kind"), f"{where}.kind")
@@ -336,11 +353,12 @@ class _Loaded:
     goals: list[Goal] = field(default_factory=list[Goal])
     releases: list[Release] = field(default_factory=list[Release])
     roles: list[Role] = field(default_factory=list[Role])
+    principles: list[Principle] = field(default_factory=list[Principle])
     argument: list[ArgNode] = field(default_factory=list[ArgNode])
 
 
 def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
-    """Parse one prodc file for every noun list it carries (``needs:``/``goals:``/``releases:``)."""
+    """Parse one prodc file for every noun list it carries (``needs:``/``goals:``/``principles:``/…)."""
     where = path.name
     try:
         doc = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -376,6 +394,10 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
         role = _role(raw, f"{where}.roles[{i}]")
         _unique("role", role.id)
         out.roles.append(role)
+    for i, raw in enumerate(_as_list(tbl.get("principles"), f"{where}.principles")):
+        principle = _principle(raw, f"{where}.principles[{i}]")
+        _unique("principle", principle.id)
+        out.principles.append(principle)
     for i, raw in enumerate(_as_list(tbl.get("argument"), f"{where}.argument")):
         node = _arg_node(raw, f"{where}.argument[{i}]")
         _unique("argument node", node.id)
@@ -387,10 +409,11 @@ def load(config: Config) -> Model:
     """Read every prodc file once into a :class:`~prodc.model.Model`, then validate cross-refs.
 
     One loader for every noun: ids are unique within their kind, and each string reference
-    (``variant_of``, ``children``, ``goal``, ``release``, ``role``) is checked here as a hard
-    error — a dangling reference to something declared in these files is a typo you own, not a
-    runtime unknown. ``role`` is checked unconditionally like ``goal``/``release``: it is a new
-    field, so (unlike free-text ``who``) there is no migration reason to make it lax.
+    (``variant_of``, ``children``, ``goal``, ``release``, ``role``, a withdrawal's ``principle``) is
+    checked here as a hard error — a dangling reference to something declared in these files is a
+    typo you own, not a runtime unknown. ``role`` is checked unconditionally like
+    ``goal``/``release``: it is a new field, so (unlike free-text ``who``) there is no migration
+    reason to make it lax.
     """
     acc = _Loaded()
     seen: dict[str, dict[str, Path]] = {
@@ -398,6 +421,7 @@ def load(config: Config) -> Model:
         "goal": {},
         "release": {},
         "role": {},
+        "principle": {},
         "argument node": {},
     }
     for pattern in config.need_globs:
@@ -407,19 +431,27 @@ def load(config: Config) -> Model:
             acc.goals.extend(f.goals)
             acc.releases.extend(f.releases)
             acc.roles.extend(f.roles)
+            acc.principles.extend(f.principles)
             acc.argument.extend(f.argument)
     _check_variants(acc.needs)
     _check_children(acc.needs)
     _check_ref(acc.needs, "goal", lambda n: n.goal, {g.id for g in acc.goals})
     _check_ref(acc.needs, "release", lambda n: n.release, {r.id for r in acc.releases})
     _check_ref(acc.needs, "role", lambda n: n.role, {p.id for p in acc.roles})
-    _check_source_roles(acc.needs, {p.id for p in acc.roles})
+    _check_ref(
+        acc.needs,
+        "principle",
+        lambda n: n.withdrawn.principle if n.withdrawn else None,
+        {a.id for a in acc.principles},
+    )
+    _check_source_roles(acc.needs, acc.principles, {p.id for p in acc.roles})
     _check_argument(acc.argument)
     return Model(
         needs=tuple(acc.needs),
         goals=tuple(acc.goals),
         releases=tuple(acc.releases),
         roles=tuple(acc.roles),
+        principles=tuple(acc.principles),
         argument=tuple(acc.argument),
     )
 
@@ -439,18 +471,21 @@ def _check_ref(
             raise LoaderError(f"need {need.id!r}: {role} {ref!r} is not a known {role} id")
 
 
-def _check_source_roles(needs: list[Need], known: set[str]) -> None:
+def _check_source_roles(needs: list[Need], principles: list[Principle], known: set[str]) -> None:
     """Every ``source.role`` that is set must name a declared role id (like ``need.role``, #52).
 
-    Validated unconditionally: ``role`` is a new, opt-in field, so there is no migration reason to
-    be lax — a dangling role on a source is a typo the author owns, surfaced at load, not a silent
-    unknown that only shows as missing provenance later.
+    Validated unconditionally, on a need's sources and a principle's alike: ``role`` is a new, opt-in
+    field, so there is no migration reason to be lax — a dangling role on a source is a typo the
+    author owns, surfaced at load, not a silent unknown that only shows as missing provenance later.
     """
-    for need in needs:
-        for i, s in enumerate(need.sources):
+    owners = [("need", n.id, n.sources) for n in needs] + [
+        ("principle", a.id, a.sources) for a in principles
+    ]
+    for noun, oid, sources in owners:
+        for i, s in enumerate(sources):
             if s.role is not None and s.role not in known:
                 raise LoaderError(
-                    f"need {need.id!r}: source[{i}] role {s.role!r} is not a known role id"
+                    f"{noun} {oid!r}: source[{i}] role {s.role!r} is not a known role id"
                 )
 
 

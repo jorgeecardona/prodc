@@ -139,6 +139,29 @@ class Role:
     text: str
 
 
+@dataclass(frozen=True)
+class Principle:
+    """A founding product commitment — the vision, held as given rather than validated.
+
+    In the logic-system reading prodc already uses (a need is a proposition, a proof its
+    answer-with-evidence, an ``assumption`` a conjecture taken on faith *to be tested*), a principle
+    differs in intent: it is a chosen frame the product is built on, not a bet pending validation.
+    It is what decides between clients who want opposite things — a need that contradicts it is
+    withdrawn ``out_of_scope`` citing it (:attr:`Withdrawal.principle`).
+
+    Principles are discovered, not decreed: ``sources`` keeps the signals that surfaced one (often a
+    client), and ``revised_at`` dates its latest statement. A decision taken under an older version
+    of the principle is flagged for re-review when the principle is revised — the ripple. A separate noun
+    (like :class:`Role`), not a Need marker: a principle is a stance, not what a person wants, so it
+    never enters coverage, the plan, or the opinion check.
+    """
+
+    id: str
+    text: str
+    revised_at: str | None = None  # ISO date the principle was last stated or revised
+    sources: tuple[Source, ...] = ()  # the signals that surfaced it — provenance, not validation
+
+
 class AttestationKind(StrEnum):
     """Who reviewed the warrant — a ladder of strength, human strongest (cf. SourceKind)."""
 
@@ -185,11 +208,14 @@ class Withdrawal:
     Unlike a draft (staged, not yet decided), a withdrawal is a decision *against*: the need is
     taken off the active board and out of coverage, with its ``reason``, ``date`` and ``kind`` kept
     on the record as the durable trace (``prodc show`` still renders it). Reinstate to put it back.
+    ``principle`` names the :class:`Principle` the decision rests on (typically for ``out_of_scope``), so a
+    later revision of that principle can flag this decision for re-review.
     """
 
     reason: str
     date: str
     kind: WithdrawalKind = WithdrawalKind.WONT_DO
+    principle: str | None = None  # id of the Principle this decision rests on
 
 
 @dataclass(frozen=True)
@@ -345,6 +371,7 @@ class Model:
     goals: tuple[Goal, ...] = ()
     releases: tuple[Release, ...] = ()  # in declared order = ship sequence
     roles: tuple[Role, ...] = ()  # the roles needs' `who` play (#52)
+    principles: tuple[Principle, ...] = ()  # the product vision, held as given
     argument: tuple[ArgNode, ...] = ()  # the GSN assurance graph (#28)
 
 

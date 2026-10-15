@@ -38,6 +38,7 @@ from ..status import (
     argument_defects,
     evidence_age_days,
     importance_revisit_due,
+    principle_report,
     proof_suggestions,
     recurrence,
     relink_suggestions,
@@ -49,6 +50,7 @@ from ..writer import (
     WriteError,
     accept,
     add_need,
+    add_principle,
     add_proof,
     add_role,
     attest,
@@ -57,6 +59,7 @@ from ..writer import (
     link_variant_group,
     reinstate,
     relink_proof,
+    revise_principle,
     set_field,
     set_importance,
     withdraw,
@@ -83,6 +86,7 @@ from .render import (
     render_out_of_scope,
     render_plan,
     render_portfolio,
+    render_principles,
     render_recurrence,
     render_releases,
     render_roles,
@@ -232,6 +236,16 @@ def cmd_lint(args: argparse.Namespace) -> int:
     _annotate_importance_warnings(results, cfg)
     _annotate_draft_age_warnings(results, cfg)
     _annotate_label_deprecation(results)
+    # The principle ripple: a need withdrawn citing a principle that was revised *after* the decision
+    # comes back up — the frame it was judged against has changed since. A warning, never a hard
+    # error; prodc flags, the PM re-decides.
+    for rep in principle_report(needs, list(model.principles)):
+        for n in rep.stale:
+            if n.id in by_id and n.withdrawn is not None:
+                by_id[n.id].warnings.append(
+                    f"withdrawn per principle {rep.principle.id} on {n.withdrawn.date}, but "
+                    f"{rep.principle.id} was revised {rep.principle.revised_at} — re-review the decision"
+                )
     errors = _lint_errors(results)
     warnings = [
         (r.need.id, w) for r in sorted(results, key=lambda x: x.need.id) for w in r.warnings
@@ -318,6 +332,7 @@ def cmd_status(args: argparse.Namespace) -> int:
                 role_cov,
                 unroled,
                 hos,
+                principles=board.principles,
             )
         )
     else:
@@ -350,6 +365,8 @@ def cmd_status(args: argparse.Namespace) -> int:
             print(render_handoffs(hos))
         if recs:
             print(render_recurrence(recs))
+        if model.principles:
+            print(render_principles(board.principles))
         if orphan_map:
             print(render_orphans(orphan_map))
 
@@ -479,6 +496,22 @@ def cmd_add(args: argparse.Namespace) -> int:
             print(f"prodc: {exc}", file=sys.stderr)
             return 2
         return emit_edit(edit, args.dry_run, args.json)
+    if args.noun == "principle":
+        try:
+            cfg = Config.load(cfg_path)
+            edit = add_principle(
+                cfg,
+                args.need_id,
+                args.text,
+                file=args.file,
+                revised_at=date.today().isoformat(),
+                expect_sha=args.expect_sha,
+                dry_run=args.dry_run,
+            )
+        except (ConfigError, LoaderError, WriteError) as exc:
+            print(f"prodc: {exc}", file=sys.stderr)
+            return 2
+        return emit_edit(edit, args.dry_run, args.json)
     if args.who is None:
         print("prodc: add need requires --who (the author recorded on the source)", file=sys.stderr)
         return 2
@@ -578,6 +611,7 @@ def cmd_withdraw(args: argparse.Namespace) -> int:
             reason=args.reason,
             date=args.date or date.today().isoformat(),
             kind=args.kind,
+            principle=args.principle,
             expect_sha=args.expect_sha,
             dry_run=args.dry_run,
         )
@@ -602,6 +636,33 @@ def cmd_reinstate(args: argparse.Namespace) -> int:
             dry_run=args.dry_run,
         )
     except (ConfigError, WriteError) as exc:
+        print(f"prodc: {exc}", file=sys.stderr)
+        return 2
+    return emit_edit(edit, args.dry_run, args.json)
+
+
+def cmd_revise(args: argparse.Namespace) -> int:
+    """Revise a product principle in place: optional new text, always a fresh revised_at (the ripple).
+
+    Re-stamping ``revised_at`` is the point — every need withdrawn citing this principle with an
+    earlier date comes back up for re-review (surfaced by `lint`). Comment-safe: only the principle's
+    own block is spliced, the rest of the file is untouched.
+    """
+    cfg_path = Path(args.config)
+    if not cfg_path.exists():
+        print(f"prodc: no config at {cfg_path}", file=sys.stderr)
+        return 2
+    try:
+        cfg = Config.load(cfg_path)
+        edit = revise_principle(
+            cfg,
+            args.principle_id,
+            text=args.text,
+            revised_at=args.date or date.today().isoformat(),
+            expect_sha=args.expect_sha,
+            dry_run=args.dry_run,
+        )
+    except (ConfigError, LoaderError, WriteError) as exc:
         print(f"prodc: {exc}", file=sys.stderr)
         return 2
     return emit_edit(edit, args.dry_run, args.json)

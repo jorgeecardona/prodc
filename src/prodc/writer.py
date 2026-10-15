@@ -100,15 +100,21 @@ def _dump(doc: dict[str, object]) -> str:
 
 
 def _need_block_span(lines: list[str], need_id: str) -> tuple[int, int, int] | None:
-    """Line span [start, end) and item indent of the `needs:` item whose id is ``need_id``.
+    """Line span [start, end) and item indent of the `needs:` item whose id is ``need_id``."""
+    return _block_span(lines, "needs", need_id)
+
+
+def _block_span(lines: list[str], key: str, item_id: str) -> tuple[int, int, int] | None:
+    """Line span [start, end) and item indent of the top-level ``key:`` list item ``item_id``.
 
     Line-based and deliberately conservative: it understands the common prodc layout (a
-    top-level ``needs:`` key whose items are ``- `` at a fixed indent) and returns None for
-    anything it is not sure about, so the caller can fall back to a full re-dump. Trailing
-    blank and comment lines are left out of the span, so a comment that introduces the *next*
-    need is never swallowed.
+    top-level list key — ``needs:``, ``principles:`` — whose items are ``- `` at a fixed indent) and
+    returns None for anything it is not sure about, so the caller can fall back to a full
+    re-dump. Trailing blank and comment lines are left out of the span, so a comment that
+    introduces the *next* item is never swallowed.
     """
-    needs_at = next((i for i, ln in enumerate(lines) if re.match(r"^needs:\s*(#.*)?$", ln)), None)
+    key_line = re.compile(rf"^{re.escape(key)}:\s*(#.*)?$")
+    needs_at = next((i for i, ln in enumerate(lines) if key_line.match(ln)), None)
     if needs_at is None:
         return None
     item_re = None
@@ -138,7 +144,7 @@ def _need_block_span(lines: list[str], need_id: str) -> tuple[int, int, int] | N
     # close each span at the start of the next item (or `i`, the end of the list region)
     bounds = [s[0] for s in spans] + [i]
     for idx, (start, _e, indent, iid) in enumerate(spans):
-        if iid != need_id:
+        if iid != item_id:
             continue
         end = bounds[idx + 1]
         while end - 1 > start and (
@@ -194,23 +200,33 @@ def _render_edit(old_text: str, doc: dict[str, object], need_id: str) -> str:
     :func:`_validated` guards correctness either way.
     """
     _normalize_answer(doc)
+    return _render_item_edit(old_text, doc, "needs", need_id)
+
+
+def _render_item_edit(old_text: str, doc: dict[str, object], key: str, item_id: str) -> str:
+    """Splice the edited ``key:`` list item ``item_id`` back into ``old_text``, comments intact.
+
+    The general form of :func:`_render_edit` (which adds the needs-only ``answer``
+    normalisation): any top-level list noun — ``needs:``, ``principles:`` — is spliced the same way,
+    with the same full re-dump fallback when the shape is not one the splice is sure of.
+    """
     lines = old_text.splitlines(keepends=True)
-    span = _need_block_span(lines, need_id)
-    needs = doc.get("needs")
-    if span is None or not isinstance(needs, list):
+    span = _block_span(lines, key, item_id)
+    items = doc.get(key)
+    if span is None or not isinstance(items, list):
         return _dump(doc)
     start, end, indent = span
-    need = next(
+    item = next(
         (
             cast("dict[str, object]", n)
-            for n in cast("list[object]", needs)
-            if isinstance(n, dict) and cast("dict[str, object]", n).get("id") == need_id
+            for n in cast("list[object]", items)
+            if isinstance(n, dict) and cast("dict[str, object]", n).get("id") == item_id
         ),
         None,
     )
-    if need is None:
+    if item is None:
         return _dump(doc)
-    dumped = yaml.safe_dump([need], sort_keys=False, allow_unicode=True, default_flow_style=False)
+    dumped = yaml.safe_dump([item], sort_keys=False, allow_unicode=True, default_flow_style=False)
     pad = " " * indent
     block = "".join(pad + ln if ln.strip() else ln for ln in dumped.splitlines(keepends=True))
     return "".join(lines[:start]) + block + "".join(lines[end:])
@@ -475,20 +491,25 @@ def withdraw(
     reason: str,
     date: str,
     kind: str = "wont_do",
+    principle: str | None = None,
     expect_sha: str | None,
     dry_run: bool,
 ) -> Edit:
     """Record a decision against a need — withdrawn / won't-do (#74).
 
-    Writes a ``withdrawn: {reason, date, kind?}`` mapping onto the need, which takes it off the
-    active board and out of coverage; the record stays as its durable trace. ``kind`` says *why*
-    (``wont_do`` default, ``out_of_scope``, ``duplicate``) and is written only when it is not the
-    default, to keep the common case clean. Replaces any existing withdrawal (re-withdrawing
-    updates it). Reinstate with :func:`reinstate`.
+    Writes a ``withdrawn: {reason, date, kind?, principle?}`` mapping onto the need, which takes it off
+    the active board and out of coverage; the record stays as its durable trace. ``kind`` says
+    *why* (``wont_do`` default, ``out_of_scope``, ``duplicate``) and is written only when it is not
+    the default, to keep the common case clean. ``principle`` names the Principle the decision rests on
+    (the reload gate rejects an unknown id), so revising that principle later flags this decision for
+    re-review. Replaces any existing withdrawal (re-withdrawing updates it). Reinstate with
+    :func:`reinstate`.
     """
     mark: dict[str, object] = {"reason": reason, "date": date}
     if kind != "wont_do":
         mark["kind"] = kind
+    if principle is not None:
+        mark["principle"] = principle
     path, _ = _locate(config, need_id)
     doc, old_text = _read_doc(path)
     if expect_sha is not None and _sha256(old_text) != expect_sha:
@@ -731,6 +752,85 @@ def add_role(
         raise WriteError(f"role {role_id!r} already exists in {target.name}")
     roles.append({"id": role_id, "text": text})
     return _validated(config, target, old_text, _dump(doc), dry_run)
+
+
+def add_principle(
+    config: Config,
+    principle_id: str,
+    text: str,
+    *,
+    file: str,
+    revised_at: str,
+    expect_sha: str | None = None,
+    dry_run: bool,
+) -> Edit:
+    """Declare a new Principle in ``file``'s top-level ``principles:`` list, stamped ``revised_at``.
+
+    Mirrors :func:`add_role`: a new/edited file is re-dumped whole, the reload gate rejects
+    anything that does not load (including an id already declared in another file), and a
+    duplicate id in this file is refused. ``revised_at`` is stamped at creation so the first
+    revision has something to ripple against.
+    """
+    target = config.root / file
+    if target.exists():
+        doc, old_text = _read_doc(target)
+    else:
+        doc, old_text = {}, ""
+    if expect_sha is not None and _sha256(old_text) != expect_sha:
+        raise WriteError(f"{target.name} changed since it was read (optimistic lock)")
+    raw = doc.setdefault("principles", [])
+    if not isinstance(raw, list):
+        raise WriteError(f"{target.name}: 'principles' is not a list")
+    principles = cast("list[object]", raw)
+    if any(
+        isinstance(a, dict) and cast("dict[str, object]", a).get("id") == principle_id
+        for a in principles
+    ):
+        raise WriteError(f"principle {principle_id!r} already exists in {target.name}")
+    principles.append({"id": principle_id, "text": text, "revised_at": revised_at})
+    return _validated(config, target, old_text, _dump(doc), dry_run)
+
+
+def _locate_principle(config: Config, principle_id: str) -> tuple[Path, dict[str, object], str]:
+    """The file holding ``principle_id``, its parsed doc, and its raw text."""
+    for path in _config_files(config):
+        doc, text = _read_doc(path)
+        raw = doc.get("principles")
+        if not isinstance(raw, list):
+            continue
+        for a in cast("list[object]", raw):
+            if isinstance(a, dict) and cast("dict[str, object]", a).get("id") == principle_id:
+                return path, doc, text
+    raise WriteError(f"no principle {principle_id!r} in any prodc file")
+
+
+def revise_principle(
+    config: Config,
+    principle_id: str,
+    *,
+    text: str | None,
+    revised_at: str,
+    expect_sha: str | None = None,
+    dry_run: bool,
+) -> Edit:
+    """Revise a principle in place: optionally new ``text``, always a new ``revised_at``.
+
+    Stamping ``revised_at`` is the point — it is what makes the ripple fire: every need withdrawn
+    citing this principle with an earlier date comes back up for re-review. Comment-safe: only the
+    principle's own block is spliced (:func:`_render_item_edit`), the rest of the file is untouched.
+    """
+    path, doc, old_text = _locate_principle(config, principle_id)
+    if expect_sha is not None and _sha256(old_text) != expect_sha:
+        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
+    for raw in cast("list[object]", doc["principles"]):
+        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == principle_id:
+            principle = cast("dict[str, object]", raw)
+            if text is not None:
+                principle["text"] = text
+            principle["revised_at"] = revised_at
+            break
+    new_text = _render_item_edit(old_text, doc, "principles", principle_id)
+    return _validated(config, path, old_text, new_text, dry_run)
 
 
 def _snapshot(paths: list[Path]) -> dict[Path, str | None]:

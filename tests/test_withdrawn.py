@@ -246,6 +246,7 @@ def test_show_json_carries_withdrawn(tmp_path: Path, capsys: pytest.CaptureFixtu
         "reason": "superseded by N-1",
         "date": "2026-10-10",
         "kind": "wont_do",  # default when the YAML omits kind
+        "principle": None,  # no principle cited
     }
 
 

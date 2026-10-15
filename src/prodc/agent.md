@@ -72,6 +72,8 @@ Read first, then act, then check.
 | record a new need (with honest provenance) | `prodc add need <id> --text "…" --who <you> --kind assumption --file needs/<f>.yaml` |
 | triage staged drafts | `prodc review` — list them; `--promote <id>…`/`--promote-all` onto the board, `--drop <id>…` to delete |
 | declare a role (the roster) | `prodc add role <id> --text "…" --file needs/<f>.yaml` |
+| declare a product principle (the vision, held as given) | `prodc add principle <id> --text "…" --file needs/<f>.yaml` — the frame that decides between clients who want opposite things; what an `out_of_scope` decision cites |
+| revise a principle (fires the re-review ripple) | `prodc revise principle <id> [--text "…"] [--date ISO]` — re-stamps `revised_at`, so every need withdrawn under it with an earlier date comes back up |
 | attach evidence after a user said something | `prodc capture <id> --kind primary --who <person> [--role <id>] --date <ISO> --quote "…"` (`--role` records which declared role vouched for it) |
 | set or append a field | `prodc set <id> key=value` (append a list with `key+=value`, e.g. `proofs+=web:orders.feature#…`) |
 | propose / attach a proof for a HOLE | `prodc suggest <id> [--apply] [--dry-run]` |
