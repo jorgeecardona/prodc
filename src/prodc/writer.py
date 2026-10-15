@@ -16,11 +16,14 @@ import hashlib
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import yaml
 
 from .config import Config
+
+if TYPE_CHECKING:
+    from .model import Source
 from .loader import LoaderError, load
 
 # Fields an agent may `set` on a need. Unknown keys are silently ignored by the loader, so the
@@ -754,6 +757,22 @@ def add_role(
     return _validated(config, target, old_text, _dump(doc), dry_run)
 
 
+def _source_dict(s: Source) -> dict[str, object]:
+    """Serialise a :class:`~prodc.model.Source` back to a YAML mapping, dropping empty fields."""
+    out: dict[str, object] = {"kind": s.kind.value}
+    for key, value in (
+        ("who", s.who),
+        ("role", s.role),
+        ("date", s.date),
+        ("quote", s.quote),
+        ("locator", s.locator),
+        ("observed_at", s.observed_at),
+    ):
+        if value is not None:
+            out[key] = value
+    return out
+
+
 def add_principle(
     config: Config,
     principle_id: str,
@@ -761,6 +780,7 @@ def add_principle(
     *,
     file: str,
     revised_at: str,
+    sources: tuple[Source, ...] = (),
     expect_sha: str | None = None,
     dry_run: bool,
 ) -> Edit:
@@ -769,7 +789,9 @@ def add_principle(
     Mirrors :func:`add_role`: a new/edited file is re-dumped whole, the reload gate rejects
     anything that does not load (including an id already declared in another file), and a
     duplicate id in this file is refused. ``revised_at`` is stamped at creation so the first
-    revision has something to ripple against.
+    revision has something to ripple against. ``sources`` carry the provenance that surfaced the
+    principle — the signals (often a client) a ``--from-need`` promotion copies across, so the
+    discovery history stays honest: the principle was discovered, not decreed.
     """
     target = config.root / file
     if target.exists():
@@ -787,7 +809,10 @@ def add_principle(
         for a in principles
     ):
         raise WriteError(f"principle {principle_id!r} already exists in {target.name}")
-    principles.append({"id": principle_id, "text": text, "revised_at": revised_at})
+    entry: dict[str, object] = {"id": principle_id, "text": text, "revised_at": revised_at}
+    if sources:
+        entry["sources"] = [_source_dict(s) for s in sources]
+    principles.append(entry)
     return _validated(config, target, old_text, _dump(doc), dry_run)
 
 

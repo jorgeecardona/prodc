@@ -330,3 +330,117 @@ def test_lint_ripple_fires_only_for_decisions_before_revision(
     assert "N-7: withdrawn per principle P-1 on 2026-10-10, but P-1 was revised 2026-10-15" in out
     # N-9 (decided 2026-10-16, after the revision) is not
     assert "N-9: withdrawn per principle" not in out
+
+
+# --- discovery lifecycle: promote a need into a principle (--from-need) ------
+
+_PROMOTE_NEEDS = """
+roles:
+  - id: owner
+    text: the product owner
+needs:
+  - id: N-3
+    text: timbre should keep everything on the laptop
+    sources:
+      - kind: primary
+        who: Jordan
+        role: owner
+        date: 2026-10-01
+        quote: I never want my audio in the cloud
+"""
+
+
+def test_add_principle_from_need_copies_text_and_sources_leaving_need(tmp_path: Path) -> None:
+    from prodc.cli import main
+
+    cfg = _project(tmp_path, needs=_PROMOTE_NEEDS)
+    code = main(
+        [
+            "add",
+            "principle",
+            "P-1",
+            "--from-need",
+            "N-3",
+            "--file",
+            "needs/a.yaml",
+            "--config",
+            str(cfg),
+        ]
+    )
+    assert code == 0
+    model = load(Config.load(cfg))
+    p1 = {p.id: p for p in model.principles}["P-1"]
+    assert p1.text == "timbre should keep everything on the laptop"  # text copied from the need
+    assert p1.revised_at == date.today().isoformat()
+    # the provenance that surfaced it travels across
+    assert p1.sources == (
+        Source(
+            kind=SourceKind.PRIMARY,
+            who="Jordan",
+            role="owner",
+            date="2026-10-01",
+            quote="I never want my audio in the cloud",
+        ),
+    )
+    # the origin need stays on the board, unchanged
+    n3 = {n.id: n for n in model.needs}["N-3"]
+    assert n3.is_withdrawn is False
+    assert len(n3.sources) == 1
+
+
+def test_add_principle_from_need_text_override(tmp_path: Path) -> None:
+    from prodc.cli import main
+
+    cfg = _project(tmp_path, needs=_PROMOTE_NEEDS)
+    main(
+        [
+            "add",
+            "principle",
+            "P-1",
+            "--from-need",
+            "N-3",
+            "--text",
+            "timbre is local-first",
+            "--file",
+            "needs/a.yaml",
+            "--config",
+            str(cfg),
+        ]
+    )
+    p1 = {p.id: p for p in load(Config.load(cfg)).principles}["P-1"]
+    assert p1.text == "timbre is local-first"  # --text wins over the need's text
+    assert len(p1.sources) == 1  # sources still copied
+
+
+def test_add_principle_from_unknown_need_errors(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+
+    cfg = _project(tmp_path, needs=_PROMOTE_NEEDS)
+    code = main(
+        [
+            "add",
+            "principle",
+            "P-1",
+            "--from-need",
+            "N-404",
+            "--file",
+            "needs/a.yaml",
+            "--config",
+            str(cfg),
+        ]
+    )
+    assert code == 2
+    assert "no need 'N-404'" in capsys.readouterr().err
+
+
+def test_add_principle_without_text_or_from_need_errors(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+
+    cfg = _project(tmp_path, needs=_PROMOTE_NEEDS)
+    code = main(["add", "principle", "P-1", "--file", "needs/a.yaml", "--config", str(cfg)])
+    assert code == 2
+    assert "requires --text" in capsys.readouterr().err

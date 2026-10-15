@@ -495,6 +495,9 @@ def cmd_add(args: argparse.Namespace) -> int:
         print(f"prodc: no config at {cfg_path}", file=sys.stderr)
         return 2
     if args.noun == "role":
+        if args.text is None:
+            print("prodc: add role requires --text", file=sys.stderr)
+            return 2
         try:
             cfg = Config.load(cfg_path)
             edit = add_role(
@@ -512,12 +515,30 @@ def cmd_add(args: argparse.Namespace) -> int:
     if args.noun == "principle":
         try:
             cfg = Config.load(cfg_path)
+            text, sources = args.text, ()
+            if args.from_need:
+                # Promote a need into a principle (the discovery lifecycle): the signals that
+                # surfaced it travel with it as provenance, so the history stays honest. The origin
+                # need stays on the board unchanged — a need and the principle it inspired coexist.
+                origin = next((n for n in load(cfg).needs if n.id == args.from_need), None)
+                if origin is None:
+                    print(f"prodc: no need '{args.from_need}' to promote", file=sys.stderr)
+                    return 2
+                text = args.text or origin.text
+                sources = origin.sources
+            if text is None:
+                print(
+                    "prodc: add principle requires --text (or --from-need to take it from a need)",
+                    file=sys.stderr,
+                )
+                return 2
             edit = add_principle(
                 cfg,
                 args.need_id,
-                args.text,
+                text,
                 file=args.file,
                 revised_at=date.today().isoformat(),
+                sources=sources,
                 expect_sha=args.expect_sha,
                 dry_run=args.dry_run,
             )
@@ -527,6 +548,9 @@ def cmd_add(args: argparse.Namespace) -> int:
         return emit_edit(edit, args.dry_run, args.json)
     if args.who is None:
         print("prodc: add need requires --who (the author recorded on the source)", file=sys.stderr)
+        return 2
+    if args.text is None:
+        print("prodc: add need requires --text", file=sys.stderr)
         return 2
     try:
         cfg = Config.load(cfg_path)

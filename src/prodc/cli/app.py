@@ -174,7 +174,19 @@ def main(argv: list[str] | None = None) -> int:
         "need_id",
         help="the new need's id (or role id for `add role`, principle id for `add principle`), e.g. N-9",
     )
-    ad.add_argument("--text", required=True, help="the need text (or the role / principle text)")
+    ad.add_argument(
+        "--text",
+        default=None,
+        help="the need text (or the role / principle text); required except `add principle "
+        "--from-need`, which takes the text from the need",
+    )
+    ad.add_argument(
+        "--from-need",
+        default=None,
+        metavar="ID",
+        help="principle only: promote a need into a principle — copy its text (unless --text "
+        "overrides) and its sources as the provenance that surfaced it; the need stays on the board",
+    )
     ad.add_argument(
         "--who",
         default=None,

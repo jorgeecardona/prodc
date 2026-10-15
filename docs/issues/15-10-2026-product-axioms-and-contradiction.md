@@ -131,8 +131,23 @@ The `contradicts` need→need edge (gap B):
   `contradicts`, so `status`/`show --json` expose it; `show` names it on a `contradicts:` line.
 - `lint` warns on both needs of an unresolved pair; `tests/test_contradicts.py`; agent playbook row.
 
-Next: step 4 (the discovery lifecycle — an `assumption` surfaced by clients promoted to a
-principle). Settle the shape with Jorge first.
+## Progress (15-10-2026) — step 4 DONE
+
+The discovery lifecycle (property 3) — a need the PM commits to becomes a principle:
+- `prodc add principle <id> --from-need <need-id> --file …` promotes a need into a principle.
+  Shape settled with Jorge (15-10-2026): the principle **copies the need's text** (unless `--text`
+  overrides) and **copies the need's sources** as the provenance that surfaced it, and the **origin
+  need stays on the board unchanged** — a need and the principle it inspired coexist (the need may
+  still be a real deliverable). No new withdrawal kind, no `surfaced_by` field: the honest history
+  lives in the copied sources.
+- writer: `add_principle(sources=…)` writes the provenance; `_source_dict` serialises a Source.
+- cli: `--text` is now optional on `add` (still required for need/role, and for principle unless
+  `--from-need`); `--from-need` reads the origin need's text + sources.
+- `tests/test_principles.py` (promote cases); agent playbook row.
+
+All four steps of the issue are shipped. Possible follow-ups (not scheduled): a `status` section
+listing principles' provenance; surfacing unresolved contradictions in the `status` text board (today
+they are in `lint` + `status --json` per-need `contradicts`).
 
 ---
 scope: L · verify: test · area: model · relates: out-of-scope (#74 follow-up), #52 (role noun), research-board profile (logic-system framing), #56 (variant_of as a need→need edge precedent)
