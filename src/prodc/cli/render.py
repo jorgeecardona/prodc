@@ -331,7 +331,11 @@ def render_show(r: NeedResult, importance_label: str | None = None) -> str:
     return "\n".join(lines)
 
 
-def render_brief(client: str, results: list[NeedResult]) -> str:
+def render_brief(
+    client: str,
+    results: list[NeedResult],
+    stale: list[tuple[NeedResult, int]] | None = None,
+) -> str:
     open_ = brief_open(results)
     out = [f"brief — {client}: {len(open_)} open question{'s' if len(open_) != 1 else ''}"]
     if not open_:
@@ -347,6 +351,10 @@ def render_brief(client: str, results: list[NeedResult]) -> str:
             if g
         )
         out.append(f"  {bang} {r.need.id:<12} [{gaps}]  {r.need.text}")
+    if stale:
+        out.append(f"  confirm still wanted ({len(stale)} with evidence past the stale threshold):")
+        for r, age in sorted(stale, key=lambda t: (-t[1], t[0].need.id)):
+            out.append(f"    ~ {r.need.id:<12} {age}d old   {r.need.text}")
     return "\n".join(out)
 
 
@@ -359,9 +367,16 @@ def _importance_cell(need: Need) -> str:
     return f"imp={need.importance}{' (guess)' if weak else ''}"
 
 
-def render_plan(results: list[NeedResult], recurrence_counts: dict[str, int]) -> str:
+def render_plan(
+    results: list[NeedResult], recurrence_counts: dict[str, int], *, revisit: bool = False
+) -> str:
     ranked = rank(results, recurrence_counts)
-    out = ["plan — ranked backlog (must + state + evidence + recurrence, importance refines)"]
+    header = (
+        f"plan — revisit: {len(ranked)} need(s) with undated or stale importance (#59)"
+        if revisit
+        else "plan — ranked backlog (must + state + evidence + recurrence, importance refines)"
+    )
+    out = [header]
     for i, r in enumerate(ranked, 1):
         bang = "!!" if r.need.must else "  "
         imp = _importance_cell(r.need)

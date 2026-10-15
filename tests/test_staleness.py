@@ -152,3 +152,51 @@ needs:
     assert code == 0
     written = (tmp_path / "needs" / "a.yaml").read_text(encoding="utf-8")
     assert "observed_at:" in written and "2026-10-05" in written
+
+
+# --- brief "confirm still wanted" (#58 follow-up) ---------------------------
+
+
+def _client_needs() -> str:
+    old = (date.today() - timedelta(days=400)).isoformat()
+    fresh = date.today().isoformat()
+    return f"""
+needs:
+  - id: OLD-1
+    text: acme wants the old thing
+    client: acme
+    sources:
+      - kind: primary
+        who: Ana
+        quote: "I need this"
+        observed_at: {old}
+  - id: FRESH-1
+    text: acme wants the fresh thing
+    client: acme
+    sources:
+      - kind: primary
+        who: Bob
+        quote: "me too"
+        observed_at: {fresh}
+"""
+
+
+def test_brief_confirm_still_wanted(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from prodc.cli import main
+
+    toml = _TOML + "\n[lint]\nstale_after_days = 180\n"
+    main(["brief", "acme", "--config", str(_project(tmp_path, toml, _client_needs())), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+    stale = {s["id"] for s in payload["confirm_still_wanted"]}
+    assert stale == {"OLD-1"}  # only the >180d evidence is up for re-confirmation
+
+
+def test_brief_no_confirm_section_without_knob(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+
+    # no [lint].stale_after_days configured -> nothing to re-confirm
+    main(["brief", "acme", "--config", str(_project(tmp_path, _TOML, _client_needs())), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["confirm_still_wanted"] == []

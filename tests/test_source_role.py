@@ -13,7 +13,7 @@ from prodc.loader import LoaderError, load
 from prodc.model import Need, Source, SourceKind
 from prodc.writer import capture_source
 
-_TOML = "[prodc]\nneeds = [\"needs/*.yaml\"]\n"
+_TOML = '[prodc]\nneeds = ["needs/*.yaml"]\n'
 
 _NEEDS = """
 roles:

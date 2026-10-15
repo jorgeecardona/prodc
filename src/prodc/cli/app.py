@@ -133,6 +133,13 @@ def main(argv: list[str] | None = None) -> int:
     pl.add_argument(
         "--include-drafts", action="store_true", help="include draft (staged) needs (#60)"
     )
+    pl.add_argument(
+        "--revisit",
+        type=int,
+        default=None,
+        metavar="DAYS",
+        help="only needs whose importance is undated or set more than DAYS ago — a refresh pass (#59)",
+    )
     pl.set_defaults(func=cmd_plan)
 
     ar = sub.add_parser("argument", help="show the GSN assurance graph and its defects")

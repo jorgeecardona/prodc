@@ -58,7 +58,9 @@ def test_review_list_carries_staged_date_and_dup(
     assert rows["D-2"]["duplicate"] is None
 
 
-def test_review_promote_sets_draft_false(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_review_promote_sets_draft_false(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     cfg = _project(tmp_path)
     code = main(["review", "--promote", "D-1", "--config", str(cfg)])
     assert code == 0
@@ -113,7 +115,9 @@ def test_review_dry_run_writes_nothing(tmp_path: Path, capsys: pytest.CaptureFix
     assert "dry-run" in capsys.readouterr().out
 
 
-def test_review_preserves_header_comment(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_review_preserves_header_comment(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     cfg = _project(tmp_path)
     main(["review", "--drop", "D-2", "--config", str(cfg)])
     capsys.readouterr()

@@ -95,7 +95,7 @@ def test_relink_skips_when_adapter_absent(
 ) -> None:
     # A locator whose adapter does not exist is BROKEN but has no inventory to relink against.
     (tmp_path / "needs").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "prodc.toml").write_text("[prodc]\nneeds = [\"needs/*.yaml\"]\n", encoding="utf-8")
+    (tmp_path / "prodc.toml").write_text('[prodc]\nneeds = ["needs/*.yaml"]\n', encoding="utf-8")
     (tmp_path / "needs" / "a.yaml").write_text(
         "needs:\n  - id: N-1\n    text: t\n    proofs: ['ghost:1']\n", encoding="utf-8"
     )

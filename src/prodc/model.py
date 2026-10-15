@@ -74,7 +74,9 @@ class Source:
 
     kind: SourceKind
     who: str | None = None
-    role: str | None = None  # id of the Role the `who` spoke as — whose signal this is (#52 follow-up)
+    role: str | None = (
+        None  # id of the Role the `who` spoke as — whose signal this is (#52 follow-up)
+    )
     date: str | None = None
     quote: str | None = None
     locator: str | None = None
@@ -215,7 +217,9 @@ class Need:
     release: str | None = None  # id of the Release slice this need ships in; None = unslotted
     product: bool = True  # False = infra/NFR/internal, excluded from product coverage (#48)
     draft: bool = False  # True = staged, not yet counted on the board until promoted (#60)
-    draft_added: str | None = None  # ISO date this need was staged (#60); lets a lint age-gate it later
+    draft_added: str | None = (
+        None  # ISO date this need was staged (#60); lets a lint age-gate it later
+    )
     withdrawn: Withdrawal | None = None  # a decision against this need — off the board (#74)
     answer: Answer | None = (
         None  # which way a settled need resolved (yes/no/inconclusive); None=open-ended

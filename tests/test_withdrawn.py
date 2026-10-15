@@ -306,8 +306,18 @@ def test_withdraw_writes_non_default_kind(tmp_path: Path) -> None:
 
     cfg = _project(tmp_path)
     code = main(
-        ["withdraw", "N-1", "--reason", "off strategy", "--kind", "out_of_scope",
-         "--date", "2026-10-15", "--config", str(cfg)]
+        [
+            "withdraw",
+            "N-1",
+            "--reason",
+            "off strategy",
+            "--kind",
+            "out_of_scope",
+            "--date",
+            "2026-10-15",
+            "--config",
+            str(cfg),
+        ]
     )
     assert code == 0
     by_id = {n.id: n for n in load(Config.load(cfg)).needs}

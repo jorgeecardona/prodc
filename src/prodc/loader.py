@@ -150,7 +150,9 @@ def _withdrawal(raw: object, where: str) -> Withdrawal | None:
         kind = WithdrawalKind(kind_name)
     except ValueError:
         kinds = "|".join(k.value for k in WithdrawalKind)
-        raise LoaderError(f"{where}.kind: unknown withdrawal kind {kind_name!r} ({kinds})") from None
+        raise LoaderError(
+            f"{where}.kind: unknown withdrawal kind {kind_name!r} ({kinds})"
+        ) from None
     return Withdrawal(reason=reason, date=date, kind=kind)
 
 

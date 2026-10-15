@@ -37,6 +37,7 @@ from ..status import (
     applicable_needs,
     argument_defects,
     evidence_age_days,
+    importance_revisit_due,
     proof_suggestions,
     recurrence,
     relink_suggestions,
@@ -384,7 +385,20 @@ def cmd_brief(args: argparse.Namespace) -> int:
         return 2
     scoped = applicable_needs(needs, args.client)
     results = resolve(scoped, cfg.adapters, cfg.source_adapters)
-    print(brief_json(args.client, results) if args.json else render_brief(args.client, results))
+    # "Confirm still wanted" (#58): needs whose evidence is older than the stale threshold, to
+    # re-check with the client in the meeting. Only when [lint].stale_after_days is configured.
+    stale: list[tuple[NeedResult, int]] = []
+    if cfg.stale_after_days is not None:
+        today = date.today()
+        for r in results:
+            age = evidence_age_days(r.need, today)
+            if age is not None and age > cfg.stale_after_days:
+                stale.append((r, age))
+    print(
+        brief_json(args.client, results, stale)
+        if args.json
+        else render_brief(args.client, results, stale)
+    )
     return 0
 
 
@@ -397,10 +411,14 @@ def cmd_plan(args: argparse.Namespace) -> int:
     needs = board_needs(list(model.needs), include_drafts=args.include_drafts)  # drafts off (#60)
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
     recurrence_counts = {rec.baseline.id: rec.count for rec in recurrence(needs)}
+    revisit = args.revisit is not None
+    if revisit:
+        today = date.today()
+        results = [r for r in results if importance_revisit_due(r.need, today, args.revisit)]
     print(
-        plan_json(results, recurrence_counts)
+        plan_json(results, recurrence_counts, revisit=revisit)
         if args.json
-        else render_plan(results, recurrence_counts)
+        else render_plan(results, recurrence_counts, revisit=revisit)
     )
     return 0
 
@@ -1090,7 +1108,9 @@ def _cmd_relink(cfg: Config, results: list[NeedResult], args: argparse.Namespace
                 print(f"{s.need.id}: {s.need.text}")
                 last = s.need.id
             print(f"    {s.score:.2f}  {s.broken} → {s.locator}")
-        print(f"suggest --relink: {len(suggestions)} candidate(s) at min-score {args.min_score:.2f}")
+        print(
+            f"suggest --relink: {len(suggestions)} candidate(s) at min-score {args.min_score:.2f}"
+        )
     return 0
 
 
@@ -1136,7 +1156,9 @@ def _apply_relinks(
     else:
         verb = "would relink" if args.dry_run else "relinked"
         for s, edit in applied:
-            print(f"{verb} {s.broken} → {s.locator} on {s.need.id} ({s.score:.2f}) in {edit.path.name}")
+            print(
+                f"{verb} {s.broken} → {s.locator} on {s.need.id} ({s.score:.2f}) in {edit.path.name}"
+            )
             print(edit.diff, end="")
         print(f"suggest --relink --apply: {verb} {len(applied)} locator(s)")
     return 0

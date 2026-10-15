@@ -78,6 +78,24 @@ def evidence_age_days(need: Need, today: date) -> int | None:
     return (today - max(dates)).days if dates else None
 
 
+def importance_revisit_due(need: Need, today: date, max_age_days: int) -> bool:
+    """Whether a need's importance should be revisited — for ``plan --revisit`` (#59).
+
+    Due when the need has an importance set but it is either never dated (no ``importance_set_at``)
+    or last set more than ``max_age_days`` ago. A need with no importance is never due — there is
+    nothing to revisit. A malformed date is treated as not-due (the lint warning owns that defect).
+    """
+    if need.importance is None:
+        return False
+    when = need.importance_set_at
+    if when is None:
+        return True
+    try:
+        return (today - date.fromisoformat(when)).days > max_age_days
+    except ValueError:
+        return False
+
+
 def _resolve_proof(locator: str, adapters: dict[str, Adapter]) -> ProofResult:
     name, sep, payload = locator.partition(":")
     adapter = adapters.get(name)

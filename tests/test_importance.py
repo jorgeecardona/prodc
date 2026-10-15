@@ -164,3 +164,52 @@ needs:
     payload = json.loads(capsys.readouterr().out)
     n1 = next(n for n in payload["needs"] if n["id"] == "N-1")
     assert n1["importance_set_at"] == "2026-10-01"
+
+
+# --- plan --revisit (#59 follow-up) -----------------------------------------
+
+
+def test_plan_revisit_filters_to_undated_and_stale(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+
+    old = (date.today() - timedelta(days=400)).isoformat()
+    recent = (date.today() - timedelta(days=5)).isoformat()
+    needs = f"""
+needs:
+  - id: UNDATED
+    text: importance set, never dated
+    importance: 2
+  - id: STALE
+    text: importance set long ago
+    importance: 3
+    importance_set_at: {old}
+  - id: FRESH
+    text: importance set recently
+    importance: 1
+    importance_set_at: {recent}
+  - id: NONE
+    text: no importance at all
+"""
+    main(["plan", "--revisit", "30", "--config", str(_project(tmp_path, _TOML, needs)), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["revisit"] is True
+    assert {p["id"] for p in payload["plan"]} == {"UNDATED", "STALE"}
+
+
+def test_plan_without_revisit_lists_all(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from prodc.cli import main
+
+    needs = """
+needs:
+  - id: N-1
+    text: a thing
+    importance: 2
+  - id: N-2
+    text: another thing
+"""
+    main(["plan", "--config", str(_project(tmp_path, _TOML, needs)), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["revisit"] is False
+    assert {p["id"] for p in payload["plan"]} == {"N-1", "N-2"}

@@ -272,7 +272,9 @@ class Config:
             raise ConfigError("[lint].importance_revisit_days must be a positive integer")
         draft_max_age = lint_tbl.get("draft_max_age_days")
         if draft_max_age is not None and (
-            not isinstance(draft_max_age, int) or isinstance(draft_max_age, bool) or draft_max_age < 1
+            not isinstance(draft_max_age, int)
+            or isinstance(draft_max_age, bool)
+            or draft_max_age < 1
         ):
             raise ConfigError("[lint].draft_max_age_days must be a positive integer")
 

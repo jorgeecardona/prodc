@@ -130,7 +130,11 @@ def show_json(r: NeedResult) -> str:
     return json.dumps(payload, indent=2)
 
 
-def brief_json(client: str, results: list[NeedResult]) -> str:
+def brief_json(
+    client: str,
+    results: list[NeedResult],
+    stale: list[tuple[NeedResult, int]] | None = None,
+) -> str:
     open_ = brief_open(results)
     return json.dumps(
         {
@@ -146,15 +150,22 @@ def brief_json(client: str, results: list[NeedResult]) -> str:
                 }
                 for r in open_
             ],
+            "confirm_still_wanted": [
+                {"id": r.need.id, "text": r.need.text, "evidence_age": age}
+                for r, age in sorted(stale or [], key=lambda t: (-t[1], t[0].need.id))
+            ],
         },
         indent=2,
     )
 
 
-def plan_json(results: list[NeedResult], recurrence_counts: dict[str, int]) -> str:
+def plan_json(
+    results: list[NeedResult], recurrence_counts: dict[str, int], *, revisit: bool = False
+) -> str:
     ranked = rank(results, recurrence_counts)
     return json.dumps(
         {
+            "revisit": revisit,
             "plan": [
                 {
                     "rank": i,
@@ -168,7 +179,7 @@ def plan_json(results: list[NeedResult], recurrence_counts: dict[str, int]) -> s
                     "importance_is_guess": (r.need.importance is not None and r.need.is_opinion),
                 }
                 for i, r in enumerate(ranked, 1)
-            ]
+            ],
         },
         indent=2,
     )
