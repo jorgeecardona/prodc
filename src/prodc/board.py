@@ -114,6 +114,7 @@ def need_payload(r: NeedResult, *, flavor: Literal["board", "html"] = "board") -
                 else None
             ),
             "proofs": list(need.proofs),
+            "contradicts": list(need.contradicts),
             "detail": list(r.detail),
             "warnings": list(r.warnings),
             "attestation": (
@@ -155,6 +156,7 @@ def need_payload(r: NeedResult, *, flavor: Literal["board", "html"] = "board") -
         "release": need.release,
         "product": need.product,
         "draft": need.draft,
+        "contradicts": list(need.contradicts),
         "answer": need.answer.value if need.answer else None,
         "withdrawn": (
             {

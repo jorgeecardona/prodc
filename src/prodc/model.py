@@ -252,6 +252,9 @@ class Need:
     )
     not_duplicate_of: tuple[str, ...] = ()  # ids this need is confirmed NOT a duplicate of (#55)
     not_variant_of: tuple[str, ...] = ()  # ids this need is confirmed NOT a shared variant of (#56)
+    contradicts: tuple[
+        str, ...
+    ] = ()  # ids of needs this one opposes; symmetric, a principle decides
 
     @property
     def is_variant(self) -> bool:

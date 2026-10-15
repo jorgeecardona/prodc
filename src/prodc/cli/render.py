@@ -340,6 +340,8 @@ def render_show(r: NeedResult, importance_label: str | None = None) -> str:
         lines.append("  sources: (none — opinion)")
     if need.children:
         lines.append(f"  children: {', '.join(need.children)}")
+    if need.contradicts:
+        lines.append(f"  contradicts: {', '.join(need.contradicts)}")
     if need.seam:
         lines.append(f"  seam: {', '.join(need.seam)}")
     if need.proofs:

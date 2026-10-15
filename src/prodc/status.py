@@ -680,6 +680,52 @@ def principle_report(needs: list[Need], principles: list[Principle]) -> list[Pri
 
 
 @dataclass(frozen=True)
+class Contradiction:
+    """Two needs in tension — clients wanting opposite things. ``unresolved`` = both still live.
+
+    The ``contradicts`` relation is symmetric and the model carries it on both needs, so a pair is
+    unordered (``a.id < b.id``). It is *unresolved* while neither need has left the board: the
+    tension the product vision has not yet decided. Withdrawing one side (typically ``out_of_scope``
+    citing the principle that decides) resolves it — this is the structural home for "clients want
+    opposite things; the vision decides" (#B).
+    """
+
+    a: Need
+    b: Need
+    unresolved: bool  # both live (not withdrawn, not a staged draft) — the vision hasn't decided
+
+
+def _contradiction_live(need: Need) -> bool:
+    """On the board for contradiction purposes: not decided-against, not a staged draft."""
+    return not need.is_withdrawn and not need.draft
+
+
+def contradictions(needs: list[Need]) -> list[Contradiction]:
+    """The symmetric ``contradicts`` pairs across ``needs``, each flagged ``unresolved`` when live.
+
+    Reads the relation off the (already symmetric) model, so a pair surfaces from either need's
+    ``contradicts``; pairs are deduped and unordered. A target not present in ``needs`` is skipped,
+    so a scoped subset never raises — pass the whole ``model.needs`` to judge resolution honestly
+    (a withdrawn side is what resolves a pair, and a board-filtered list would have dropped it).
+    """
+    by_id = {n.id: n for n in needs}
+    seen: set[frozenset[str]] = set()
+    out: list[Contradiction] = []
+    for n in needs:
+        for t in n.contradicts:
+            if t == n.id or t not in by_id:
+                continue
+            key = frozenset({n.id, t})
+            if key in seen:
+                continue
+            seen.add(key)
+            a, b = (n, by_id[t]) if n.id < t else (by_id[t], n)
+            out.append(Contradiction(a, b, _contradiction_live(a) and _contradiction_live(b)))
+    out.sort(key=lambda c: (c.a.id, c.b.id))
+    return out
+
+
+@dataclass(frozen=True)
 class Handoff:
     """A derived step in a cross-role journey: one flow child hands off to the next (#52)."""
 

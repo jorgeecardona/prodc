@@ -116,8 +116,23 @@ Shipped (steps 1+2 of the build order):
   `show` names the principle on the withdrawn line; `lint` warns the ripple (stale decision);
   `tests/test_principles.py`; agent playbook rows.
 
-Next: step 3 (the `contradicts` need→need edge + both-live-contradiction lint), step 4 (the
-discovery lifecycle — an `assumption` surfaced by clients promoted to a principle).
+## Progress (15-10-2026) — step 3 DONE
+
+The `contradicts` need→need edge (gap B):
+- `model.Need.contradicts: tuple[str, ...]` — ids of needs this one opposes.
+- loader: parsed, each target validated as a known need id and never the need itself
+  (`_check_contradicts`), then the relation is closed **symmetrically** in the loaded model
+  (`_symmetrize_contradicts` + `dataclasses.replace`): declare the edge once in the file (the
+  comment-safe writer never touches two needs), but both needs carry the full neighbour set.
+- `status.Contradiction` + `contradictions(needs)`: the symmetric pairs, each `unresolved` when
+  both sides are still live (not withdrawn, not a staged draft) — the tension the vision has not
+  decided. Withdrawing one side (`out_of_scope` citing a principle) resolves it.
+- `set <id> contradicts+=<id>` (added to writer `_LIST_FIELDS`); `need_payload` carries
+  `contradicts`, so `status`/`show --json` expose it; `show` names it on a `contradicts:` line.
+- `lint` warns on both needs of an unresolved pair; `tests/test_contradicts.py`; agent playbook row.
+
+Next: step 4 (the discovery lifecycle — an `assumption` surfaced by clients promoted to a
+principle). Settle the shape with Jorge first.
 
 ---
 scope: L · verify: test · area: model · relates: out-of-scope (#74 follow-up), #52 (role noun), research-board profile (logic-system framing), #56 (variant_of as a need→need edge precedent)

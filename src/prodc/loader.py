@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import datetime
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import cast
 
@@ -244,6 +244,10 @@ def _need(
         _as_str(d, f"{where}.not_variant_of[{i}]")
         for i, d in enumerate(_as_list(tbl.get("not_variant_of"), f"{where}.not_variant_of"))
     )
+    contradicts = tuple(
+        _as_str(c, f"{where}.contradicts[{i}]")
+        for i, c in enumerate(_as_list(tbl.get("contradicts"), f"{where}.contradicts"))
+    )
     if children and proofs:
         raise LoaderError(
             f"{where} ({nid}): a flow (need with children) proves its steps via the "
@@ -274,6 +278,7 @@ def _need(
         product=product,
         not_duplicate_of=not_duplicate_of,
         not_variant_of=not_variant_of,
+        contradicts=contradicts,
         importance_set_at=importance_set_at,
         draft=draft,
         draft_added=draft_added,
@@ -435,6 +440,7 @@ def load(config: Config) -> Model:
             acc.argument.extend(f.argument)
     _check_variants(acc.needs)
     _check_children(acc.needs)
+    _check_contradicts(acc.needs)
     _check_ref(acc.needs, "goal", lambda n: n.goal, {g.id for g in acc.goals})
     _check_ref(acc.needs, "release", lambda n: n.release, {r.id for r in acc.releases})
     _check_ref(acc.needs, "role", lambda n: n.role, {p.id for p in acc.roles})
@@ -446,6 +452,7 @@ def load(config: Config) -> Model:
     )
     _check_source_roles(acc.needs, acc.principles, {p.id for p in acc.roles})
     _check_argument(acc.argument)
+    acc.needs = _symmetrize_contradicts(acc.needs)
     return Model(
         needs=tuple(acc.needs),
         goals=tuple(acc.goals),
@@ -512,6 +519,37 @@ def _check_children(needs: list[Need]) -> None:
         for cid in need.children:
             if cid not in known:
                 raise LoaderError(f"need {need.id!r}: child {cid!r} is not a known need id")
+
+
+def _check_contradicts(needs: list[Need]) -> None:
+    """Every id in a need's ``contradicts`` must name a known need, and never the need itself."""
+    known = {n.id for n in needs}
+    for need in needs:
+        for cid in need.contradicts:
+            if cid == need.id:
+                raise LoaderError(f"need {need.id!r}: contradicts itself")
+            if cid not in known:
+                raise LoaderError(f"need {need.id!r}: contradicts {cid!r} is not a known need id")
+
+
+def _symmetrize_contradicts(needs: list[Need]) -> list[Need]:
+    """Close the ``contradicts`` relation symmetrically: if A declares B, B contradicts A too.
+
+    The file stays single-declaration — declare the edge once, so the comment-safe writer never has
+    to touch two needs — but the loaded model carries the full symmetric neighbour set on both
+    needs, so every reader (show, lint, the JSON payload) sees the one relation. Run after
+    :func:`_check_contradicts`, so every target id is known.
+    """
+    edges: dict[str, set[str]] = {n.id: set(n.contradicts) for n in needs}
+    for n in needs:
+        for t in n.contradicts:
+            edges[t].add(n.id)
+    return [
+        replace(n, contradicts=tuple(sorted(edges[n.id])))
+        if edges[n.id] != set(n.contradicts)
+        else n
+        for n in needs
+    ]
 
 
 def _check_variants(needs: list[Need]) -> None:

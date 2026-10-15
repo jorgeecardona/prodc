@@ -36,6 +36,7 @@ from ..status import (
     RelinkSuggestion,
     applicable_needs,
     argument_defects,
+    contradictions,
     evidence_age_days,
     importance_revisit_due,
     principle_report,
@@ -245,6 +246,18 @@ def cmd_lint(args: argparse.Namespace) -> int:
                 by_id[n.id].warnings.append(
                     f"withdrawn per principle {rep.principle.id} on {n.withdrawn.date}, but "
                     f"{rep.principle.id} was revised {rep.principle.revised_at} — re-review the decision"
+                )
+    # Unresolved contradiction: two needs oppose each other yet BOTH are still live — the product
+    # vision has not decided between them. A warning on both sides (withdraw one out_of_scope citing
+    # the principle that decides, or reconcile them).
+    for c in contradictions(needs):
+        if not c.unresolved:
+            continue
+        for near, far in ((c.a, c.b), (c.b, c.a)):
+            if near.id in by_id:
+                by_id[near.id].warnings.append(
+                    f"unresolved contradiction with {far.id} — both live, the vision has not "
+                    "decided yet (withdraw one out_of_scope citing the principle, or reconcile)"
                 )
     errors = _lint_errors(results)
     warnings = [

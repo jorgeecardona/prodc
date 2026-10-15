@@ -76,6 +76,7 @@ Read first, then act, then check.
 | revise a principle (fires the re-review ripple) | `prodc revise principle <id> [--text "…"] [--date ISO]` — re-stamps `revised_at`, so every need withdrawn under it with an earlier date comes back up |
 | attach evidence after a user said something | `prodc capture <id> --kind primary --who <person> [--role <id>] --date <ISO> --quote "…"` (`--role` records which declared role vouched for it) |
 | set or append a field | `prodc set <id> key=value` (append a list with `key+=value`, e.g. `proofs+=web:orders.feature#…`) |
+| mark two needs as opposing each other | `prodc set <id> contradicts+=<other-id>` — symmetric (declare once); `lint` flags a pair left both-live (clients want opposite things and the vision has not decided), and `withdraw … --kind out_of_scope --principle <id>` resolves it |
 | propose / attach a proof for a HOLE | `prodc suggest <id> [--apply] [--dry-run]` |
 | relink a BROKEN proof (renamed test) | `prodc suggest --relink [<id>] [--apply] [--dry-run]` — proposes the nearest live inventory entry to replace the broken locator |
 | link a recurring want to a shared baseline | `prodc recurrence --suggest --apply --baseline-id <id> --file needs/<f>.yaml` |

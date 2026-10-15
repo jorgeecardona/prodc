@@ -43,7 +43,7 @@ _SCALAR_FIELDS = frozenset(
         "draft",
     }
 )
-_LIST_FIELDS = frozenset({"proofs", "children"})
+_LIST_FIELDS = frozenset({"proofs", "children", "contradicts"})
 
 # Source-kind aliases accepted on write (old names → the primary/secondary/assumption ladder),
 # normalised so new files use the current vocabulary even when an author types the old kind.
