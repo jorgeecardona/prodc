@@ -388,6 +388,7 @@ def capture_source(
     *,
     kind: str,
     who: str | None,
+    role: str | None = None,
     date: str | None,
     quote: str | None,
     locator: str | None,
@@ -400,6 +401,8 @@ def capture_source(
     Records evidence as given; the loader's soft hygiene checks (a primary source wants a who and a
     quote-or-locator, a secondary source wants a locator) still apply on the next read.
     ``observed_at`` dates when the evidence was recorded, so the board can flag stale needs (#58).
+    ``role`` records which declared role the ``who`` spoke as (validated against ``roles:`` on the
+    next load) — whose signal it is, orthogonal to the evidence tier (#52 follow-up).
     """
     kind = _canonical_kind(kind)
     path, _ = _locate(config, need_id)
@@ -409,6 +412,7 @@ def capture_source(
     source: dict[str, object] = {"kind": kind}
     for key, value in (
         ("who", who),
+        ("role", role),
         ("date", date),
         ("quote", quote),
         ("locator", locator),

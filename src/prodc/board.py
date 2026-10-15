@@ -48,16 +48,19 @@ from .status import (
 def warrant(need: Need) -> str:
     """The warrant column: the strongest source kind, or 'opinion' when there is no source at all.
 
-    A `primary` source names its person (`primary:who`); `secondary`/`assumption` show the kind. A
-    need with any source is shown by that kind even if it is an opinion (only an assumption) — the
-    opinion roll-up lives in the gap counts, this column shows the literal evidence tier.
+    A `primary` source names its person (`primary:who`, and `primary:who (role)` when that person's
+    role is recorded, #52); `secondary`/`assumption` show the kind. A need with any source is shown
+    by that kind even if it is an opinion (only an assumption) — the opinion roll-up lives in the
+    gap counts, this column shows the literal evidence tier.
     """
     strongest = need.strongest_kind  # the one source-strength ranking lives on the model
     if strongest is None:
         return "opinion"
     if strongest is SourceKind.PRIMARY:
-        who = next((s.who for s in need.sources if s.kind is SourceKind.PRIMARY and s.who), None)
-        return f"primary:{who}" if who else "primary"
+        src = next((s for s in need.sources if s.kind is SourceKind.PRIMARY and s.who), None)
+        if src is None:
+            return "primary"
+        return f"primary:{src.who}" + (f" ({src.role})" if src.role else "")
     return strongest.value
 
 
@@ -120,6 +123,7 @@ def need_payload(r: NeedResult, *, flavor: Literal["board", "html"] = "board") -
                 {
                     "kind": s.kind.value,
                     "who": s.who,
+                    "role": s.role,
                     "date": s.date,
                     "quote": s.quote,
                     "locator": s.locator,

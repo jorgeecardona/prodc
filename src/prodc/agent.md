@@ -72,7 +72,7 @@ Read first, then act, then check.
 | record a new need (with honest provenance) | `prodc add need <id> --text "…" --who <you> --kind assumption --file needs/<f>.yaml` |
 | triage staged drafts | `prodc review` — list them; `--promote <id>…`/`--promote-all` onto the board, `--drop <id>…` to delete |
 | declare a role (the roster) | `prodc add role <id> --text "…" --file needs/<f>.yaml` |
-| attach evidence after a user said something | `prodc capture <id> --kind primary --who <person> --date <ISO> --quote "…"` |
+| attach evidence after a user said something | `prodc capture <id> --kind primary --who <person> [--role <id>] --date <ISO> --quote "…"` (`--role` records which declared role vouched for it) |
 | set or append a field | `prodc set <id> key=value` (append a list with `key+=value`, e.g. `proofs+=web:orders.feature#…`) |
 | propose / attach a proof for a HOLE | `prodc suggest <id> [--apply] [--dry-run]` |
 | link a recurring want to a shared baseline | `prodc recurrence --suggest --apply --baseline-id <id> --file needs/<f>.yaml` |

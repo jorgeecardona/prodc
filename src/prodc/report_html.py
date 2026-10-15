@@ -361,7 +361,7 @@ function renderDetail(n) {
   let srcHtml;
   if (!n.sources.length) srcHtml = '<span class="warn">no source — this need is an opinion</span>';
   else srcHtml = n.sources.map(s => {
-    const head = `<span class="tag">${esc(s.kind)}</span>${s.who?" "+esc(s.who):""}${s.date?' <span class="meta">· '+esc(s.date)+'</span>':""}`;
+    const head = `<span class="tag">${esc(s.kind)}</span>${s.who?" "+esc(s.who):""}${s.role?' <span class="meta">('+esc(s.role)+')</span>':""}${s.date?' <span class="meta">· '+esc(s.date)+'</span>':""}`;
     const q = s.quote ? `<div class="q">“${esc(s.quote)}”</div>` : "";
     const loc = s.locator ? `<div class="meta">${esc(s.locator)}</div>` : "";
     return `<div class="src">${head}${q}${loc}</div>`;

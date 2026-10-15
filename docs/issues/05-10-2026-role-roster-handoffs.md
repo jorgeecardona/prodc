@@ -35,5 +35,8 @@ area: cli
 
 ## What is still deferred
 
-4. **`Need.label` deprecation** — once roles carry the role description, the per-need `label`
-   (hoisted onto the roster today) is redundant. Deprecate separately.
+4. **`Need.label` deprecation** — 🔸 *soft-deprecated (0.3.x).* `prodc lint` now warns on any need
+   carrying `label` ("'label' is deprecated — express it with role + client (#52)"); the field is
+   still parsed and still renders (`who (label)`), so nothing breaks. Full removal (drop the field,
+   the file-level default, the writer key, and the `who (label)` rendering) is the remaining step —
+   left for when existing boards have migrated off it.

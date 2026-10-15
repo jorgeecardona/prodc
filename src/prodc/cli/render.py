@@ -304,7 +304,12 @@ def render_show(r: NeedResult, importance_label: str | None = None) -> str:
             bits = [s.kind.value]
             bits += [
                 f"{k}={v}"
-                for k, v in (("who", s.who), ("date", s.date), ("locator", s.locator))
+                for k, v in (
+                    ("who", s.who),
+                    ("role", s.role),
+                    ("date", s.date),
+                    ("locator", s.locator),
+                )
                 if v
             ]
             line = "    - " + "  ".join(bits)

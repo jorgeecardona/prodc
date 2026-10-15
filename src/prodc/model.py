@@ -74,6 +74,7 @@ class Source:
 
     kind: SourceKind
     who: str | None = None
+    role: str | None = None  # id of the Role the `who` spoke as — whose signal this is (#52 follow-up)
     date: str | None = None
     quote: str | None = None
     locator: str | None = None

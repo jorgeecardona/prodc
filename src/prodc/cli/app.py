@@ -225,6 +225,12 @@ def main(argv: list[str] | None = None) -> int:
         "(interview/artifact/proxy/internal accepted as aliases)",
     )
     cp.add_argument("--who", default=None, help="the person the evidence came from")
+    cp.add_argument(
+        "--role",
+        default=None,
+        metavar="ID",
+        help="the declared role the person spoke as (validated against roles:) — whose signal it is (#52)",
+    )
     cp.add_argument("--date", default=None, help="when (ISO, e.g. 2026-10-05)")
     cp.add_argument("--quote", default=None, help="a verbatim quote (for a primary source)")
     cp.add_argument("--locator", default=None, help="a source locator (for a secondary source)")

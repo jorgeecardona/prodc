@@ -115,6 +115,7 @@ def show_json(r: NeedResult) -> str:
                 {
                     "kind": s.kind.value,
                     "who": s.who,
+                    "role": s.role,
                     "date": s.date,
                     "quote": s.quote,
                     "locator": s.locator,

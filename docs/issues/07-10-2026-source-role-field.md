@@ -28,5 +28,14 @@ The evidence tier says how direct the signal is; the role says whose signal it i
 let the board answer "is this confirmed, and by someone who would know?" without inventing a second
 strength ladder. Small, additive, and backwards-compatible (the field is optional).
 
+## Done (0.3.x)
+
+✅ `Source.role` (optional), parsed by the loader and validated against declared `roles:` at load
+(`_check_source_roles`, unconditional like `need.role`). Written by `prodc capture --role <id>`
+(the reload gate rejects a dangling role). Surfaced: the warrant headline shows it on a primary
+source (`primary:Jordan (owner)`), `show` lists it per source (`role=owner`), and it rides the
+`sources[]` payload in `show --json` and the HTML viewer. Orthogonal to `kind` — provenance, not a
+strength axis, so ranking is unchanged. Issue complete.
+
 ---
 scope: S · verify: test · area: model · relates: source-kind redesign (primary/secondary/assumption), #52

@@ -169,6 +169,7 @@ def _source(raw: object, where: str) -> Source:
     return Source(
         kind=kind,
         who=_opt_str(tbl.get("who"), f"{where}.who"),
+        role=_opt_str(tbl.get("role"), f"{where}.role"),
         date=_opt_str(tbl.get("date"), f"{where}.date"),
         quote=_opt_str(tbl.get("quote"), f"{where}.quote"),
         locator=_opt_str(tbl.get("locator"), f"{where}.locator"),
@@ -401,6 +402,7 @@ def load(config: Config) -> Model:
     _check_ref(acc.needs, "goal", lambda n: n.goal, {g.id for g in acc.goals})
     _check_ref(acc.needs, "release", lambda n: n.release, {r.id for r in acc.releases})
     _check_ref(acc.needs, "role", lambda n: n.role, {p.id for p in acc.roles})
+    _check_source_roles(acc.needs, {p.id for p in acc.roles})
     _check_argument(acc.argument)
     return Model(
         needs=tuple(acc.needs),
@@ -424,6 +426,21 @@ def _check_ref(
         ref = pick(need)
         if ref is not None and ref not in known:
             raise LoaderError(f"need {need.id!r}: {role} {ref!r} is not a known {role} id")
+
+
+def _check_source_roles(needs: list[Need], known: set[str]) -> None:
+    """Every ``source.role`` that is set must name a declared role id (like ``need.role``, #52).
+
+    Validated unconditionally: ``role`` is a new, opt-in field, so there is no migration reason to
+    be lax — a dangling role on a source is a typo the author owns, surfaced at load, not a silent
+    unknown that only shows as missing provenance later.
+    """
+    for need in needs:
+        for i, s in enumerate(need.sources):
+            if s.role is not None and s.role not in known:
+                raise LoaderError(
+                    f"need {need.id!r}: source[{i}] role {s.role!r} is not a known role id"
+                )
 
 
 def _check_argument(argument: list[ArgNode]) -> None:
