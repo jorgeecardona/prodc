@@ -50,6 +50,7 @@ from ..writer import (
     add_role,
     attest,
     capture_source,
+    delete_need,
     link_variant_group,
     reinstate,
     set_field,
@@ -136,6 +137,33 @@ def _annotate_importance_warnings(results: list[NeedResult], cfg: Config) -> Non
                 )
 
 
+def _annotate_draft_age_warnings(results: list[NeedResult], cfg: Config) -> None:
+    """Flag staged drafts older than `[lint].draft_max_age_days`, so a batch can't be forgotten (#60).
+
+    Mirrors the importance-revisit check: a draft with no `draft_added` stamp is flagged undated
+    (it cannot be aged, so it is not silently exempt); a dated draft past the limit is flagged with
+    its age. Only runs when the knob is set.
+    """
+    if cfg.draft_max_age_days is None:
+        return
+    today = date.today()
+    for r in results:
+        if not r.need.draft or r.need.is_withdrawn:
+            continue
+        when = r.need.draft_added
+        if when is None:
+            r.warnings.append("draft with no staged date (`add --draft` stamps one) — #60")
+            continue
+        try:
+            days = (today - date.fromisoformat(when)).days
+        except ValueError:
+            continue
+        if days > cfg.draft_max_age_days:
+            r.warnings.append(
+                f"draft staged {days}d ago (> {cfg.draft_max_age_days}d) — promote or drop (#60)"
+            )
+
+
 def _lint_errors(results: list[NeedResult]) -> list[str]:
     """Hard problems a lint gate fails on: a dangling proof, or a must-have with no evidence."""
     errors: list[str] = []
@@ -184,6 +212,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
                     f"who may name the same person: {whos} (needs {', '.join(v.need_ids)}) — #61"
                 )
     _annotate_importance_warnings(results, cfg)
+    _annotate_draft_age_warnings(results, cfg)
     errors = _lint_errors(results)
     warnings = [
         (r.need.id, w) for r in sorted(results, key=lambda x: x.need.id) for w in r.warnings
@@ -531,6 +560,132 @@ def cmd_reinstate(args: argparse.Namespace) -> int:
     return emit_edit(edit, args.dry_run, args.json)
 
 
+def cmd_review(args: argparse.Namespace) -> int:
+    """Triage draft needs: list them with a duplicate score, or --promote / --drop a batch (#60).
+
+    The companion to `add --draft`: drafts pile up staged off the board, and this is the surface
+    that clears them. With no action flag it lists each draft with its provenance and the nearest
+    existing need (a dedup score, reusing #55), so a reviewer can see what is a duplicate before
+    promoting. `--promote` flips `draft=false` (sugar over `set`); `--drop` deletes the draft
+    outright (the #60 delete-need path). Both act only on drafts — a real need is withdrawn, not
+    dropped, so its record survives.
+    """
+    loaded = load_or_report(args)
+    if loaded is None:
+        return 2
+    cfg, model = loaded
+    needs = list(model.needs)
+    drafts = [n for n in needs if n.draft and not n.is_withdrawn]
+    draft_ids = {n.id for n in drafts}
+
+    drop = list(args.drop or [])
+    if args.promote_all:
+        promote = [n.id for n in drafts if n.id not in drop]
+    else:
+        promote = list(args.promote or [])
+
+    unknown = [i for i in (*promote, *drop) if i not in draft_ids]
+    if unknown:
+        print(
+            f"prodc: not a staged draft: {', '.join(unknown)} "
+            "(review acts only on drafts — withdraw a real need instead)",
+            file=sys.stderr,
+        )
+        return 2
+    both = sorted(set(promote) & set(drop))
+    if both:
+        print(f"prodc: {', '.join(both)} named in both --promote and --drop", file=sys.stderr)
+        return 2
+
+    if not promote and not drop:
+        return _review_list(cfg, drafts, needs, args.json)
+    return _review_apply(cfg, promote, drop, args)
+
+
+def _review_list(cfg: Config, drafts: list[Need], needs: list[Need], as_json: bool) -> int:
+    """List the staged drafts with provenance and the nearest existing need (read-only)."""
+    rows: list[dict[str, object]] = []
+    for d in sorted(drafts, key=lambda n: n.id):
+        others = [n for n in needs if n.id != d.id]
+        hits = matches_for(d.text, others, cfg.duplicate_threshold, exclude_id=d.id)
+        dup = {"id": hits[0][0].id, "score": round(hits[0][1], 4)} if hits else None
+        rows.append(
+            {
+                "id": d.id,
+                "text": d.text,
+                "who": d.who,
+                "client": d.client,
+                "sources": [s.kind.value for s in d.sources],
+                "staged": d.draft_added,
+                "duplicate": dup,
+            }
+        )
+    if as_json:
+        print(json.dumps({"drafts": rows}, indent=2))
+        return 0
+    for r in rows:
+        who = f" — {r['who']}" if r["who"] else ""
+        client = f" [{r['client']}]" if r["client"] else ""
+        staged = f" (staged {r['staged']})" if r["staged"] else ""
+        print(f"{r['id']}{who}{client}{staged}: {r['text']}")
+        kinds = cast("list[str]", r["sources"])
+        if kinds:
+            print(f"        sources: {', '.join(kinds)}")
+        dup = cast("dict[str, object] | None", r["duplicate"])
+        if dup is not None:
+            print(f"        possible duplicate of {dup['id']} ({dup['score']:.2f}) — #55")
+    print(f"review: {len(rows)} draft(s) staged")
+    return 0
+
+
+def _review_apply(
+    cfg: Config, promote: list[str], drop: list[str], args: argparse.Namespace
+) -> int:
+    """Promote (`draft=false`) and/or drop (delete) the named drafts, each a validated edit (#60).
+
+    Sequential and independent, like `suggest --apply`: each need is one reload-gated, single-file
+    write applied in id order, and a rejection aborts with a non-zero exit (earlier writes stand).
+    """
+    applied: list[tuple[str, str, Edit]] = []  # (action, need_id, edit)
+    try:
+        for nid in sorted(promote):
+            edit = set_field(cfg, nid, "draft=false", expect_sha=None, dry_run=args.dry_run)
+            applied.append(("promote", nid, edit))
+        for nid in sorted(drop):
+            edit = delete_need(cfg, nid, dry_run=args.dry_run)
+            applied.append(("drop", nid, edit))
+    except WriteError as exc:
+        print(f"prodc: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(
+            json.dumps(
+                [
+                    {
+                        "action": action,
+                        "need": nid,
+                        "file": edit.path.name,
+                        "dry_run": args.dry_run,
+                        "diff": edit.diff,
+                    }
+                    for action, nid, edit in applied
+                ],
+                indent=2,
+            )
+        )
+        return 0
+    for action, nid, edit in applied:
+        verb = "would promote" if action == "promote" else "would drop"
+        if not args.dry_run:
+            verb = "promoted" if action == "promote" else "dropped"
+        print(f"{verb} {nid} in {edit.path.name}")
+        print(edit.diff, end="")
+    n_prom = sum(1 for row in applied if row[0] == "promote")
+    n_drop = len(applied) - n_prom
+    print(f"review: {n_prom} promoted, {n_drop} dropped" + (" (dry-run)" if args.dry_run else ""))
+    return 0
+
+
 def cmd_capture(args: argparse.Namespace) -> int:
     """Append a Source to an existing need (capture evidence)."""
     cfg_path = Path(args.config)
@@ -573,7 +728,9 @@ def _repo_row(config_path: str) -> RepoRow:
     name = p.parent.name or str(p)
     try:
         cfg = Config.load(p)
-        needs = list(load(cfg).needs)
+        # Drafts (#60) and withdrawn needs (#74) are off the counted board, same as `status`/`plan`,
+        # so a repo's portfolio line never inflates with staged ideas.
+        needs = board_needs(list(load(cfg).needs), include_drafts=False)
     except (ConfigError, LoaderError, OSError) as exc:
         return RepoRow(name, 0, 0, 0, 0, 0.0, {}, error=str(exc))
     results = resolve(needs, cfg.adapters, cfg.source_adapters)

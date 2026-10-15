@@ -216,6 +216,22 @@ def _render_edit(old_text: str, doc: dict[str, object], need_id: str) -> str:
     return "".join(lines[:start]) + block + "".join(lines[end:])
 
 
+def _render_delete(old_text: str, doc: dict[str, object], need_id: str) -> str:
+    """Re-render after removing a need, excising only its block to keep every other comment (#60).
+
+    The mirror of :func:`_render_edit`: find the need's span and drop it from the original text,
+    so the file header and the surrounding needs stay byte-for-byte. Falls back to a full re-dump
+    of ``doc`` (with the need already removed) when the file's shape is anything the splice isn't
+    sure of; the reload gate in :func:`_validated` guards correctness either way.
+    """
+    lines = old_text.splitlines(keepends=True)
+    span = _need_block_span(lines, need_id)
+    if span is None:
+        return _dump(doc)
+    start, end = span[0], span[1]
+    return "".join(lines[:start]) + "".join(lines[end:])
+
+
 def _read_doc(path: Path) -> tuple[dict[str, object], str]:
     text = path.read_text(encoding="utf-8")
     try:
@@ -495,6 +511,31 @@ def reinstate(config: Config, need_id: str, *, expect_sha: str | None, dry_run: 
     return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
 
 
+def delete_need(
+    config: Config, need_id: str, *, expect_sha: str | None = None, dry_run: bool
+) -> Edit:
+    """Remove a need from its file entirely — the hard-delete write path (#60).
+
+    Unlike :func:`withdraw` (which keeps the need as a dated decision-against record), this erases
+    it. The reload gate makes it referentially safe: a need still pointed at by another's
+    ``children``/``variant_of`` or a ``need:`` proof fails to load after the excision, so the write
+    is reverted and refused rather than leaving a dangling reference. Comment-safe (the #53 splice,
+    reversed): only the deleted need's block leaves the file.
+    """
+    path, _ = _locate(config, need_id)
+    doc, old_text = _read_doc(path)
+    if expect_sha is not None and _sha256(old_text) != expect_sha:
+        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
+    needs = _need_list(doc, path)
+    kept: list[object] = [
+        raw
+        for raw in needs
+        if not (isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id)
+    ]
+    doc["needs"] = kept
+    return _validated(config, path, old_text, _render_delete(old_text, doc, need_id), dry_run)
+
+
 def accept(
     config: Config,
     need_id: str,
@@ -603,6 +644,7 @@ def add_need(
     }
     if draft:
         new_need["draft"] = True
+        new_need["draft_added"] = today  # stamped so a lint age-gate can fire later (#60)
     needs.append(new_need)
     return _validated(config, target, old_text, _dump(doc), dry_run)
 

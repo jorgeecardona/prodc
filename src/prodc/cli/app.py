@@ -28,6 +28,7 @@ from .commands import (
     cmd_recurrence,
     cmd_reinstate,
     cmd_report,
+    cmd_review,
     cmd_set,
     cmd_show,
     cmd_status,
@@ -323,6 +324,35 @@ def main(argv: list[str] | None = None) -> int:
         help="refuse if the file's content hash differs (optimistic lock)",
     )
     ri.set_defaults(func=cmd_reinstate)
+
+    rv = sub.add_parser(
+        "review", help="triage staged drafts: list them, or --promote / --drop a batch (#60)"
+    )
+    rv.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    rv.add_argument("--json", action="store_true", help="machine-readable output")
+    rv.add_argument(
+        "--promote",
+        nargs="+",
+        default=None,
+        metavar="ID",
+        help="promote these drafts onto the board (sets draft=false)",
+    )
+    rv.add_argument(
+        "--promote-all",
+        action="store_true",
+        help="promote every staged draft (except any named in --drop)",
+    )
+    rv.add_argument(
+        "--drop",
+        nargs="+",
+        default=None,
+        metavar="ID",
+        help="delete these drafts outright (a draft, never a real need — withdraw that)",
+    )
+    rv.add_argument(
+        "--dry-run", action="store_true", help="validate and show the diffs, don't write"
+    )
+    rv.set_defaults(func=cmd_review)
 
     pf = sub.add_parser("portfolio", help="roll up many boards into one scoreboard")
     pf.add_argument(

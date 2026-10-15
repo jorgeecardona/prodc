@@ -176,6 +176,18 @@ def test_portfolio_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> N
     assert payload["totals"]["boards"] == 1 and payload["totals"]["total"] == 3
 
 
+def test_portfolio_excludes_drafts(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    import json
+
+    # A draft (#60) must not inflate a repo's portfolio line — same board as status/plan.
+    cfg = _project(tmp_path / "alpha")
+    with (tmp_path / "alpha" / "needs" / "a.yaml").open("a", encoding="utf-8") as f:
+        f.write("  - id: DRAFT-1\n    text: a staged idea\n    draft: true\n")
+    main(["portfolio", str(cfg), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["boards"][0]["total"] == 3  # still 3, the draft is off the counted board
+
+
 def test_portfolio_bad_config_exits_2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     code = main(["portfolio", str(tmp_path / "nope.toml")])
     capsys.readouterr()

@@ -127,3 +127,47 @@ def test_promote_via_set_draft_false(tmp_path: Path, capsys: pytest.CaptureFixtu
     main(["status", "--config", str(cfg), "--json"])
     payload = json.loads(capsys.readouterr().out)
     assert {n["id"] for n in payload["needs"]} == {"N-1", "D-1"}
+
+
+_AGE_NEEDS = """
+needs:
+  - id: N-1
+    text: user can see a thing
+  - id: OLD-1
+    text: a long-forgotten draft
+    draft: true
+    draft_added: 2020-01-01
+  - id: UNDATED-1
+    text: a draft with no staged date
+    draft: true
+"""
+
+
+def test_lint_flags_stale_draft(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from prodc.cli import main
+
+    toml = _TOML + "\n[lint]\ndraft_max_age_days = 30\n"
+    cfg = _project(tmp_path, toml=toml, needs=_AGE_NEEDS)
+    code = main(["lint", "--config", str(cfg)])
+    out = capsys.readouterr().out
+    assert code == 0  # an old draft is a warning, not a hard error
+    assert "OLD-1: draft staged" in out
+    assert "UNDATED-1: draft with no staged date" in out
+
+
+def test_lint_no_draft_gate_without_knob(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+
+    cfg = _project(tmp_path, needs=_AGE_NEEDS)  # no [lint].draft_max_age_days
+    main(["lint", "--config", str(cfg)])
+    assert "draft staged" not in capsys.readouterr().out
+
+
+def test_config_rejects_bad_draft_max_age_days(tmp_path: Path) -> None:
+    from prodc.config import ConfigError
+
+    toml = _TOML + "\n[lint]\ndraft_max_age_days = 0\n"
+    with pytest.raises(ConfigError, match="draft_max_age_days"):
+        Config.load(_project(tmp_path, toml=toml))

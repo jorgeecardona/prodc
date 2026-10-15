@@ -201,6 +201,7 @@ def _need(
     release = _opt_str(tbl.get("release"), f"{where}.release")
     product = _as_bool(tbl["product"], f"{where}.product") if "product" in tbl else True
     draft = _as_bool(tbl["draft"], f"{where}.draft") if "draft" in tbl else False
+    draft_added = _opt_str(tbl.get("draft_added"), f"{where}.draft_added")
     withdrawn = _withdrawal(tbl.get("withdrawn"), f"{where}.withdrawn")
     answer = _answer(tbl.get("answer"), f"{where}.answer")
 
@@ -260,6 +261,7 @@ def _need(
         not_variant_of=not_variant_of,
         importance_set_at=importance_set_at,
         draft=draft,
+        draft_added=draft_added,
         withdrawn=withdrawn,
         answer=answer,
     )

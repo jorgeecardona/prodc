@@ -9,7 +9,14 @@ import pytest
 
 from prodc.config import Config
 from prodc.loader import load
-from prodc.writer import WriteError, add_need, add_role, capture_source, set_field
+from prodc.writer import (
+    WriteError,
+    add_need,
+    add_role,
+    capture_source,
+    delete_need,
+    set_field,
+)
 
 
 def _proj(tmp_path: Path, body: str) -> Config:
@@ -254,3 +261,61 @@ def test_add_role_dry_run_leaves_no_file(tmp_path: Path) -> None:
     edit = add_role(cfg, "owner", "owns it", file="needs/roles.yaml", dry_run=True)
     assert "owner" in edit.diff
     assert not (cfg.root / "needs" / "roles.yaml").exists()  # dry-run wrote nothing
+
+
+def test_delete_need_removes_the_block_keeping_others(tmp_path: Path) -> None:
+    cfg = _proj(
+        tmp_path,
+        "# keep me\nneeds:\n  - id: N-1\n    text: one\n  - id: N-2\n    text: two\n",
+    )
+    delete_need(cfg, "N-1", dry_run=False)
+    text = _a_yaml(cfg)
+    assert {n.id for n in load(cfg).needs} == {"N-2"}
+    assert "# keep me" in text  # header comment survives the splice
+
+
+def test_delete_need_unknown_id_rejected(tmp_path: Path) -> None:
+    cfg = _proj(tmp_path, "needs:\n  - id: N-1\n    text: t\n")
+    with pytest.raises(WriteError, match="no need 'N-9'"):
+        delete_need(cfg, "N-9", dry_run=False)
+
+
+def test_delete_need_dangling_reference_reverts(tmp_path: Path) -> None:
+    # N-2 is a child of flow N-1; deleting N-2 would dangle the reference, so the reload gate
+    # must reject the write and restore the file.
+    body = (
+        "needs:\n"
+        "  - id: N-1\n    text: a flow\n    children: [N-2]\n"
+        "  - id: N-2\n    text: a step\n    proofs: ['x:1']\n"
+    )
+    cfg = _proj(tmp_path, body)
+    before = _a_yaml(cfg)
+    with pytest.raises(WriteError, match="edit rejected"):
+        delete_need(cfg, "N-2", dry_run=False)
+    assert _a_yaml(cfg) == before  # reverted
+
+
+def test_delete_need_dry_run_leaves_file(tmp_path: Path) -> None:
+    cfg = _proj(tmp_path, "needs:\n  - id: N-1\n    text: one\n  - id: N-2\n    text: two\n")
+    before = _a_yaml(cfg)
+    edit = delete_need(cfg, "N-1", dry_run=True)
+    assert _a_yaml(cfg) == before  # nothing written
+    assert "N-1" in edit.diff and edit.diff.startswith("---")
+
+
+def test_add_draft_stamps_draft_added(tmp_path: Path) -> None:
+    cfg = _proj(tmp_path, "needs: []\n")
+    add_need(
+        cfg,
+        "D-1",
+        "a staged idea",
+        who="agent",
+        kind="assumption",
+        file="needs/a.yaml",
+        draft=True,
+        expect_sha=None,
+        dry_run=False,
+    )
+    need = {n.id: n for n in load(cfg).needs}["D-1"]
+    assert need.draft is True
+    assert need.draft_added == datetime.date.today().isoformat()

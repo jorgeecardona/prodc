@@ -115,6 +115,7 @@ class Config:
         default_factory=dict[int, tuple[str, str]]
     )  # [importance].levels — ordinal → (label, meaning); empty = no rubric declared (#59)
     importance_revisit_days: int | None = None  # [lint].importance_revisit_days (#59)
+    draft_max_age_days: int | None = None  # [lint].draft_max_age_days — flag stale drafts (#60)
     default_draft: bool = False  # [add].default_draft — `add` stages as draft by default (#60)
     callbacks: tuple[Callback, ...] = ()  # [[callbacks.hooks]] — lifecycle callbacks (#71)
     callback_state_file: str = ".prodc/state.json"  # [callbacks].state_file — the state ledger
@@ -269,6 +270,11 @@ class Config:
             not isinstance(revisit, int) or isinstance(revisit, bool) or revisit < 1
         ):
             raise ConfigError("[lint].importance_revisit_days must be a positive integer")
+        draft_max_age = lint_tbl.get("draft_max_age_days")
+        if draft_max_age is not None and (
+            not isinstance(draft_max_age, int) or isinstance(draft_max_age, bool) or draft_max_age < 1
+        ):
+            raise ConfigError("[lint].draft_max_age_days must be a positive integer")
 
         importance_levels: dict[int, tuple[str, str]] = {}
         imp_tbl = _as_dict(raw.get("importance", {}), "[importance]")
@@ -303,6 +309,7 @@ class Config:
             stale_after_days=stale,
             importance_levels=importance_levels,
             importance_revisit_days=revisit,
+            draft_max_age_days=draft_max_age,
             default_draft=default_draft,
             callbacks=callbacks,
             callback_state_file=callback_state_file,

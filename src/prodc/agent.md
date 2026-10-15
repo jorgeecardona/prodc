@@ -49,14 +49,16 @@ Read first, then act, then check.
 3. **When someone describes a want**, decide: is there real evidence? If a user said it, capture
    it as `primary`. If it is your own inference, record it as an `assumption` and let it show as the
    weaker signal it is. Stage anything still half-formed with `add … --draft` — it loads but stays off the
-   counted board until you promote it with `prodc set <id> draft=false`.
+   counted board until you promote it. `prodc review` is the triage surface: it lists the staged
+   drafts with a duplicate score, and `--promote <id>…` / `--promote-all` move them onto the board
+   while `--drop <id>…` deletes the ones that were noise.
 4. **Find the proof.** For a HOLE need, `prodc suggest <id>` ranks candidate proofs from the test
    suite; `prodc suggest <id> --apply` writes the best one (preview with `--dry-run`).
 5. **Check for duplication and recurrence.** `prodc dupes` flags near-duplicate needs;
    `prodc recurrence --suggest` finds the same want across clients that could share one baseline.
 6. **Gate before you hand off.** `prodc lint` is the red gate: it exits non-zero on a BROKEN proof
    or a must-have opinion. `prodc lint --strict` *also* fails on any hygiene warning (shared proofs,
-   unlinked recurrence, stale evidence). When you want a coverage threshold in CI, `prodc status`
+   unlinked recurrence, stale evidence, drafts left staged too long via `[lint].draft_max_age_days`). When you want a coverage threshold in CI, `prodc status`
    carries its own gate flags (`--min-coverage`, `--max-dangling`, `--max-orphans`, `--strict`).
 
 ## The commands you will use most
@@ -68,6 +70,7 @@ Read first, then act, then check.
 | rank the backlog | `prodc plan` |
 | prep a client meeting | `prodc brief <client>` |
 | record a new need (with honest provenance) | `prodc add need <id> --text "…" --who <you> --kind assumption --file needs/<f>.yaml` |
+| triage staged drafts | `prodc review` — list them; `--promote <id>…`/`--promote-all` onto the board, `--drop <id>…` to delete |
 | declare a role (the roster) | `prodc add role <id> --text "…" --file needs/<f>.yaml` |
 | attach evidence after a user said something | `prodc capture <id> --kind primary --who <person> --date <ISO> --quote "…"` |
 | set or append a field | `prodc set <id> key=value` (append a list with `key+=value`, e.g. `proofs+=web:orders.feature#…`) |
