@@ -300,6 +300,13 @@ def main(argv: list[str] | None = None) -> int:
     wd.add_argument(
         "--reason", required=True, help="why it was decided against (kept on the record)"
     )
+    wd.add_argument(
+        "--kind",
+        choices=["wont_do", "out_of_scope", "duplicate"],
+        default="wont_do",
+        help="the decision's kind: wont_do (default), out_of_scope (real but not this product), "
+        "or duplicate (#74)",
+    )
     wd.add_argument("--date", default=None, help="when (ISO, e.g. 2026-10-10; default: today)")
     wd.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     wd.add_argument("--json", action="store_true", help="machine-readable output")

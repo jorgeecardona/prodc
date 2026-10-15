@@ -276,7 +276,9 @@ def render_show(r: NeedResult, importance_label: str | None = None) -> str:
     if need.answer:
         lines.append(f"  answer: {need.answer.value}")
     if need.withdrawn:
-        lines.append(f"  withdrawn: {need.withdrawn.reason} ({need.withdrawn.date})")
+        w = need.withdrawn
+        tag = "" if w.kind.value == "wont_do" else f" [{w.kind.value}]"
+        lines.append(f"  withdrawn{tag}: {w.reason} ({w.date})")
     if need.description:
         lines.append(f"  description: {need.description}")
     if need.importance is not None:

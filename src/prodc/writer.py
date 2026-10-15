@@ -474,16 +474,21 @@ def withdraw(
     *,
     reason: str,
     date: str,
+    kind: str = "wont_do",
     expect_sha: str | None,
     dry_run: bool,
 ) -> Edit:
     """Record a decision against a need — withdrawn / won't-do (#74).
 
-    Writes a ``withdrawn: {reason, date}`` mapping onto the need, which takes it off the active
-    board and out of coverage; the record stays as its durable trace. Replaces any existing
-    withdrawal (re-withdrawing updates the reason/date). Reinstate with :func:`reinstate`.
+    Writes a ``withdrawn: {reason, date, kind?}`` mapping onto the need, which takes it off the
+    active board and out of coverage; the record stays as its durable trace. ``kind`` says *why*
+    (``wont_do`` default, ``out_of_scope``, ``duplicate``) and is written only when it is not the
+    default, to keep the common case clean. Replaces any existing withdrawal (re-withdrawing
+    updates it). Reinstate with :func:`reinstate`.
     """
     mark: dict[str, object] = {"reason": reason, "date": date}
+    if kind != "wont_do":
+        mark["kind"] = kind
     path, _ = _locate(config, need_id)
     doc, old_text = _read_doc(path)
     if expect_sha is not None and _sha256(old_text) != expect_sha:

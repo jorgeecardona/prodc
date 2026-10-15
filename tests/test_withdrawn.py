@@ -242,7 +242,11 @@ def test_show_json_carries_withdrawn(tmp_path: Path, capsys: pytest.CaptureFixtu
 
     main(["show", "W-1", "--config", str(_project(tmp_path)), "--json"])
     payload = json.loads(capsys.readouterr().out)
-    assert payload["withdrawn"] == {"reason": "superseded by N-1", "date": "2026-10-10"}
+    assert payload["withdrawn"] == {
+        "reason": "superseded by N-1",
+        "date": "2026-10-10",
+        "kind": "wont_do",  # default when the YAML omits kind
+    }
 
 
 def test_status_json_live_need_has_null_withdrawn(
@@ -254,3 +258,85 @@ def test_status_json_live_need_has_null_withdrawn(
     payload = json.loads(capsys.readouterr().out)
     n1 = next(n for n in payload["needs"] if n["id"] == "N-1")
     assert n1["withdrawn"] is None
+
+
+# --- withdrawal kind (#74 follow-up) ----------------------------------------
+
+_KIND_NEEDS = """
+needs:
+  - id: N-1
+    text: user can see a delivered thing
+    proofs: ["x:1"]
+  - id: OOS-1
+    text: a real but off-strategy need
+    withdrawn:
+      reason: not the product we build
+      date: 2026-10-10
+      kind: out_of_scope
+"""
+
+
+def test_loader_parses_withdrawal_kind(tmp_path: Path) -> None:
+    from prodc.model import WithdrawalKind
+
+    cfg = Config.load(_project(tmp_path, needs=_KIND_NEEDS))
+    by_id = {n.id: n for n in load(cfg).needs}
+    assert by_id["OOS-1"].withdrawn is not None
+    assert by_id["OOS-1"].withdrawn.kind is WithdrawalKind.OUT_OF_SCOPE
+
+
+def test_withdrawal_kind_defaults_wont_do(tmp_path: Path) -> None:
+    from prodc.model import WithdrawalKind
+
+    cfg = Config.load(_project(tmp_path))  # W-1 omits kind
+    by_id = {n.id: n for n in load(cfg).needs}
+    w = by_id["W-1"].withdrawn
+    assert w is not None and w.kind is WithdrawalKind.WONT_DO
+
+
+def test_unknown_withdrawal_kind_rejected(tmp_path: Path) -> None:
+    needs = _KIND_NEEDS.replace("kind: out_of_scope", "kind: bogus")
+    with pytest.raises(LoaderError, match="unknown withdrawal kind 'bogus'"):
+        load(Config.load(_project(tmp_path, needs=needs)))
+
+
+def test_withdraw_writes_non_default_kind(tmp_path: Path) -> None:
+    from prodc.cli import main
+    from prodc.model import WithdrawalKind
+
+    cfg = _project(tmp_path)
+    code = main(
+        ["withdraw", "N-1", "--reason", "off strategy", "--kind", "out_of_scope",
+         "--date", "2026-10-15", "--config", str(cfg)]
+    )
+    assert code == 0
+    by_id = {n.id: n for n in load(Config.load(cfg)).needs}
+    w = by_id["N-1"].withdrawn
+    assert w is not None and w.kind is WithdrawalKind.OUT_OF_SCOPE
+
+
+def test_withdraw_omits_default_kind_in_yaml(tmp_path: Path) -> None:
+    from prodc.cli import main
+
+    cfg = _project(tmp_path)
+    main(["withdraw", "N-1", "--reason", "nope", "--date", "2026-10-15", "--config", str(cfg)])
+    text = (tmp_path / "needs" / "a.yaml").read_text(encoding="utf-8")
+    assert "kind:" not in text  # wont_do is the default; not written, keeps files clean
+
+
+def test_status_breaks_down_withdrawn_by_kind(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+
+    main(["status", "--config", str(_project(tmp_path, needs=_KIND_NEEDS))])
+    out = capsys.readouterr().out
+    assert "withdrawn: 1 (decided against) — 1 out_of_scope" in out
+
+
+def test_show_tags_non_default_kind(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from prodc.cli import main
+
+    main(["show", "OOS-1", "--config", str(_project(tmp_path, needs=_KIND_NEEDS))])
+    out = capsys.readouterr().out
+    assert "withdrawn [out_of_scope]: not the product we build (2026-10-10)" in out

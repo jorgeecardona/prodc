@@ -79,7 +79,7 @@ Read first, then act, then check.
 | link a recurring want to a shared baseline | `prodc recurrence --suggest --apply --baseline-id <id> --file needs/<f>.yaml` |
 | record a human/AI review of the warrant | `prodc attest <id> --by <who> --date <ISO> [--ai]` |
 | record a human acceptance pass | `prodc accept <id> --who <person> --date <ISO>` |
-| decide against a need (won't-do) | `prodc withdraw <id> --reason "…"` — off the board + out of coverage; `prodc reinstate <id>` puts it back |
+| decide against a need (won't-do) | `prodc withdraw <id> --reason "…" [--kind out_of_scope\|duplicate]` — off the board + out of coverage (use `out_of_scope` for a real need that isn't this product); `prodc reinstate <id>` puts it back |
 | hand a human a readable status file | `prodc report -o status.md` (markdown; `--format html` for an interactive viewer; `--client ID` to scope) |
 | act on a need going green (notify a tracker, etc.) | `prodc sync` — runs the `[callbacks]` commands for needs whose state changed since the last sync (`--dry-run` to preview) |
 | gate in CI | `prodc lint --strict` |

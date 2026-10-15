@@ -263,6 +263,14 @@ def cmd_status(args: argparse.Namespace) -> int:
     # orphans) until promoted with `set <id> draft=false`, unless --include-drafts is passed.
     draft_count = sum(1 for n in needs if n.draft and not n.is_withdrawn)
     withdrawn_count = sum(1 for n in needs if n.is_withdrawn)
+    # Break withdrawals down by kind (#74 follow-up), so "declined but valid" (out_of_scope) is
+    # legible on the board apart from plain won't-do; wont_do is the implicit default, not listed.
+    withdrawn_kinds: dict[str, int] = {}
+    for n in needs:
+        if n.withdrawn and n.withdrawn.kind.value != "wont_do":
+            withdrawn_kinds[n.withdrawn.kind.value] = (
+                withdrawn_kinds.get(n.withdrawn.kind.value, 0) + 1
+            )
     needs = board_needs(needs, include_drafts=args.include_drafts)
     # Scoped coverage (#49): restrict the board + coverage to a subset, so the number people
     # act on (this client, this goal) isn't diluted by the whole mixed board.
@@ -318,7 +326,9 @@ def cmd_status(args: argparse.Namespace) -> int:
         if draft_count and not args.include_drafts:
             print(f"drafts: {draft_count} staged (hidden — --include-drafts to show) (#60)")
         if withdrawn_count:
-            print(f"withdrawn: {withdrawn_count} (decided against) (#74)")
+            extra = ", ".join(f"{c} {k}" for k, c in sorted(withdrawn_kinds.items()))
+            suffix = f" — {extra}" if extra else ""
+            print(f"withdrawn: {withdrawn_count} (decided against){suffix} (#74)")
         visible = [r for r in results if r.need.product]
         if args.only_must:
             visible = [r for r in visible if r.need.must]
@@ -549,6 +559,7 @@ def cmd_withdraw(args: argparse.Namespace) -> int:
             args.need_id,
             reason=args.reason,
             date=args.date or date.today().isoformat(),
+            kind=args.kind,
             expect_sha=args.expect_sha,
             dry_run=args.dry_run,
         )

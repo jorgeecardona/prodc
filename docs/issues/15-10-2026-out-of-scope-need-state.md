@@ -41,6 +41,19 @@ Lean toward option 1 unless a concrete behaviour (not just a count) needs option
 `Withdrawal.kind` keeps the evidence + decision record intact and adds the one axis the founder
 actually asked for: *why* it is off the board, as data rather than prose.
 
+## Done (0.3.x) — option 1
+
+✅ `WithdrawalKind` StrEnum (`wont_do` default / `out_of_scope` / `duplicate`) + `Withdrawal.kind`,
+parsed and validated by the loader (same `Enum(name) except ValueError` pattern as `SourceKind`).
+`prodc withdraw --kind <k>` writes it (only when non-default, to keep files clean). Surfaced:
+`status` breaks the withdrawn count down by kind ("withdrawn: N (decided against) — 1 out_of_scope"),
+`show` tags a non-default kind (`withdrawn [out_of_scope]: …`), and both board payloads carry
+`withdrawn.kind`. Behaviour is unchanged — all kinds are equally off the board and out of coverage;
+the kind is provenance for the decision, not a new board state.
+
+Option 2 (a distinct board state) remains unbuilt and is only justified if out-of-scope needs
+should *behave* differently (e.g. a "declined but valid" view, or handoff to another board).
+
 ## Related
 
 #74 (withdrawn), #48 (product/nonproduct), #52 (role — the vision need is often `kind: assumption`

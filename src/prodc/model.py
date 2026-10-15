@@ -161,17 +161,33 @@ class Attestation:
     comment: str | None = None  # the review's feedback / rationale, kept on the record
 
 
+class WithdrawalKind(StrEnum):
+    """Why a need is off the board — the decision's *kind*, as data, not only free-text reason.
+
+    All three take the need off the active board and out of coverage identically; the kind records
+    *why* so the board can tell a validated-but-off-strategy need apart from one killed as not
+    worth doing. ``OUT_OF_SCOPE`` is the case a real, client-evidenced need is declined because it
+    is not the product being built — distinct from ``WONT_DO`` (decided against on its merits) and
+    ``DUPLICATE`` (the same want is tracked under another need).
+    """
+
+    WONT_DO = "wont_do"  # decided against on its merits — the default, #74's original meaning
+    OUT_OF_SCOPE = "out_of_scope"  # real and valid, but not this product
+    DUPLICATE = "duplicate"  # the same want is tracked elsewhere
+
+
 @dataclass(frozen=True)
 class Withdrawal:
     """A decision not to pursue a need — withdrawn / won't-do (#74).
 
     Unlike a draft (staged, not yet decided), a withdrawal is a decision *against*: the need is
-    taken off the active board and out of coverage, with its ``reason`` and ``date`` kept on the
-    record as the durable trace (``prodc show`` still renders it). Reinstate to put it back.
+    taken off the active board and out of coverage, with its ``reason``, ``date`` and ``kind`` kept
+    on the record as the durable trace (``prodc show`` still renders it). Reinstate to put it back.
     """
 
     reason: str
     date: str
+    kind: WithdrawalKind = WithdrawalKind.WONT_DO
 
 
 @dataclass(frozen=True)

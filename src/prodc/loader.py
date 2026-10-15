@@ -30,6 +30,7 @@ from .model import (
     Source,
     SourceKind,
     Withdrawal,
+    WithdrawalKind,
 )
 
 
@@ -130,10 +131,12 @@ def _answer(raw: object, where: str) -> Answer | None:
 
 
 def _withdrawal(raw: object, where: str) -> Withdrawal | None:
-    """Parse ``withdrawn: {reason, date}`` into a :class:`Withdrawal` (#74).
+    """Parse ``withdrawn: {reason, date, kind?}`` into a :class:`Withdrawal` (#74).
 
-    Both fields are required when the key is present — a decision against a need must say why
-    and when, the same way an attestation needs who and when.
+    ``reason`` and ``date`` are required when the key is present — a decision against a need must
+    say why and when, the same way an attestation needs who and when. ``kind`` is optional and
+    defaults to ``wont_do``; it is validated with the same ``Enum(name) except ValueError`` pattern
+    as ``SourceKind``, so an unknown kind is a :class:`LoaderError` the author owns.
     """
     if raw is None:
         return None
@@ -142,7 +145,13 @@ def _withdrawal(raw: object, where: str) -> Withdrawal | None:
     date = _opt_str(tbl.get("date"), f"{where}.date")
     if not reason or not date:
         raise LoaderError(f"{where}: a withdrawal needs both 'reason' and 'date'")
-    return Withdrawal(reason=reason, date=date)
+    kind_name = _opt_str(tbl.get("kind"), f"{where}.kind") or WithdrawalKind.WONT_DO.value
+    try:
+        kind = WithdrawalKind(kind_name)
+    except ValueError:
+        kinds = "|".join(k.value for k in WithdrawalKind)
+        raise LoaderError(f"{where}.kind: unknown withdrawal kind {kind_name!r} ({kinds})") from None
+    return Withdrawal(reason=reason, date=date, kind=kind)
 
 
 # Old source-kind names (pre-0.3.58) mapped to the primary/secondary/assumption ladder, so
