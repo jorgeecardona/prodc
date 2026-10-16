@@ -89,7 +89,7 @@ Read first, then act, then check.
 | act on a need going green (notify a tracker, etc.) | `prodc sync` — runs the `[callbacks]` commands for needs whose state changed since the last sync (`--dry-run` to preview) |
 | gate in CI | `prodc lint --strict` |
 
-Less often: `prodc argument` (the GSN assurance graph and its defects), `prodc portfolio <path>…`
+Less often: `prodc portfolio <path>…`
 (roll up many boards into one scoreboard + totals; a path is a prodc.toml or a dir to discover
 boards under), and `prodc diff <snapshot.json>` (what changed since a
 saved `status --json`). `prodc status` also takes `--goal <id>`, `--columns id,state,text,warrant`,

@@ -1,6 +1,6 @@
 # Model
 
-All nouns live in the files matched by `[prodc].needs`. Any file may carry `needs:`, `goals:`, `releases:`, `roles:`, `argument:`. Cross-references are string ids, checked at load.
+All nouns live in the files matched by `[prodc].needs`. Any file may carry `needs:`, `goals:`, `releases:`, `roles:`, `principles:`, `decisions:`. Cross-references are string ids, checked at load.
 
 ## Nouns
 
@@ -12,10 +12,11 @@ All nouns live in the files matched by `[prodc].needs`. Any file may carry `need
 | **Goal** | measurable objective needs trace up to; `id`, `text`, `metric` | `goals:` |
 | **Release** | ship slice; list order = ship order; `id`, `text` | `releases:` |
 | **Role** | a named function in the product's world; `who`+`client` is an instance of it (John@Sincerely is the `owner`); `id`, `text` | `roles:` |
-| **ArgNode** | GSN node: `kind` claim/strategy/evidence/context/assumption/justification, `supported_by`, `in_context_of`, `about` | `argument:` |
-| **Attestation** | a review that the proofs establish the need | `attestation:` on a need |
+| **Principle** | the product vision, held as given (not validated); an `out_of_scope` withdrawal cites it, and revising it re-opens decisions taken under it | `principles:` |
+| **Decision** | the solution chosen for a need over the `alternatives` rejected (OST), resting on which `principles`; `needs` required | `decisions:` |
+| **Attestation** | a review that the proofs establish the need; `verdict` pass/concerns/fail (only pass clears it) | `attestation:` on a need |
 
-File-level `who`, `label`, `client` default every need in that file.
+File-level `who`, `client` default every need in that file.
 
 ## Need fields
 
@@ -26,8 +27,8 @@ File-level `who`, `label`, `client` default every need in that file.
 | `description` | optional free-form markdown detail (edge cases, rationale, a worked scenario); **not** EARS-checked — keeps the one-line `text` scannable (#73) |
 | `who` | the person (free text — John, Jacob) |
 | `role` | Role id — the role `who` plays; checked against declared `roles:` |
-| `label` | free text for `who` |
 | `must` | must-have; a must with no proof tops the board |
+| `contradicts` | need ids this one opposes (symmetric); `lint` flags a pair left both-live |
 | `sources` | evidence list (see ladder) |
 | `proofs` | locators (leaf needs only; a flow uses `seam`) |
 | `children` | sub-need ids; makes this a flow that rolls them up |

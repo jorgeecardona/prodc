@@ -11,7 +11,6 @@ Every command takes `--config prodc.toml` (default) and `--json`. `prodc -C DIR 
 | `show <id>` | One need as a citable answer: grounds, warrant, sources, proofs | `prodc show N-1` |
 | `brief <client>` | Pre-meeting agenda for one client: its opinions and HOLEs, must first | `prodc brief acme` |
 | `plan` | Ranked backlog: must + state + evidence + recurrence; `importance` refines | `prodc plan --json` |
-| `argument` | The GSN graph and its defects (unsupported claim, dangling context) | `prodc argument --strict` |
 | `diff <snapshot>` | State changes since a saved `status --json` | `prodc diff last.json` |
 | `portfolio <path>…` | Many boards, one scoreboard (+ totals footer); a path is a prodc.toml or a dir to discover boards under (prunes VCS/vendor/hidden dirs, `--max-depth` default 4) | `prodc portfolio projects/` |
 | `dupes` | Candidate duplicate need pairs by text similarity; `--threshold` overrides `[lint].duplicate_threshold` | `prodc dupes --threshold 0.7` |
@@ -20,6 +19,7 @@ Every command takes `--config prodc.toml` (default) and `--json`. `prodc -C DIR 
 | `report` | Render the board as a shareable document for a PM to read, share, or print. `--format md` (default) is a readable markdown document; `--format html` is a single self-contained, interactive, read-only viewer (filter by state/client, search, expand a need, regroup by client/goal/release/state, print to PDF) with no external assets. `-o PATH` writes a file, `--client ID` scopes it | `prodc report --format html -o status.html` |
 | `sync` | Run the configured lifecycle callbacks (`[callbacks]`) for needs whose state changed since the last sync: resolves the board, diffs it against the state ledger, pipes each changed need + board context to the callback command as JSON on stdin, and writes the ledger forward. First run records a baseline and fires nothing; a failed callback is reported, exits non-zero, and leaves its need un-advanced so the next sync retries. `--dry-run` shows what would fire | `prodc sync` |
 | `agent` | Print prodc's agent playbook so a coding agent runs prodc as the project's PM; `--write PATH` writes it into the repo (`--force` to overwrite) | `prodc agent >> AGENTS.md` |
+| `guide` | Print prodc's short human CLI onboarding guide; `--write PATH` writes it into the repo | `prodc guide` |
 
 ### `status` flags
 
@@ -47,10 +47,14 @@ Each rewrites one YAML file, re-loads the whole model as validation, reverts on 
 | `set <id> key=value` | set one field; `key+=value` appends to `proofs`/`children`; `importance=<n\|label>` is checked against the `[importance]` rubric and stamps `importance_set_at` | `prodc set N-2 importance=needed` |
 | `capture <id> --kind K` | append a source (`K` = `primary`\|`secondary`\|`assumption`; old `interview`/`artifact`/`proxy`/`internal` still accepted); `--who --date --quote --locator --observed-at` (observed-at defaults to today, for staleness) | `prodc capture N-3 --kind primary --who Ana --date 2026-10-05 --quote "…"` |
 | `accept <id> --who W --date D` | add an `accept:W@D` proof; `--revoke` removes it | `prodc accept N-2 --who jorge --date 2026-10-05` |
-| `attest <id> --by X --date D` | record a review that the proofs establish the need; `--ai --verdict --comment` | `prodc attest N-1 --by claude-fable-5-1 --ai --date 2026-10-05 --verdict pass` |
-| `withdraw <id> --reason R` | record a decision against the need (won't-do): off the board + out of coverage, the record kept; `--date` defaults to today | `prodc withdraw N-7 --reason "superseded by N-3"` |
+| `attest <id> --by X --date D` | record a review that the proofs establish the need; `--verdict pass\|concerns\|fail` (only pass clears it — anything else warns), `--ai --comment` | `prodc attest N-1 --by claude-fable-5-1 --ai --date 2026-10-05 --verdict pass` |
+| `withdraw <id> --reason R` | record a decision against the need: off the board + out of coverage, the record kept; `--kind wont_do\|out_of_scope\|duplicate`, `--of` (the original, required for duplicate), `--principle` (the vision it rests on); `--date` defaults to today | `prodc withdraw N-7 --reason "dup" --kind duplicate --of N-3` |
+| `withdraw decision <id> --reason R` / `reinstate decision <id>` | supersede / restore a decision (noun-first; ids are unique per noun) | `prodc withdraw decision D-1 --reason "superseded by D-7"` |
 | `reinstate <id>` | remove a need's withdrawal, putting it back on the board (errors if not withdrawn) | `prodc reinstate N-7` |
 | `add need <id> --text T --who W --file F` | new need with agent provenance; `--kind assumption\|secondary` (never primary — that's earned by a real user); warns on a possible duplicate, `--strict-dupes` refuses, `--no-dupe-check` skips; `--draft` stages it off the board (promote later with `set <id> draft=false`) | `prodc add need N-9 --text "…" --who bot --file needs/bot.yaml --draft` |
 | `add role <id> --text T --file F` | declare a Role in `F`'s `roles:` list (new file created if needed); duplicate id refused | `prodc add role owner --text "owns the roastery" --file needs/roles.yaml` |
+| `add principle <id> --text T --file F` | declare a product principle (the vision); `--from-need <id>` promotes a need, copying its text + sources | `prodc add principle P-1 --text "local-first" --file needs/principles.yaml` |
+| `revise principle <id> [--text] [--date]` | re-state a principle; re-stamps `revised_at`, which flags decisions taken under the old version for re-review | `prodc revise principle P-1 --text "…"` |
+| `add decision <id> --text T --needs IDS --file F` | the solution chosen for a need (OST); `--alternative` (repeatable, the rejected options), `--consequences`, `--principles`, `--date` | `prodc add decision D-1 --text "store as FLAC" --needs N-1 --alternative WAV --file needs/decisions.yaml` |
 
-`set` fields: `text who label must importance claim goal release variant_of client product draft`; lists: `proofs children`.
+`set` fields: `text who must importance claim goal release variant_of client product draft`; lists: `proofs children contradicts`.

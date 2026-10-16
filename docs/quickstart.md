@@ -19,7 +19,6 @@ pending = ["@pending"]
 
 ```yaml
 who: jordan
-label: "design partner"
 needs:
   - id: N-1
     text: "see which orders are past due at a glance"
