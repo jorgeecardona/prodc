@@ -85,6 +85,7 @@ from .render import (
     render_argument,
     render_brief,
     render_columns,
+    render_contradictions,
     render_decisions,
     render_goals,
     render_handoffs,
@@ -406,6 +407,9 @@ def cmd_status(args: argparse.Namespace) -> int:
             print(render_principles(board.principles))
         if model.decisions:
             print(render_decisions(list(model.decisions), needs=list(model.needs)))
+        unresolved = [c for c in contradictions(list(model.needs)) if c.unresolved]
+        if unresolved:
+            print(render_contradictions(unresolved))
         if orphan_map:
             print(render_orphans(orphan_map))
 

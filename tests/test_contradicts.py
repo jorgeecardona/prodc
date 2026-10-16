@@ -149,6 +149,17 @@ def test_lint_warns_unresolved_contradiction_on_both(
     assert "N-2: unresolved contradiction with N-1" in out
 
 
+def test_status_text_shows_unresolved_contradictions(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+
+    main(["status", "--config", str(_project(tmp_path))])
+    out = capsys.readouterr().out
+    assert "contradictions (two needs in tension" in out
+    assert "N-1 vs N-2" in out
+
+
 def test_lint_silent_when_contradiction_resolved(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

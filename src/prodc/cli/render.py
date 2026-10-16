@@ -23,6 +23,7 @@ from ..model import (
     ears_shape,
 )
 from ..status import (
+    Contradiction,
     Handoff,
     PrincipleReport,
     Recurrence,
@@ -286,6 +287,14 @@ def render_principles(reports: list[PrincipleReport]) -> str:
         if rep.stale:
             ids = ", ".join(n.id for n in rep.stale)
             out.append(f"        ⚠ decided before the latest revision: {ids} — re-review")
+    return "\n".join(out)
+
+
+def render_contradictions(contras: list[Contradiction]) -> str:
+    """Unresolved contradictions on the board: two needs in tension the vision has not decided."""
+    out = ["\ncontradictions (two needs in tension — the vision has not decided):"]
+    for c in contras:
+        out.append(f"  {c.a.id} vs {c.b.id}    {c.a.text[:32]}  /  {c.b.text[:32]}")
     return "\n".join(out)
 
 
