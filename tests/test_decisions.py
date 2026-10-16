@@ -244,6 +244,47 @@ def test_add_decision_requires_needs(tmp_path: Path, capsys: pytest.CaptureFixtu
     assert "requires --needs" in capsys.readouterr().err
 
 
+def test_withdraw_and_reinstate_decision(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+
+    cfg = _project(tmp_path)  # has D-1 serving N-1
+    assert (
+        main(
+            [
+                "withdraw",
+                "decision",
+                "D-1",
+                "--reason",
+                "superseded by D-2",
+                "--date",
+                "2026-10-20",
+                "--config",
+                str(cfg),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    d1 = {d.id: d for d in load(Config.load(cfg)).decisions}["D-1"]
+    assert d1.withdrawn is not None and d1.withdrawn.reason == "superseded by D-2"
+    # off the in-force set while withdrawn
+    assert decisions_for("N-1", list(load(Config.load(cfg)).decisions)) == []
+    assert main(["reinstate", "decision", "D-1", "--config", str(cfg)]) == 0
+    assert {d.id: d for d in load(Config.load(cfg)).decisions}["D-1"].withdrawn is None
+
+
+def test_reinstate_decision_not_withdrawn_errors(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+
+    cfg = _project(tmp_path)
+    assert main(["reinstate", "decision", "D-1", "--config", str(cfg)]) == 2
+    assert "not withdrawn" in capsys.readouterr().err
+
+
 def test_add_decision_requires_text(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     from prodc.cli import main
 

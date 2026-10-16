@@ -63,11 +63,13 @@ from ..writer import (
     delete_need,
     link_variant_group,
     reinstate,
+    reinstate_decision,
     relink_proof,
     revise_principle,
     set_field,
     set_importance,
     withdraw,
+    withdraw_decision,
 )
 from .common import (
     RepoRow,
@@ -709,16 +711,31 @@ def cmd_withdraw(args: argparse.Namespace) -> int:
         return 2
     try:
         cfg = Config.load(cfg_path)
-        edit = withdraw(
-            cfg,
-            args.need_id,
-            reason=args.reason,
-            date=args.date or date.today().isoformat(),
-            kind=args.kind,
-            principle=args.principle,
-            expect_sha=args.expect_sha,
-            dry_run=args.dry_run,
-        )
+        if args.target == "decision":
+            # noun-first: ids are unique per noun, so a need and a decision may share one — the
+            # noun disambiguates (matches `add decision` / `revise principle`).
+            if not args.decision_id:
+                print("prodc: withdraw decision needs a decision id", file=sys.stderr)
+                return 2
+            edit = withdraw_decision(
+                cfg,
+                args.decision_id,
+                reason=args.reason,
+                date=args.date or date.today().isoformat(),
+                expect_sha=args.expect_sha,
+                dry_run=args.dry_run,
+            )
+        else:
+            edit = withdraw(
+                cfg,
+                args.target,
+                reason=args.reason,
+                date=args.date or date.today().isoformat(),
+                kind=args.kind,
+                principle=args.principle,
+                expect_sha=args.expect_sha,
+                dry_run=args.dry_run,
+            )
     except (ConfigError, WriteError) as exc:
         print(f"prodc: {exc}", file=sys.stderr)
         return 2
@@ -733,12 +750,23 @@ def cmd_reinstate(args: argparse.Namespace) -> int:
         return 2
     try:
         cfg = Config.load(cfg_path)
-        edit = reinstate(
-            cfg,
-            args.need_id,
-            expect_sha=args.expect_sha,
-            dry_run=args.dry_run,
-        )
+        if args.target == "decision":
+            if not args.decision_id:
+                print("prodc: reinstate decision needs a decision id", file=sys.stderr)
+                return 2
+            edit = reinstate_decision(
+                cfg,
+                args.decision_id,
+                expect_sha=args.expect_sha,
+                dry_run=args.dry_run,
+            )
+        else:
+            edit = reinstate(
+                cfg,
+                args.target,
+                expect_sha=args.expect_sha,
+                dry_run=args.dry_run,
+            )
     except (ConfigError, WriteError) as exc:
         print(f"prodc: {exc}", file=sys.stderr)
         return 2

@@ -354,7 +354,10 @@ def main(argv: list[str] | None = None) -> int:
     wd = sub.add_parser(
         "withdraw", help="record a decision against a need — withdrawn / won't-do (#74)"
     )
-    wd.add_argument("need_id", help="the need id to withdraw")
+    wd.add_argument("target", help="the need id to withdraw, or 'decision' to withdraw a decision")
+    wd.add_argument(
+        "decision_id", nargs="?", default=None, help="the decision id (when target is 'decision')"
+    )
     wd.add_argument(
         "--reason", required=True, help="why it was decided against (kept on the record)"
     )
@@ -389,7 +392,12 @@ def main(argv: list[str] | None = None) -> int:
     ri = sub.add_parser(
         "reinstate", help="remove a need's withdrawal, putting it back on the board (#74)"
     )
-    ri.add_argument("need_id", help="the need id to reinstate")
+    ri.add_argument(
+        "target", help="the need id to reinstate, or 'decision' to reinstate a decision"
+    )
+    ri.add_argument(
+        "decision_id", nargs="?", default=None, help="the decision id (when target is 'decision')"
+    )
     ri.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     ri.add_argument("--json", action="store_true", help="machine-readable output")
     ri.add_argument(

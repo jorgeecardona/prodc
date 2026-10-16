@@ -544,6 +544,63 @@ def reinstate(config: Config, need_id: str, *, expect_sha: str | None, dry_run: 
     return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
 
 
+def _locate_decision(config: Config, decision_id: str) -> tuple[Path, dict[str, object], str]:
+    """The file holding ``decision_id``, its parsed doc, and its raw text."""
+    for path in _config_files(config):
+        doc, text = _read_doc(path)
+        raw = doc.get("decisions")
+        if not isinstance(raw, list):
+            continue
+        for d in cast("list[object]", raw):
+            if isinstance(d, dict) and cast("dict[str, object]", d).get("id") == decision_id:
+                return path, doc, text
+    raise WriteError(f"no decision {decision_id!r} in any prodc file")
+
+
+def withdraw_decision(
+    config: Config,
+    decision_id: str,
+    *,
+    reason: str,
+    date: str,
+    expect_sha: str | None = None,
+    dry_run: bool,
+) -> Edit:
+    """Supersede/retire a decision: write a ``withdrawn: {reason, date}`` mark onto it.
+
+    The decision's lifecycle reuses the Need verbs (no status enum): this is how a superseded
+    decision leaves the in-force set while its record stays (e.g. ``--reason "superseded by D-7"``).
+    Comment-safe: only the decision's own block is spliced. Reinstate with :func:`reinstate_decision`.
+    """
+    path, doc, old_text = _locate_decision(config, decision_id)
+    if expect_sha is not None and _sha256(old_text) != expect_sha:
+        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
+    for raw in cast("list[object]", doc["decisions"]):
+        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == decision_id:
+            cast("dict[str, object]", raw)["withdrawn"] = {"reason": reason, "date": date}
+            break
+    new_text = _render_item_edit(old_text, doc, "decisions", decision_id)
+    return _validated(config, path, old_text, new_text, dry_run)
+
+
+def reinstate_decision(
+    config: Config, decision_id: str, *, expect_sha: str | None = None, dry_run: bool
+) -> Edit:
+    """Remove a decision's ``withdrawn`` mark, putting it back in force. Errors if not withdrawn."""
+    path, doc, old_text = _locate_decision(config, decision_id)
+    if expect_sha is not None and _sha256(old_text) != expect_sha:
+        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
+    for raw in cast("list[object]", doc["decisions"]):
+        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == decision_id:
+            d = cast("dict[str, object]", raw)
+            if "withdrawn" not in d:
+                raise WriteError(f"decision {decision_id!r} is not withdrawn")
+            del d["withdrawn"]
+            break
+    new_text = _render_item_edit(old_text, doc, "decisions", decision_id)
+    return _validated(config, path, old_text, new_text, dry_run)
+
+
 def delete_need(
     config: Config, need_id: str, *, expect_sha: str | None = None, dry_run: bool
 ) -> Edit:
