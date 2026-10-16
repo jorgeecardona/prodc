@@ -14,7 +14,7 @@ from datetime import date
 from .board import gather
 from .config import Config
 from .model import Model, NeedResult, NeedState
-from .status import state_priority
+from .status import active_decisions, principle_report, state_priority
 
 _LABEL = {
     NeedState.DELIVERED: "DELIVERED",
@@ -150,6 +150,38 @@ def render_markdown(
             out.append(
                 f"| {rec.baseline.id} | {rec.count} | {rec.baseline.text.replace('|', chr(92) + '|')} |"
             )
+        out.append("")
+
+    if model.principles:
+        out += [
+            "## Principles (the product vision — held as given)",
+            "",
+            "| principle | stated | needs declined under it |",
+            "|---|---|---|",
+        ]
+        for rep in principle_report(list(model.needs), list(model.principles)):
+            text = rep.principle.text.replace("|", "\\|")
+            declined = ", ".join(n.id for n in rep.declined) or "—"
+            stale = f" _(re-review {', '.join(n.id for n in rep.stale)})_" if rep.stale else ""
+            out.append(
+                f"| {rep.principle.id}: {text} | {rep.principle.revised_at or '—'} "
+                f"| {declined}{stale} |"
+            )
+        out.append("")
+
+    active = active_decisions(list(model.decisions))
+    if active:
+        out += [
+            "## Decisions (the solution chosen for each need)",
+            "",
+            "| decision | serves | chosen over | rests on |",
+            "|---|---|---|---|",
+        ]
+        for d in active:
+            text = d.text.replace("|", "\\|")
+            over = ", ".join(a.replace("|", "\\|") for a in d.alternatives) or "—"
+            rests = ", ".join(d.principles) or "—"
+            out.append(f"| {d.id}: {text} | {', '.join(d.needs)} | {over} | {rests} |")
         out.append("")
 
     # Open questions: the brief — opinions (no evidence) or HOLEs (no proof), must-haves first.

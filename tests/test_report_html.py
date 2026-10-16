@@ -107,6 +107,27 @@ def test_html_carries_source_quote_and_proof_resolution(
     assert n3["opinion"] is True  # no source at all
 
 
+def test_html_carries_principles_and_decisions(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    needs = (
+        "principles:\n  - id: P-1\n    text: local-first\n    revised_at: 2026-10-15\n"
+        "needs:\n  - id: N-1\n    text: store a recording\n"
+        "decisions:\n  - id: D-1\n    text: store as FLAC\n    needs: [N-1]\n"
+        "    alternatives: [WAV]\n    principles: [P-1]\n    decided_at: 2026-10-16\n"
+    )
+    (tmp_path / "needs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "prodc.toml").write_text('[prodc]\nneeds = ["needs/*.yaml"]\n', encoding="utf-8")
+    (tmp_path / "needs" / "a.yaml").write_text(needs, encoding="utf-8")
+    code = main(["report", "--format", "html", "--config", str(tmp_path / "prodc.toml")])
+    html = capsys.readouterr().out
+    assert code == 0
+    data = _payload(html)
+    assert [p["id"] for p in data["principles"]] == ["P-1"]  # type: ignore[attr-defined]
+    d = data["decisions"][0]  # type: ignore[index]
+    assert d["id"] == "D-1" and d["alternatives"] == ["WAV"] and d["principles"] == ["P-1"]
+
+
 def test_html_client_scope(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     data = _payload(_render(tmp_path, capsys, "--client", "acme"))
     ids = {n["id"] for n in data["needs"]}  # type: ignore[attr-defined]

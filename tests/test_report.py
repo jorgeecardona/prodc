@@ -87,3 +87,35 @@ def test_report_client_scope_in_heading(tmp_path: Path, capsys: pytest.CaptureFi
     out = capsys.readouterr().out
     assert code == 0
     assert "— jordan — product status" in out
+
+
+_NEEDS_PD = """
+principles:
+  - id: P-1
+    text: local-first always
+    revised_at: 2026-10-15
+needs:
+  - id: N-1
+    text: store a recording
+decisions:
+  - id: D-1
+    text: store as FLAC on disk
+    needs: [N-1]
+    alternatives: [WAV]
+    principles: [P-1]
+    decided_at: 2026-10-16
+"""
+
+
+def test_report_renders_principles_and_decisions(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "needs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "prodc.toml").write_text('[prodc]\nneeds = ["needs/*.yaml"]\n', encoding="utf-8")
+    (tmp_path / "needs" / "a.yaml").write_text(_NEEDS_PD, encoding="utf-8")
+    code = main(["report", "--config", str(tmp_path / "prodc.toml")])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "## Principles" in out and "P-1: local-first always" in out
+    assert "## Decisions" in out and "D-1: store as FLAC on disk" in out
+    assert "WAV" in out  # the rejected alternative is shown
