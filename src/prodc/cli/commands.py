@@ -11,7 +11,7 @@ import argparse
 import importlib.resources
 import json
 import sys
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import date
 from pathlib import Path
 from typing import cast
@@ -28,7 +28,7 @@ from ..dedup import (
     who_variants,
 )
 from ..loader import LoaderError, load
-from ..model import Model, Need, NeedResult, NeedState, board_needs
+from ..model import Need, NeedResult, NeedState, board_needs
 from ..report import render_markdown
 from ..report_html import render_html
 from ..status import (
@@ -1041,14 +1041,10 @@ def cmd_report(args: argparse.Namespace) -> int:
         return 2
     cfg, model = loaded
     if args.client:
+        # replace keeps every other noun (principles, decisions, …); a hand-rolled Model(...)
+        # silently dropped them, which breaks the moment the report renders them (#0.4).
         scoped = applicable_needs(list(model.needs), args.client)
-        model = Model(
-            needs=tuple(scoped),
-            goals=model.goals,
-            releases=model.releases,
-            roles=model.roles,
-            argument=model.argument,
-        )
+        model = replace(model, needs=tuple(scoped))
     if args.format == "html":
         text = render_html(cfg, model, client=args.client, rev=git_rev(cfg.root))
     else:
