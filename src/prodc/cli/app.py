@@ -370,6 +370,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     wd.add_argument("--date", default=None, help="when (ISO, e.g. 2026-10-10; default: today)")
     wd.add_argument(
+        "--of",
+        default=None,
+        metavar="ID",
+        help="the need this one duplicates (validated); required with --kind duplicate",
+    )
+    wd.add_argument(
         "--principle",
         default=None,
         metavar="ID",

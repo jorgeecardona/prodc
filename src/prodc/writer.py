@@ -495,6 +495,7 @@ def withdraw(
     date: str,
     kind: str = "wont_do",
     principle: str | None = None,
+    of: str | None = None,
     expect_sha: str | None,
     dry_run: bool,
 ) -> Edit:
@@ -513,6 +514,8 @@ def withdraw(
         mark["kind"] = kind
     if principle is not None:
         mark["principle"] = principle
+    if of is not None:
+        mark["of"] = of
     path, _ = _locate(config, need_id)
     doc, old_text = _read_doc(path)
     if expect_sha is not None and _sha256(old_text) != expect_sha:

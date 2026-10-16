@@ -243,6 +243,7 @@ class Withdrawal:
     date: str
     kind: WithdrawalKind = WithdrawalKind.WONT_DO
     principle: str | None = None  # id of the Principle this decision rests on
+    of: str | None = None  # id of the need this one duplicates (required when kind is duplicate)
 
 
 @dataclass(frozen=True)

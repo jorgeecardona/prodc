@@ -341,7 +341,8 @@ def render_show(
         lines.append(f"  answer: {need.answer.value}")
     if need.withdrawn:
         w = need.withdrawn
-        tag = "" if w.kind.value == "wont_do" else f" [{w.kind.value}]"
+        of = f" of {w.of}" if w.of else ""
+        tag = "" if w.kind.value == "wont_do" else f" [{w.kind.value}{of}]"
         per = f" per {w.principle}" if w.principle else ""
         lines.append(f"  withdrawn{tag}{per}: {w.reason} ({w.date})")
     if need.description:

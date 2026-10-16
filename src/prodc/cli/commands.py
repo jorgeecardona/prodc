@@ -733,6 +733,7 @@ def cmd_withdraw(args: argparse.Namespace) -> int:
                 date=args.date or date.today().isoformat(),
                 kind=args.kind,
                 principle=args.principle,
+                of=args.of,
                 expect_sha=args.expect_sha,
                 dry_run=args.dry_run,
             )

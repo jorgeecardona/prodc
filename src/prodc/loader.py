@@ -157,7 +157,8 @@ def _withdrawal(raw: object, where: str) -> Withdrawal | None:
             f"{where}.kind: unknown withdrawal kind {kind_name!r} ({kinds})"
         ) from None
     principle = _opt_str(tbl.get("principle"), f"{where}.principle")
-    return Withdrawal(reason=reason, date=date, kind=kind, principle=principle)
+    of = _opt_str(tbl.get("of"), f"{where}.of")
+    return Withdrawal(reason=reason, date=date, kind=kind, principle=principle, of=of)
 
 
 # Old source-kind names (pre-0.3.58) mapped to the primary/secondary/assumption ladder, so
@@ -491,6 +492,7 @@ def load(config: Config) -> Model:
         lambda n: n.withdrawn.principle if n.withdrawn else None,
         {a.id for a in acc.principles},
     )
+    _check_withdrawal_of(acc.needs)
     _check_source_roles(acc.needs, acc.principles, {p.id for p in acc.roles})
     _check_decisions(acc.decisions, {n.id for n in acc.needs}, {p.id for p in acc.principles})
     _check_argument(acc.argument)
@@ -562,6 +564,26 @@ def _check_children(needs: list[Need]) -> None:
         for cid in need.children:
             if cid not in known:
                 raise LoaderError(f"need {need.id!r}: child {cid!r} is not a known need id")
+
+
+def _check_withdrawal_of(needs: list[Need]) -> None:
+    """A withdrawal's ``of`` must name a known need (never itself); required when kind is duplicate.
+
+    ``of`` is the need this one duplicates — a ``duplicate`` withdrawal that names no target is a
+    reason string, not data the board can roll up, so it is refused at load (0.4).
+    """
+    known = {n.id for n in needs}
+    for need in needs:
+        w = need.withdrawn
+        if w is None:
+            continue
+        if w.kind is WithdrawalKind.DUPLICATE and w.of is None:
+            raise LoaderError(f"need {need.id!r}: a duplicate withdrawal must name 'of' (the original)")
+        if w.of is not None:
+            if w.of == need.id:
+                raise LoaderError(f"need {need.id!r}: withdrawn 'of' cannot be itself")
+            if w.of not in known:
+                raise LoaderError(f"need {need.id!r}: withdrawn 'of' {w.of!r} is not a known need id")
 
 
 def _check_decisions(

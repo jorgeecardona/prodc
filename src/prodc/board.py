@@ -109,6 +109,7 @@ def need_payload(r: NeedResult, *, flavor: Literal["board", "html"] = "board") -
                     "date": need.withdrawn.date,
                     "kind": need.withdrawn.kind.value,
                     "principle": need.withdrawn.principle,
+                    "of": need.withdrawn.of,
                 }
                 if need.withdrawn
                 else None
@@ -164,6 +165,7 @@ def need_payload(r: NeedResult, *, flavor: Literal["board", "html"] = "board") -
                 "date": need.withdrawn.date,
                 "kind": need.withdrawn.kind.value,
                 "principle": need.withdrawn.principle,
+                "of": need.withdrawn.of,
             }
             if need.withdrawn
             else None

@@ -247,6 +247,7 @@ def test_show_json_carries_withdrawn(tmp_path: Path, capsys: pytest.CaptureFixtu
         "date": "2026-10-10",
         "kind": "wont_do",  # default when the YAML omits kind
         "principle": None,  # no principle cited
+        "of": None,  # no duplicate target
     }
 
 
@@ -351,3 +352,60 @@ def test_show_tags_non_default_kind(tmp_path: Path, capsys: pytest.CaptureFixtur
     main(["show", "OOS-1", "--config", str(_project(tmp_path, needs=_KIND_NEEDS))])
     out = capsys.readouterr().out
     assert "withdrawn [out_of_scope]: not the product we build (2026-10-10)" in out
+
+
+# --- duplicate target: Withdrawal.of (0.4) ----------------------------------
+
+
+def test_withdraw_writes_of_target(tmp_path: Path) -> None:
+    from prodc.cli import main
+
+    cfg = _project(tmp_path)  # N-1 (live), W-1 (withdrawn)
+    code = main(
+        [
+            "withdraw",
+            "N-1",
+            "--reason",
+            "same as W-1",
+            "--kind",
+            "duplicate",
+            "--of",
+            "W-1",
+            "--date",
+            "2026-10-16",
+            "--config",
+            str(cfg),
+        ]
+    )
+    assert code == 0
+    w = {n.id: n for n in load(Config.load(cfg)).needs}["N-1"].withdrawn
+    assert w is not None and w.of == "W-1"
+
+
+def test_duplicate_withdrawal_without_of_rejected(tmp_path: Path) -> None:
+    needs = """
+needs:
+  - id: N-1
+    text: a dup with no target
+    withdrawn:
+      kind: duplicate
+      reason: same as something
+      date: 2026-10-10
+"""
+    with pytest.raises(LoaderError, match="duplicate withdrawal must name 'of'"):
+        load(Config.load(_project(tmp_path, needs=needs)))
+
+
+def test_withdrawal_of_unknown_need_rejected(tmp_path: Path) -> None:
+    needs = """
+needs:
+  - id: N-1
+    text: points at a ghost
+    withdrawn:
+      kind: duplicate
+      of: N-404
+      reason: x
+      date: 2026-10-10
+"""
+    with pytest.raises(LoaderError, match="'of' 'N-404' is not a known need id"):
+        load(Config.load(_project(tmp_path, needs=needs)))
