@@ -12,7 +12,7 @@ import json
 from ..board import need_payload
 from ..board import warrant as _warrant
 from ..dedup import DupPair, VariantGroup
-from ..model import Decision, Goal, Model, NeedResult, NeedState, Release, Role
+from ..model import Decision, Goal, NeedResult, NeedState, Release, Role
 from ..status import Handoff, PrincipleReport, Recurrence, Summary, rank
 from .common import brief_open
 
@@ -218,26 +218,6 @@ def plan_json(
                 }
                 for i, r in enumerate(ranked, 1)
             ],
-        },
-        indent=2,
-    )
-
-
-def argument_json(model: Model, defects: list[str]) -> str:
-    return json.dumps(
-        {
-            "nodes": [
-                {
-                    "id": n.id,
-                    "kind": n.kind.value,
-                    "text": n.text,
-                    "supported_by": list(n.supported_by),
-                    "in_context_of": list(n.in_context_of),
-                    "about": n.about,
-                }
-                for n in model.argument
-            ],
-            "defects": defects,
         },
         indent=2,
     )

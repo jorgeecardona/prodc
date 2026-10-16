@@ -16,7 +16,6 @@ from .commands import (
     cmd_accept,
     cmd_add,
     cmd_agent,
-    cmd_argument,
     cmd_attest,
     cmd_brief,
     cmd_capture,
@@ -143,12 +142,6 @@ def main(argv: list[str] | None = None) -> int:
         help="only needs whose importance is undated or set more than DAYS ago — a refresh pass (#59)",
     )
     pl.set_defaults(func=cmd_plan)
-
-    ar = sub.add_parser("argument", help="show the GSN assurance graph and its defects")
-    ar.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    ar.add_argument("--json", action="store_true", help="machine-readable output")
-    ar.add_argument("--strict", action="store_true", help="exit 1 if the graph has any defect")
-    ar.set_defaults(func=cmd_argument)
 
     st2 = sub.add_parser("set", help="set or append one field on a need (writes YAML)")
     st2.add_argument("need_id", help="the need id to edit, e.g. N-1")

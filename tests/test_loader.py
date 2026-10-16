@@ -292,46 +292,14 @@ def test_need_release_unknown_raises(tmp_path: Path) -> None:
         load_needs(cfg)
 
 
-def test_argument_graph_loaded_and_links_validated(tmp_path: Path) -> None:
-    from prodc.loader import load
-    from prodc.model import ArgKind
-
+def test_argument_key_is_a_removed_tombstone(tmp_path: Path) -> None:
+    # The GSN argument graph was cut in 0.4; the key is a hard error (tombstone), not silently
+    # ignored, so an old board carrying it is told what replaced it.
     cfg = _config(
         tmp_path,
-        (
-            "arg.yaml",
-            """
-            argument:
-              - id: C-1
-                kind: claim
-                text: deploys are safe
-                supported_by: [E-1]
-                in_context_of: [A-1]
-              - id: E-1
-                kind: evidence
-                text: the smoke suite passes
-                about: web:deploy.feature#Smoke
-              - id: A-1
-                kind: assumption
-                text: the suite covers the risky paths
-            """,
-        ),
+        ("a.yaml", "argument:\n  - id: C-1\n    kind: claim\n    text: t\n"),
     )
-    model = load(cfg)
-    assert {n.id for n in model.argument} == {"C-1", "E-1", "A-1"}
-    c1 = next(n for n in model.argument if n.id == "C-1")
-    assert c1.kind is ArgKind.CLAIM and c1.supported_by == ("E-1",)
-
-
-def test_argument_dangling_link_raises(tmp_path: Path) -> None:
-    cfg = _config(
-        tmp_path,
-        (
-            "a.yaml",
-            "argument:\n  - id: C-1\n    kind: claim\n    text: t\n    supported_by: [GHOST]\n",
-        ),
-    )
-    with pytest.raises(LoaderError, match="link 'GHOST' is not a known argument node id"):
+    with pytest.raises(LoaderError, match=r"'argument:' was removed in 0\.4"):
         load_needs(cfg)
 
 

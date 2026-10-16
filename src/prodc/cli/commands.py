@@ -35,7 +35,6 @@ from ..status import (
     ProofSuggestion,
     RelinkSuggestion,
     applicable_needs,
-    argument_defects,
     contradictions,
     decisions_for,
     evidence_age_days,
@@ -84,7 +83,6 @@ from .render import (
     COLUMNS,
     provenance_counts,
     render,
-    render_argument,
     render_brief,
     render_columns,
     render_contradictions,
@@ -103,7 +101,6 @@ from .render import (
     summary_line,
 )
 from .serialize import (
-    argument_json,
     brief_json,
     dup_payload,
     plan_json,
@@ -954,15 +951,6 @@ def cmd_capture(args: argparse.Namespace) -> int:
     return emit_edit(edit, args.dry_run, args.json)
 
 
-def cmd_argument(args: argparse.Namespace) -> int:
-    """Show the GSN assurance graph and its defects (unsupported claim, dangling assumption)."""
-    loaded = load_or_report(args)
-    if loaded is None:
-        return 2
-    _cfg, model = loaded
-    defects = argument_defects(list(model.argument))
-    print(argument_json(model, defects) if args.json else render_argument(model, defects))
-    return 1 if (args.strict and defects) else 0
 
 
 def _repo_row(config_path: str) -> RepoRow:

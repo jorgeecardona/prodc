@@ -229,21 +229,6 @@ def test_release_report_in_ship_order() -> None:
     assert rep[0][1].delivered == 1 and rep[1][1].delivered == 0
 
 
-def test_argument_defects_flags_unsupported_and_dangling() -> None:
-    from prodc.model import ArgKind, ArgNode
-    from prodc.status import argument_defects
-
-    nodes = [
-        ArgNode(id="C-1", kind=ArgKind.CLAIM, text="unsupported claim"),  # no support, no about
-        ArgNode(id="C-2", kind=ArgKind.CLAIM, text="ok", about="web:x#y"),  # discharged by evidence
-        ArgNode(id="A-1", kind=ArgKind.ASSUMPTION, text="never attached"),  # dangling
-    ]
-    defects = argument_defects(nodes)
-    assert any("unsupported claim 'C-1'" in d for d in defects)
-    assert any("dangling assumption 'A-1'" in d for d in defects)
-    assert not any("'C-2'" in d for d in defects)  # C-2 cites evidence, not a defect
-
-
 def test_coverage_counts_leaves_not_flow_parents() -> None:
     # a flow (parent with children) must not be double-counted in coverage (#43)
     from prodc.status import summarize

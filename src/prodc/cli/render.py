@@ -14,7 +14,6 @@ from ..board import warrant as _warrant
 from ..model import (
     Decision,
     Goal,
-    Model,
     Need,
     NeedResult,
     NeedState,
@@ -457,21 +456,6 @@ def render_plan(
             f"  {i:>3}. {bang} {r.need.id:<12} {_LABEL[r.state]:<10} "
             f"{_warrant(r.need):<16} {imp:<12} {r.need.text[:48]}"
         )
-    return "\n".join(out)
-
-
-def render_argument(model: Model, defects: list[str]) -> str:
-    out = [f"argument — GSN graph: {len(model.argument)} node(s), {len(defects)} defect(s)"]
-    for node in model.argument:
-        links = ""
-        if node.supported_by:
-            links += f"  ←{','.join(node.supported_by)}"
-        if node.in_context_of:
-            links += f"  ⊙{','.join(node.in_context_of)}"
-        about = f"  [{node.about}]" if node.about else ""
-        out.append(f"  {node.id:<12} {node.kind.value:<13} {node.text[:44]}{about}{links}")
-    for d in defects:
-        out.append(f"  ⚠ {d}")
     return "\n".join(out)
 
 

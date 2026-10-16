@@ -18,8 +18,6 @@ import yaml
 from .config import Config
 from .model import (
     Answer,
-    ArgKind,
-    ArgNode,
     Attestation,
     AttestationKind,
     Decision,
@@ -124,7 +122,7 @@ def _answer(raw: object, where: str) -> Answer | None:
     """Parse ``answer: yes|no|inconclusive`` into an :class:`Answer`, validated like other enums.
 
     The direction a settled research question resolved; absent on a product need. Same
-    ``Enum(name) except ValueError`` pattern as ``SourceKind``/``ArgKind`` so an unknown value is
+    ``Enum(name) except ValueError`` pattern as ``SourceKind`` so an unknown value is
     a :class:`LoaderError` the author owns, not silent junk.
 
     YAML 1.1 reads a bare ``yes``/``no`` as a boolean, so ``answer: no`` arrives as ``False`` —
@@ -372,30 +370,6 @@ def _decision(raw: object, where: str) -> Decision:
     )
 
 
-def _arg_node(raw: object, where: str) -> ArgNode:
-    tbl = _as_mapping(raw, where)
-    kind_name = _as_str(tbl.get("kind"), f"{where}.kind")
-    try:
-        kind = ArgKind(kind_name)
-    except ValueError:
-        kinds = "|".join(k.value for k in ArgKind)
-        raise LoaderError(f"{where}.kind: unknown kind {kind_name!r} ({kinds})") from None
-    return ArgNode(
-        id=_as_str(tbl.get("id"), f"{where}.id"),
-        kind=kind,
-        text=_as_str(tbl.get("text"), f"{where}.text"),
-        supported_by=tuple(
-            _as_str(x, f"{where}.supported_by[{i}]")
-            for i, x in enumerate(_as_list(tbl.get("supported_by"), f"{where}.supported_by"))
-        ),
-        in_context_of=tuple(
-            _as_str(x, f"{where}.in_context_of[{i}]")
-            for i, x in enumerate(_as_list(tbl.get("in_context_of"), f"{where}.in_context_of"))
-        ),
-        about=_opt_str(tbl.get("about"), f"{where}.about"),
-    )
-
-
 @dataclass
 class _Loaded:
     """One file's nouns, accumulated across the glob into the final :class:`Model`."""
@@ -406,7 +380,6 @@ class _Loaded:
     roles: list[Role] = field(default_factory=list[Role])
     principles: list[Principle] = field(default_factory=list[Principle])
     decisions: list[Decision] = field(default_factory=list[Decision])
-    argument: list[ArgNode] = field(default_factory=list[ArgNode])
 
 
 def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
@@ -454,10 +427,13 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
         decision = _decision(raw, f"{where}.decisions[{i}]")
         _unique("decision", decision.id)
         out.decisions.append(decision)
-    for i, raw in enumerate(_as_list(tbl.get("argument"), f"{where}.argument")):
-        node = _arg_node(raw, f"{where}.argument[{i}]")
-        _unique("argument node", node.id)
-        out.argument.append(node)
+    if "argument" in tbl:
+        # Tombstone (0.4): the GSN `argument` graph was removed — state the warrant as a need's
+        # `claim`, prove it with `proofs`, and review it with `prodc attest`. Removed for good in 0.5.
+        raise LoaderError(
+            f"{where}: 'argument:' was removed in 0.4 — state the warrant as need.claim, "
+            "prove it with proofs, and review it with `prodc attest`"
+        )
     return out
 
 
@@ -479,7 +455,6 @@ def load(config: Config) -> Model:
         "role": {},
         "principle": {},
         "decision": {},
-        "argument node": {},
     }
     for pattern in config.need_globs:
         for path in sorted(config.root.glob(pattern)):
@@ -490,7 +465,6 @@ def load(config: Config) -> Model:
             acc.roles.extend(f.roles)
             acc.principles.extend(f.principles)
             acc.decisions.extend(f.decisions)
-            acc.argument.extend(f.argument)
     _check_variants(acc.needs)
     _check_children(acc.needs)
     _check_contradicts(acc.needs)
@@ -506,7 +480,6 @@ def load(config: Config) -> Model:
     _check_withdrawal_of(acc.needs)
     _check_source_roles(acc.needs, acc.principles, {p.id for p in acc.roles})
     _check_decisions(acc.decisions, {n.id for n in acc.needs}, {p.id for p in acc.principles})
-    _check_argument(acc.argument)
     acc.needs = _symmetrize_contradicts(acc.needs)
     return Model(
         needs=tuple(acc.needs),
@@ -515,7 +488,6 @@ def load(config: Config) -> Model:
         roles=tuple(acc.roles),
         principles=tuple(acc.principles),
         decisions=tuple(acc.decisions),
-        argument=tuple(acc.argument),
     )
 
 
@@ -549,22 +521,6 @@ def _check_source_roles(needs: list[Need], principles: list[Principle], known: s
             if s.role is not None and s.role not in known:
                 raise LoaderError(
                     f"{noun} {oid!r}: source[{i}] role {s.role!r} is not a known role id"
-                )
-
-
-def _check_argument(argument: list[ArgNode]) -> None:
-    """Every ``supported_by``/``in_context_of`` link must name a known argument node.
-
-    Only the intra-graph links are hard errors here; ``about`` may cite a proof locator that
-    is not declared in these files, so it is left to resolve at status time. Soft defects (an
-    unsupported claim, a dangling assumption) are reported by :func:`~prodc.status.argument_defects`.
-    """
-    known = {n.id for n in argument}
-    for node in argument:
-        for ref in (*node.supported_by, *node.in_context_of):
-            if ref not in known:
-                raise LoaderError(
-                    f"argument node {node.id!r}: link {ref!r} is not a known argument node id"
                 )
 
 

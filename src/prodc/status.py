@@ -16,8 +16,6 @@ from .dedup import similarity
 from .model import (
     SOLUTION_VERBS,
     Answer,
-    ArgKind,
-    ArgNode,
     AttestationKind,
     Decision,
     Goal,
@@ -831,31 +829,6 @@ def applicable_needs(needs: list[Need], client: str) -> list[Need]:
             out.append(n)  # this client's own needs/variants
         elif n.client is None and n.variant_of is None and n.id not in overridden:
             out.append(n)  # a shared baseline this client hasn't specialised
-    return out
-
-
-_CONTEXT_KINDS = (ArgKind.CONTEXT, ArgKind.ASSUMPTION, ArgKind.JUSTIFICATION)
-
-
-def argument_defects(argument: list[ArgNode]) -> list[str]:
-    """Report an unsupported claim or a dangling context node — like HOLE, not a load failure (#28).
-
-    A CLAIM or STRATEGY discharges nothing if nothing supports it (and, for a claim, it cites
-    no evidence via ``about``). A CONTEXT/ASSUMPTION/JUSTIFICATION that no node attaches via
-    ``in_context_of`` is stated but never used. These are the checkable defects GSN exists to
-    surface; the graph still loads.
-    """
-    attached: set[str] = set()
-    for node in argument:
-        attached.update(node.in_context_of)
-    out: list[str] = []
-    for node in argument:
-        if node.kind is ArgKind.CLAIM and not node.supported_by and not node.about:
-            out.append(f"unsupported claim {node.id!r}: no supporting node and no evidence")
-        elif node.kind is ArgKind.STRATEGY and not node.supported_by:
-            out.append(f"unsupported strategy {node.id!r}: no supporting node")
-        if node.kind in _CONTEXT_KINDS and node.id not in attached:
-            out.append(f"dangling {node.kind.value} {node.id!r}: attached to no claim")
     return out
 
 
