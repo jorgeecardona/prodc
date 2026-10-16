@@ -22,6 +22,7 @@ from .commands import (
     cmd_capture,
     cmd_diff,
     cmd_dupes,
+    cmd_guide,
     cmd_lint,
     cmd_plan,
     cmd_portfolio,
@@ -605,6 +606,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     ag.add_argument("--force", action="store_true", help="overwrite PATH if it already exists")
     ag.set_defaults(func=cmd_agent)
+
+    gd = sub.add_parser(
+        "guide", help="print prodc's human CLI guide (a short, scannable onboarding path)"
+    )
+    gd.add_argument(
+        "--write",
+        default=None,
+        metavar="PATH",
+        help="write the guide to PATH instead of stdout",
+    )
+    gd.add_argument("--force", action="store_true", help="overwrite PATH if it already exists")
+    gd.set_defaults(func=cmd_guide)
 
     df = sub.add_parser(
         "diff", help="diff the current board against a prior status --json snapshot"
