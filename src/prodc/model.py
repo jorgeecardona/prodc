@@ -196,6 +196,17 @@ class AttestationKind(StrEnum):
     AI = "ai"  # a model reviewed it — weaker than a human, stronger than nothing
 
 
+class Verdict(StrEnum):
+    """A warrant review's conclusion. Only ``pass`` clears the need; anything else is a warning.
+
+    A recorded ``fail`` or ``concerns`` must not read as a green warrant — the board cannot lie.
+    """
+
+    PASS = "pass"  # the proofs establish the need
+    CONCERNS = "concerns"  # reviewed, but with reservations — not a clean pass
+    FAIL = "fail"  # the proofs do NOT establish the need
+
+
 @dataclass(frozen=True)
 class Attestation:
     """A sign-off that a need's proofs actually establish its claim (#13).
@@ -209,7 +220,7 @@ class Attestation:
     who: str  # a person's name, or the model id for an AI review
     date: str
     kind: AttestationKind = AttestationKind.HUMAN
-    verdict: str | None = None  # the reviewer's conclusion, e.g. "pass" / "concerns" / "fail"
+    verdict: Verdict | None = None  # the reviewer's conclusion; only pass clears the warrant
     comment: str | None = None  # the review's feedback / rationale, kept on the record
 
 

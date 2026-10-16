@@ -326,20 +326,43 @@ def test_flow_orphan_silent_without_flows() -> None:
 
 
 def test_ai_attestation_is_middle_rung_warning() -> None:
-    from prodc.model import Attestation, AttestationKind
+    from prodc.model import Attestation, AttestationKind, Verdict
 
     ai = Need(
         id="N-1",
         text="t",
         proofs=("x:1",),
-        attestation=Attestation(who="opus", date="2026-10-05", kind=AttestationKind.AI),
+        attestation=Attestation(
+            who="opus", date="2026-10-05", kind=AttestationKind.AI, verdict=Verdict.PASS
+        ),
     )
     human = Need(
-        id="N-2", text="t", proofs=("x:1",), attestation=Attestation(who="Jorge", date="2026-10-05")
+        id="N-2",
+        text="t",
+        proofs=("x:1",),
+        attestation=Attestation(who="Jorge", date="2026-10-05", verdict=Verdict.PASS),
     )
     by_id = {r.need.id: r for r in resolve([ai, human], {"x": _delivered()})}
     assert any("(AI) — not a human" in w for w in by_id["N-1"].warnings)
-    assert not any("#13" in w for w in by_id["N-2"].warnings)  # human review: no warning
+    assert not any("#13" in w for w in by_id["N-2"].warnings)  # human review, verdict pass: clean
+
+
+def test_non_pass_verdict_does_not_read_as_green() -> None:
+    """A recorded human fail (or missing verdict) must warn — the board cannot show a false green."""
+    from prodc.model import Attestation, Verdict
+
+    failed = Need(
+        id="N-1",
+        text="t",
+        proofs=("x:1",),
+        attestation=Attestation(who="Jorge", date="2026-10-05", verdict=Verdict.FAIL),
+    )
+    unspecified = Need(
+        id="N-2", text="t", proofs=("x:1",), attestation=Attestation(who="Jorge", date="2026-10-05")
+    )
+    by_id = {r.need.id: r for r in resolve([failed, unspecified], {"x": _delivered()})}
+    assert any("did not pass (fail)" in w for w in by_id["N-1"].warnings)
+    assert any("did not pass (no verdict)" in w for w in by_id["N-2"].warnings)
 
 
 def test_flow_seam_proof_gates_delivered() -> None:

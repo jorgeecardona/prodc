@@ -317,7 +317,10 @@ def main(argv: list[str] | None = None) -> int:
     at.add_argument("--date", required=True, help="when (ISO, e.g. 2026-10-05)")
     at.add_argument("--ai", action="store_true", help="the reviewer is an AI model, not a human")
     at.add_argument(
-        "--verdict", default=None, help="the reviewer's conclusion, e.g. pass/concerns/fail"
+        "--verdict",
+        choices=["pass", "concerns", "fail"],
+        default=None,
+        help="the reviewer's conclusion; only pass clears the warrant (anything else warns)",
     )
     at.add_argument("--comment", default=None, help="the review's feedback, kept on the record")
     at.add_argument("--config", default="prodc.toml", help="path to prodc.toml")

@@ -31,6 +31,7 @@ from .model import (
     Role,
     Source,
     SourceKind,
+    Verdict,
     Withdrawal,
     WithdrawalKind,
 )
@@ -100,11 +101,21 @@ def _attestation(raw: object, where: str) -> Attestation | None:
     except ValueError:
         kinds = "|".join(k.value for k in AttestationKind)
         raise LoaderError(f"{where}.kind: unknown kind {kind_name!r} ({kinds})") from None
+    verdict_name = _opt_str(tbl.get("verdict"), f"{where}.verdict")
+    verdict: Verdict | None = None
+    if verdict_name is not None:
+        try:
+            verdict = Verdict(verdict_name)
+        except ValueError:
+            verdicts = "|".join(v.value for v in Verdict)
+            raise LoaderError(
+                f"{where}.verdict: unknown verdict {verdict_name!r} ({verdicts})"
+            ) from None
     return Attestation(
         who=who,
         date=date,
         kind=kind,
-        verdict=_opt_str(tbl.get("verdict"), f"{where}.verdict"),
+        verdict=verdict,
         comment=_opt_str(tbl.get("comment"), f"{where}.comment"),
     )
 

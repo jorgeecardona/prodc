@@ -29,6 +29,7 @@ from .model import (
     Release,
     Role,
     SourceKind,
+    Verdict,
     ears_warnings,
 )
 
@@ -138,10 +139,16 @@ def _warrant_warnings(need: Need, result: NeedResult) -> list[str]:
     att = need.attestation
     if att is None:
         return ["DELIVERED on an unattested proof link — warrant not reviewed (#13)"]
+    out: list[str] = []
     if att.kind is AttestationKind.AI:
         # an AI review is a middle rung: better than nothing, weaker than a human sign-off
-        return [f"DELIVERED, warrant reviewed by {att.who} (AI) — not a human (#13)"]
-    return []
+        out.append(f"DELIVERED, warrant reviewed by {att.who} (AI) — not a human (#13)")
+    if att.verdict is not Verdict.PASS:
+        # a recorded fail/concerns (or no verdict) must NOT read as a green warrant — the board
+        # cannot lie. Only `pass` clears the review (0.4 false-green fix).
+        said = att.verdict.value if att.verdict else "no verdict"
+        out.append(f"DELIVERED but the warrant review did not pass ({said}) — re-review (#13)")
+    return out
 
 
 def _answer_warnings(need: Need, result: NeedResult) -> list[str]:
