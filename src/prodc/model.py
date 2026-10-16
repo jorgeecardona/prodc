@@ -271,7 +271,6 @@ class Need:
     proofs: tuple[str, ...] = ()  # locators, "<adapter>:<payload>" (leaf needs)
     children: tuple[str, ...] = ()  # ids of sub-needs (a flow is a Need with children)
     seam: tuple[str, ...] = ()  # end-to-end proof locators for a flow's between-steps behaviour
-    label: str | None = None  # free text for the `who`, e.g. "design partner, Sincerely"
     client: str | None = None  # which client this instance is for; None = shared baseline
     variant_of: str | None = None  # id of the baseline need this specialises; None = standalone
     importance: int | None = None  # author-supplied ordinal (higher = more); refines ranking

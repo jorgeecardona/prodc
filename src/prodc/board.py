@@ -94,7 +94,6 @@ def need_payload(r: NeedResult, *, flavor: Literal["board", "html"] = "board") -
             "state": r.state.value,
             "must": need.must,
             "who": need.who or "(unassigned)",
-            "label": need.label,
             "client": need.client,
             "opinion": need.is_opinion,
             "warrant": strongest.value if strongest is not None else "opinion",

@@ -29,7 +29,6 @@ Feature: orders
 
 _NEEDS = """
 who: jordan
-label: "design partner"
 needs:
   - id: N-1
     text: see past-due orders at a glance

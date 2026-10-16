@@ -400,7 +400,7 @@ function renderDetail(n) {
   const rows = [];
   const push = (k, v) => { if (v) rows.push(`<dt>${k}</dt><dd>${v}</dd>`); };
   if (n.description) push("detail", esc(n.description));
-  push("who", esc(n.who) + (n.label ? ` <span class="meta">(${esc(n.label)})</span>` : ""));
+  push("who", esc(n.who));
   if (n.client) push("client", esc(n.client));
   if (n.goal) push("goal", esc(n.goal));
   if (n.release) push("release", esc(n.release));

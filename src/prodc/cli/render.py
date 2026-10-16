@@ -139,11 +139,9 @@ def render(results: list[NeedResult], wide: bool = False) -> str:
     ]
     for who in sorted(groups):
         rs = sorted(groups[who], key=state_priority)
-        label = next((x.need.label for x in rs if x.need.label), None)
         counts = {s: sum(1 for r in rs if r.state is s) for s in NeedState}
         head = "   ".join(f"{counts[s]} {_LABEL[s]}" for s in NeedState if counts[s])
-        title = f"{who}" + (f" ({label})" if label else "")
-        out.append(f"\n{title}    {head}")
+        out.append(f"\n{who}    {head}")
         out.append(f"    {_provenance_line(rs)}\n")
         for r in rs:
             out.append(
@@ -327,7 +325,7 @@ def render_show(
 ) -> str:
     """One need as a citable answer — the artifact you drop into a thread."""
     need = r.need
-    who = (need.who + (f" ({need.label})" if need.label else "")) if need.who else "(unassigned)"
+    who = need.who or "(unassigned)"
     who += f" — {need.role}" if need.role else ""
     nm = f"  {r.delivered}/{r.total}" if r.total else ""
     lines = [

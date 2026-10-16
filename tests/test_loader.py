@@ -19,14 +19,13 @@ def _config(tmp_path: Path, *files: tuple[str, str]) -> Config:
     return Config(root=tmp_path, need_globs=["product/needs/*.yaml"])
 
 
-def test_file_level_who_and_label_default_each_need(tmp_path: Path) -> None:
+def test_file_level_who_defaults_each_need(tmp_path: Path) -> None:
     cfg = _config(
         tmp_path,
         (
             "john.yaml",
             """
             who: john
-            label: "design partner, Sincerely"
             needs:
               - id: J-1
                 text: "multi-location per customer"
@@ -38,9 +37,16 @@ def test_file_level_who_and_label_default_each_need(tmp_path: Path) -> None:
     )
     needs = {n.id: n for n in load_needs(cfg)}
     assert needs["J-1"].who == "john"
-    assert needs["J-1"].label == "design partner, Sincerely"
     assert needs["J-2"].who == "jane"  # per-need override wins
-    assert needs["J-2"].label == "design partner, Sincerely"  # label still inherited
+
+
+def test_label_key_is_a_removed_tombstone(tmp_path: Path) -> None:
+    cfg = _config(
+        tmp_path,
+        ("a.yaml", 'needs:\n  - id: N-1\n    text: t\n    label: "design partner"\n'),
+    )
+    with pytest.raises(LoaderError, match=r"'label' was removed in 0\.4"):
+        load_needs(cfg)
 
 
 def test_source_kind_defaults_to_internal(tmp_path: Path) -> None:

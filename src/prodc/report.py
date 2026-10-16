@@ -86,8 +86,7 @@ def render_markdown(
         out += ["", "## Needs", ""]
         for who in sorted(groups):
             rs = sorted(groups[who], key=state_priority)
-            label = next((x.need.label for x in rs if x.need.label), None)
-            out.append(f"### {who}" + (f" ({label})" if label else ""))
+            out.append(f"### {who}")
             out.append("")
             out.append("| need | state | text | user signal |")
             out.append("|---|---|---|---|")

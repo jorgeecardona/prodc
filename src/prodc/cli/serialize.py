@@ -147,7 +147,6 @@ def show_json(r: NeedResult, decisions: list[Decision] | None = None) -> str:
     payload = need_payload(r)  # the shared core — never drifts from the board
     payload.update(
         {
-            "label": need.label,
             "decisions": [_decision_payload(d) for d in (decisions or [])],
             "sources": [
                 {

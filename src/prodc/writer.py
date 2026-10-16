@@ -34,7 +34,6 @@ _SCALAR_FIELDS = frozenset(
         "description",
         "who",
         "role",
-        "label",
         "must",
         "importance",
         "claim",

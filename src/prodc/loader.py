@@ -1,6 +1,6 @@
 """Load need files (YAML) into :class:`~prodc.model.Need` objects.
 
-A file-level ``who``/``label`` default every need in it; a need may override either.
+A file-level ``who``/``client`` default every need in it; a need may override either.
 IDs are globally unique (children reference ids across files), so a duplicate is a
 :class:`LoaderError`. A flow (need with ``children``) must not also carry ``proofs``.
 """
@@ -206,17 +206,19 @@ def _need(
     raw: object,
     where: str,
     file_who: str | None,
-    file_label: str | None,
     file_client: str | None,
 ) -> Need:
     tbl = _as_mapping(raw, where)
+    if "label" in tbl:
+        raise LoaderError(
+            f"{where}: 'label' was removed in 0.4 — express it with a declared role + client (#52)"
+        )
     nid = _as_str(tbl.get("id"), f"{where}.id")
     text = _as_str(tbl.get("text"), f"{where}.text")
     description = _opt_str(tbl.get("description"), f"{where}.description")
     must = _as_bool(tbl["must"], f"{where}.must") if "must" in tbl else False
     who = _opt_str(tbl.get("who"), f"{where}.who") or file_who
     role = _opt_str(tbl.get("role"), f"{where}.role")
-    label = _opt_str(tbl.get("label"), f"{where}.label") or file_label
     client = _opt_str(tbl.get("client"), f"{where}.client") or file_client
     variant_of = _opt_str(tbl.get("variant_of"), f"{where}.variant_of")
     importance = _opt_importance(tbl.get("importance"), f"{where}.importance")
@@ -278,7 +280,6 @@ def _need(
         proofs=proofs,
         children=children,
         seam=seam,
-        label=label,
         client=client,
         variant_of=variant_of,
         importance=importance,
@@ -393,8 +394,11 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
     if doc is None:
         return out
     tbl = _as_mapping(doc, where)
+    if "label" in tbl:
+        raise LoaderError(
+            f"{where}: 'label' was removed in 0.4 — express it with a declared role + client (#52)"
+        )
     file_who = _opt_str(tbl.get("who"), f"{where}.who")
-    file_label = _opt_str(tbl.get("label"), f"{where}.label")
     file_client = _opt_str(tbl.get("client"), f"{where}.client")
 
     def _unique(kind: str, nid: str) -> None:
@@ -404,7 +408,7 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
         seen[kind][nid] = path
 
     for i, raw in enumerate(_as_list(tbl.get("needs"), f"{where}.needs")):
-        need = _need(raw, f"{where}.needs[{i}]", file_who, file_label, file_client)
+        need = _need(raw, f"{where}.needs[{i}]", file_who, file_client)
         _unique("need", need.id)
         out.needs.append(need)
     for i, raw in enumerate(_as_list(tbl.get("goals"), f"{where}.goals")):

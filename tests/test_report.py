@@ -27,7 +27,6 @@ Feature: orders
 
 _NEEDS = """
 who: jordan
-label: "design partner"
 needs:
   - id: N-1
     text: see past-due orders at a glance
@@ -67,7 +66,7 @@ def test_report_renders_summary_needs_and_open_questions(
     assert code == 0
     assert "# " in out and "product status" in out
     assert "1 of 3 delivered" in out  # one proof passes, three leaves
-    assert "### jordan (design partner)" in out
+    assert "### jordan" in out
     assert "N-1" in out and "DELIVERED" in out
     assert "## Open questions" in out
     assert "N-3" in out and "no evidence" in out  # the opinion surfaces

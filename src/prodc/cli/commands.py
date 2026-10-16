@@ -178,20 +178,6 @@ def _annotate_draft_age_warnings(results: list[NeedResult], cfg: Config) -> None
             )
 
 
-def _annotate_label_deprecation(results: list[NeedResult]) -> None:
-    """Nudge needs still carrying the free-text `label` toward role + client (#52, deprecation).
-
-    Since Role (#52) carries the archetype and `client` the org, the per-need `label` is redundant —
-    "design partner, Sincerely" is `role` + `client`. Soft only: `label` is still parsed and still
-    renders; this flags it so a board can migrate off it before it is removed.
-    """
-    for r in results:
-        if r.need.label:
-            r.warnings.append(
-                f"'label' ({r.need.label!r}) is deprecated — express it with role + client (#52)"
-            )
-
-
 def _lint_errors(results: list[NeedResult]) -> list[str]:
     """Hard problems a lint gate fails on: a dangling proof, or a must-have with no evidence."""
     errors: list[str] = []
@@ -241,7 +227,6 @@ def cmd_lint(args: argparse.Namespace) -> int:
                 )
     _annotate_importance_warnings(results, cfg)
     _annotate_draft_age_warnings(results, cfg)
-    _annotate_label_deprecation(results)
     # The principle ripple: a need withdrawn citing a principle that was revised *after* the decision
     # comes back up — the frame it was judged against has changed since. A warning, never a hard
     # error; prodc flags, the PM re-decides.

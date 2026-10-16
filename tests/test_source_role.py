@@ -116,11 +116,11 @@ def test_capture_dangling_role_rejected_by_gate(tmp_path: Path) -> None:
         )
 
 
-def test_lint_warns_on_deprecated_label(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_label_board_fails_to_load(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     from prodc.cli import main
 
+    # label was removed in 0.4; a board still carrying it is a hard load error (tombstone).
     needs = 'who: jordan\nlabel: "design partner"\nneeds:\n  - id: N-1\n    text: t\n'
     _project(tmp_path, needs=needs)
-    main(["lint", "--config", str(tmp_path / "prodc.toml")])
-    out = capsys.readouterr().out
-    assert "'label'" in out and "deprecated" in out
+    assert main(["lint", "--config", str(tmp_path / "prodc.toml")]) == 2
+    assert "'label' was removed in 0.4" in capsys.readouterr().err
