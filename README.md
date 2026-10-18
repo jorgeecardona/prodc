@@ -99,10 +99,14 @@ Now close the loop from the command line. Each write command rewrites one YAML f
 prodc capture N-3 --kind primary --who Jordan --date 2026-10-01 \
     --quote "I keep changing the printer in three places"
 
-# write the test (tag it @pending until it is green), then point the need at it
+# add the scenario to your suite, tagged @pending until it is green:
+#     @pending
+#     Scenario: Export the run sheet
+# then point the need at it:
 prodc set N-2 proofs+="web:orders.feature#Export the run sheet"
 
-prodc status      # gaps: 1 PENDING · 1 HOLE   — no opinions left
+prodc status      # gaps: 1 PENDING · 1 HOLE   — the scenario exists, so N-2 is PENDING, not BROKEN
+                  # (skip writing the scenario and the proof points at nothing: BROKEN, lint exits 1)
 prodc lint        # CI gate: exit 1 on a BROKEN proof or a must-have with no evidence
 ```
 
