@@ -344,10 +344,21 @@ def _role(raw: object, where: str) -> Role:
 
 
 def _principle(raw: object, where: str) -> Principle:
-    """Parse one ``principles:`` entry — a product commitment with its provenance."""
+    """Parse one ``principles:`` entry — a product commitment with its provenance and guards."""
     tbl = _as_mapping(raw, where)
+    pid = _as_str(tbl.get("id"), f"{where}.id")
+    proofs = tuple(
+        _as_str(p, f"{where}.proofs[{i}]")
+        for i, p in enumerate(_as_list(tbl.get("proofs"), f"{where}.proofs"))
+    )
+    for p in proofs:
+        if p.split(":", 1)[0] == "need":
+            raise LoaderError(
+                f"principle {pid!r}: proof {p!r} is a need reference — a principle guards the "
+                "code, it does not wait on a need to settle (that inverts the OST)"
+            )
     return Principle(
-        id=_as_str(tbl.get("id"), f"{where}.id"),
+        id=pid,
         text=_as_str(tbl.get("text"), f"{where}.text"),
         scope=_opt_str(tbl.get("scope"), f"{where}.scope") or "product",
         revised_at=_opt_str(tbl.get("revised_at"), f"{where}.revised_at"),
@@ -355,6 +366,8 @@ def _principle(raw: object, where: str) -> Principle:
             _source(s, f"{where}.sources[{i}]")
             for i, s in enumerate(_as_list(tbl.get("sources"), f"{where}.sources"))
         ),
+        implemented_in=_opt_str(tbl.get("implemented_in"), f"{where}.implemented_in"),
+        proofs=proofs,
     )
 
 

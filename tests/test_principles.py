@@ -7,15 +7,32 @@ it rests on; revising that principle later flags the decision for re-review (the
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
 import pytest
 
+from prodc.adapters import Adapter, ProofResult
 from prodc.config import Config
 from prodc.loader import LoaderError, load
-from prodc.model import Principle, Source, SourceKind
-from prodc.status import principle_report
+from prodc.model import Principle, PrincipleState, ProofState, Source, SourceKind
+from prodc.status import principle_report, principle_state
+
+
+@dataclass(frozen=True)
+class _Stub:
+    """Resolves any payload to a fixed ProofResult — a per-adapter test double."""
+
+    result: ProofResult
+
+    def resolve(self, payload: str) -> ProofResult:
+        _ = payload
+        return self.result
+
+
+def _adapter(state: ProofState, *, declared: bool) -> dict[str, Adapter]:
+    return {"g": _Stub(ProofResult(state, declared=declared, detail="stub"))}
 
 _TOML = """
 [prodc]
@@ -177,6 +194,64 @@ def test_add_principle_writes_scope(tmp_path: Path) -> None:
     )
     model = load(cfg)
     assert next(p for p in model.principles if p.id == "P-9").scope == "visual"
+
+
+# --- enforced / stated / violated / broken (#89) ----------------------------
+
+
+def _p(**kw: object) -> Principle:
+    return Principle(id="P-1", text="colour is load-bearing", **kw)  # type: ignore[arg-type]
+
+
+def test_no_proofs_is_stated() -> None:
+    # a principle with no guards is honestly STATED — allowed, never a gate failure.
+    assert principle_state(_p(), _adapter(ProofState.DELIVERED, declared=True)) is PrincipleState.STATED
+
+
+def test_all_proofs_delivered_is_enforced() -> None:
+    p = _p(proofs=("g:noPurple",))
+    assert principle_state(p, _adapter(ProofState.DELIVERED, declared=True)) is PrincipleState.ENFORCED
+
+
+def test_failing_guard_with_results_is_violated() -> None:
+    # the trap: a guard that ran and FAILED (results artifact present, not declared) means the code
+    # contradicts the principle NOW — VIOLATED, never a mere STATED/PENDING. "The board cannot lie."
+    p = _p(proofs=("g:noPurple",))
+    assert principle_state(p, _adapter(ProofState.PENDING, declared=False)) is PrincipleState.VIOLATED
+
+
+def test_declared_pending_guard_is_stated_not_violated() -> None:
+    # a guard that is only declared (e.g. @pending, no results) is not yet active — STATED, not VIOLATED.
+    p = _p(proofs=("g:noPurple",))
+    assert principle_state(p, _adapter(ProofState.PENDING, declared=True)) is PrincipleState.STATED
+
+
+def test_broken_proof_is_broken() -> None:
+    p = _p(proofs=("g:noPurple",))
+    assert principle_state(p, _adapter(ProofState.BROKEN, declared=False)) is PrincipleState.BROKEN
+
+
+def test_dangling_implemented_in_is_broken_even_without_proofs() -> None:
+    p = _p(implemented_in="g:tokens.css")
+    assert principle_state(p, _adapter(ProofState.BROKEN, declared=False)) is PrincipleState.BROKEN
+
+
+def test_need_proof_on_principle_rejected(tmp_path: Path) -> None:
+    needs = "principles:\n  - id: P-1\n    text: a principle\n    proofs:\n      - 'need:N-1@yes'\n"
+    with pytest.raises(LoaderError, match="guards the code, it does not wait on a need"):
+        load(Config.load(_project(tmp_path, needs=needs)))
+
+
+def test_lint_hard_fails_broken_principle(tmp_path: Path) -> None:
+    import argparse
+
+    from prodc.cli.commands import cmd_lint
+
+    # a principle whose only proof is an unresolvable locator (no 'ghost' adapter) is BROKEN.
+    needs = "principles:\n  - id: P-1\n    text: a principle\n    proofs:\n      - 'ghost:x'\n"
+    cfg_path = _project(tmp_path, needs=needs)
+    args = argparse.Namespace(config=str(cfg_path), strict=False, json=False)
+    assert cmd_lint(args) == 1
 
 
 # --- principle_report (declined / stale) ------------------------------------

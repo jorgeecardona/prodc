@@ -48,6 +48,23 @@ class NeedState(StrEnum):
     UNRESOLVED = "unresolved"  # a proof's source could not be read (e.g. sibling repo absent)
 
 
+class PrincipleState(StrEnum):
+    """Whether a principle's proofs show the code still obeys it (#89).
+
+    A principle proof is a *guard against regression*, the mirror of a need proof's *progress toward*
+    an outcome: a failing need proof is "not yet", but a failing principle guard is "the code
+    contradicts this stance right now" — exactly the tokens.css event where a reversed rule's old
+    wording lived on for months. So a failing guard is VIOLATED, never merely PENDING, and the board
+    cannot read a contradicted principle as green.
+    """
+
+    ENFORCED = "enforced"  # every proof resolved green — the code demonstrably obeys it
+    STATED = "stated"  # no active guard (no proofs, or only declared-pending ones) — honest, allowed
+    VIOLATED = "violated"  # a guard ran and failed — the code contradicts the stance now
+    BROKEN = "broken"  # a proof or implemented_in locator resolves to nothing — lint fails
+    UNRESOLVED = "unresolved"  # a proof's source could not be read (e.g. sibling repo absent)
+
+
 class Answer(StrEnum):
     """Which way a settled question resolved — the research board's direction axis.
 
@@ -169,6 +186,13 @@ class Principle:
     and code comments, where a Decision or an ``out_of_scope`` withdrawal cannot cite them. The scope
     must be one declared in ``[principles].scopes`` (default ``["product"]``); an undeclared scope is a
     load error the author owns.
+
+    ``proofs`` tie the principle to the guard tests that prove the code still obeys it, resolved by
+    the same adapters as a need's proofs, and ``implemented_in`` points at the one place the values
+    live (e.g. a tokens file) — a pointer, not a copy, so the hex/font values stay in code. Together
+    they give the principle a :class:`PrincipleState` (ENFORCED / STATED / VIOLATED / BROKEN); a
+    principle may not carry a ``need:`` proof — it guards the code, it does not wait on a need to
+    settle — and it still never enters coverage or the plan.
     """
 
     id: str
@@ -176,6 +200,8 @@ class Principle:
     scope: str = "product"  # product/design/visual/engineering — declared in [principles].scopes (#88)
     revised_at: str | None = None  # ISO date the principle was last stated or revised
     sources: tuple[Source, ...] = ()  # the signals that surfaced it — provenance, not validation
+    implemented_in: str | None = None  # locator to the ONE place the values live; a pointer, not a copy (#89)
+    proofs: tuple[str, ...] = ()  # guard-test locators, resolved by the same adapters as needs (#89)
 
 
 @dataclass(frozen=True)

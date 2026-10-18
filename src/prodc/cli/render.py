@@ -18,6 +18,7 @@ from ..model import (
     Need,
     NeedResult,
     NeedState,
+    PrincipleState,
     Release,
     Role,
     ears_shape,
@@ -290,13 +291,34 @@ def render_principles(reports: list[PrincipleReport]) -> str:
         a = rep.principle
         rev = f"revised {a.revised_at}" if a.revised_at else "undated"
         scope = "" if a.scope == "product" else f"[{a.scope}] "
-        out.append(f"  {a.id:<6} {scope}{rev}  {a.text}")
+        flag = "⚠ " if rep.state in (PrincipleState.VIOLATED, PrincipleState.BROKEN) else ""
+        out.append(f"  {a.id:<6} {flag}{rep.state.value.upper():<9} {scope}{rev}  {a.text}")
+        if a.implemented_in:
+            out.append(f"        implemented in: {a.implemented_in}")
         if rep.declined:
             out.append(f"        declined: {', '.join(n.id for n in rep.declined)}")
         if rep.stale:
             ids = ", ".join(n.id for n in rep.stale)
             out.append(f"        ⚠ decided before the latest revision: {ids} — re-review")
+    tally = _principle_tally(reports)
+    if tally:
+        out.append(f"  — {tally}")
     return "\n".join(out)
+
+
+def _principle_tally(reports: list[PrincipleReport]) -> str:
+    """A per-scope ENFORCED/STATED/… count line, scopes and states in declared enum order (#89)."""
+    by_scope: dict[str, dict[PrincipleState, int]] = {}
+    for rep in reports:
+        counts = by_scope.setdefault(rep.principle.scope, {})
+        counts[rep.state] = counts.get(rep.state, 0) + 1
+    parts: list[str] = []
+    for scope, counts in by_scope.items():
+        inner = ", ".join(
+            f"{counts[s]} {s.value}" for s in PrincipleState if counts.get(s)
+        )
+        parts.append(f"{scope}: {inner}")
+    return "  ·  ".join(parts)
 
 
 def render_contradictions(contras: list[Contradiction]) -> str:

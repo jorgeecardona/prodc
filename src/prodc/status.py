@@ -23,6 +23,7 @@ from .model import (
     NeedResult,
     NeedState,
     Principle,
+    PrincipleState,
     ProofState,
     Release,
     Role,
@@ -658,13 +659,48 @@ def role_report(
     return coverage, unroled
 
 
+def principle_state(principle: Principle, adapters: dict[str, Adapter]) -> PrincipleState:
+    """Resolve a principle's guards into its enforced/stated/violated/broken state (#89).
+
+    A principle proof is a guard against regression, so its ``ProofState`` reads differently from a
+    need's (:class:`~prodc.model.PrincipleState` says why). Using :attr:`ProofResult.declared` to tell
+    a declared-but-inactive guard from one that actually ran and failed:
+
+    - ``implemented_in`` set but not resolving, or any proof BROKEN → **BROKEN** (lint fails).
+    - any proof UNRESOLVED → **UNRESOLVED** (a source could not be read).
+    - a proof PENDING with ``declared=False`` (a results artifact shows it failing) → **VIOLATED**.
+    - no proofs, or only DELIVERED-or-declared-pending guards and not all green → **STATED** (honest).
+    - every proof DELIVERED → **ENFORCED**.
+
+    ``implemented_in`` is a pointer, not evidence: it can only make a principle BROKEN (a dangling
+    locator), never ENFORCED.
+    """
+    impl_broken = (
+        principle.implemented_in is not None
+        and _resolve_proof(principle.implemented_in, adapters).state is ProofState.BROKEN
+    )
+    results = [_resolve_proof(loc, adapters) for loc in principle.proofs]
+    if not principle.proofs:
+        return PrincipleState.BROKEN if impl_broken else PrincipleState.STATED
+    if impl_broken or any(r.state is ProofState.BROKEN for r in results):
+        return PrincipleState.BROKEN
+    if any(r.state is ProofState.UNRESOLVED for r in results):
+        return PrincipleState.UNRESOLVED
+    if any(r.state is ProofState.PENDING and not r.declared for r in results):
+        return PrincipleState.VIOLATED  # a guard ran and failed — the code contradicts the stance
+    if all(r.state is ProofState.DELIVERED for r in results):
+        return PrincipleState.ENFORCED
+    return PrincipleState.STATED  # some declared-pending guards, none failing — honestly not yet active
+
+
 @dataclass(frozen=True)
 class PrincipleReport:
-    """One principle and the decisions that rest on it — the ripple, made visible."""
+    """One principle, its enforcement state, and the decisions that rest on it — the ripple made visible."""
 
     principle: Principle
     declined: tuple[Need, ...]  # needs withdrawn citing this principle
     stale: tuple[Need, ...]  # of those, decided before the principle's latest revision — re-review
+    state: PrincipleState = PrincipleState.STATED  # enforced/stated/violated/broken (#89)
 
 
 def _decided_before(decided: str, revised: str | None) -> bool:
@@ -681,13 +717,19 @@ def _decided_before(decided: str, revised: str | None) -> bool:
         return False
 
 
-def principle_report(needs: list[Need], principles: list[Principle]) -> list[PrincipleReport]:
-    """Each declared principle with the needs withdrawn under it, and which of those are stale.
+def principle_report(
+    needs: list[Need],
+    principles: list[Principle],
+    adapters: dict[str, Adapter] | None = None,
+) -> list[PrincipleReport]:
+    """Each declared principle with its enforcement state, the needs withdrawn under it, and the stale ones.
 
     Reads the *whole* need list, withdrawn needs included — a declined need is off the board, so
     the board-filtered list would hide exactly what this reports. A decision is stale when the
     withdrawal is dated before the principle's ``revised_at``: the frame it was judged against has
     changed since, so it comes back up for re-review. Records-only — prodc flags, the PM re-decides.
+    When ``adapters`` are given, each principle also carries its :func:`principle_state` (#89); without
+    them the state defaults to STATED (a caller that has no proof adapters, e.g. a plain ripple view).
     """
     by_principle: dict[str, list[Need]] = {a.id: [] for a in principles}
     for n in needs:
@@ -701,7 +743,8 @@ def principle_report(needs: list[Need], principles: list[Principle]) -> list[Pri
             for n in declined
             if n.withdrawn is not None and _decided_before(n.withdrawn.date, a.revised_at)
         ]
-        out.append(PrincipleReport(a, tuple(declined), tuple(stale)))
+        state = principle_state(a, adapters) if adapters is not None else PrincipleState.STATED
+        out.append(PrincipleReport(a, tuple(declined), tuple(stale), state))
     return out
 
 

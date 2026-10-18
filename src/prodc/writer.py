@@ -915,6 +915,8 @@ def add_principle(
     file: str,
     revised_at: str,
     scope: str = "product",
+    implemented_in: str | None = None,
+    proofs: tuple[str, ...] = (),
     sources: tuple[Source, ...] = (),
     expect_sha: str | None = None,
     dry_run: bool,
@@ -948,6 +950,10 @@ def add_principle(
     if scope != "product":
         entry["scope"] = scope  # written only when non-default, to keep the common case clean
     entry["revised_at"] = revised_at
+    if implemented_in is not None:
+        entry["implemented_in"] = implemented_in
+    if proofs:
+        entry["proofs"] = list(proofs)
     if sources:
         entry["sources"] = [_source_dict(s) for s in sources]
     principles.append(entry)

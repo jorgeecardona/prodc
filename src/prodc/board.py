@@ -248,5 +248,5 @@ def gather(
         handoffs=handoffs(use_needs),
         recurrence=recurrence(use_needs),
         orphans=orphans(use_needs, cfg.adapters),
-        principles=principle_report(list(model.needs), list(model.principles)),
+        principles=principle_report(list(model.needs), list(model.principles), cfg.adapters),
     )

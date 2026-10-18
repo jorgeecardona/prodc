@@ -28,7 +28,7 @@ from ..dedup import (
     who_variants,
 )
 from ..loader import LoaderError, load
-from ..model import Need, NeedResult, NeedState, board_needs
+from ..model import Need, NeedResult, NeedState, PrincipleState, board_needs
 from ..report import render_markdown
 from ..report_html import render_html
 from ..status import (
@@ -229,14 +229,31 @@ def cmd_lint(args: argparse.Namespace) -> int:
     _annotate_draft_age_warnings(results, cfg)
     # The principle ripple: a need withdrawn citing a principle that was revised *after* the decision
     # comes back up — the frame it was judged against has changed since. A warning, never a hard
-    # error; prodc flags, the PM re-decides.
-    for rep in principle_report(needs, list(model.principles)):
+    # error; prodc flags, the PM re-decides. The same loop grades each principle's guards (#89): a
+    # BROKEN guard/implemented_in is a hard error (a dangling locator), a VIOLATED guard warns (the
+    # code contradicts a stated principle — surfaced, but the PM owns the reconcile).
+    principle_errors: list[str] = []
+    principle_warnings: list[tuple[str, str]] = []
+    for rep in principle_report(needs, list(model.principles), cfg.adapters):
         for n in rep.stale:
             if n.id in by_id and n.withdrawn is not None:
                 by_id[n.id].warnings.append(
                     f"withdrawn per principle {rep.principle.id} on {n.withdrawn.date}, but "
                     f"{rep.principle.id} was revised {rep.principle.revised_at} — re-review the decision"
                 )
+        if rep.state is PrincipleState.BROKEN:
+            principle_errors.append(
+                f"{rep.principle.id}: BROKEN principle guard — a proof or implemented_in locator "
+                "resolves to nothing"
+            )
+        elif rep.state is PrincipleState.VIOLATED:
+            principle_warnings.append(
+                (
+                    rep.principle.id,
+                    "VIOLATED — a guard failed: the code contradicts this principle; reconcile the "
+                    "code or revise the principle",
+                )
+            )
     # Unresolved contradiction: two needs oppose each other yet BOTH are still live — the product
     # vision has not decided between them. A warning on both sides (withdraw one out_of_scope citing
     # the principle that decides, or reconcile them).
@@ -249,10 +266,10 @@ def cmd_lint(args: argparse.Namespace) -> int:
                     f"unresolved contradiction with {far.id} — both live, the vision has not "
                     "decided yet (withdraw one out_of_scope citing the principle, or reconcile)"
                 )
-    errors = _lint_errors(results)
+    errors = _lint_errors(results) + principle_errors
     warnings = [
         (r.need.id, w) for r in sorted(results, key=lambda x: x.need.id) for w in r.warnings
-    ]
+    ] + principle_warnings
     # Decision drift (keyed by the decision id, not a need): a decision left serving only
     # withdrawn/non-product needs is engineering with no live product reason; a decision decided
     # under a principle that was revised later comes back up (the same ripple a withdrawal gets).
@@ -558,6 +575,8 @@ def cmd_add(args: argparse.Namespace) -> int:
                 file=args.file,
                 revised_at=date.today().isoformat(),
                 scope=args.scope,
+                implemented_in=args.implemented_in,
+                proofs=tuple(args.principle_proofs or ()),
                 sources=sources,
                 expect_sha=args.expect_sha,
                 dry_run=args.dry_run,

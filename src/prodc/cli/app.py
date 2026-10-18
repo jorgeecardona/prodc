@@ -189,6 +189,22 @@ def main(argv: list[str] | None = None) -> int:
         "must be declared in [principles].scopes",
     )
     ad.add_argument(
+        "--implemented-in",
+        default=None,
+        metavar="LOCATOR",
+        dest="implemented_in",
+        help="principle only: a locator to the one place its values live (a pointer, not a copy)",
+    )
+    ad.add_argument(
+        "--proof",
+        action="append",
+        default=None,
+        dest="principle_proofs",
+        metavar="LOCATOR",
+        help="principle only: a guard-test locator proving the code obeys it (repeatable); "
+        "never a need: reference",
+    )
+    ad.add_argument(
         "--needs",
         default=None,
         metavar="IDS",

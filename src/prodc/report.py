@@ -14,7 +14,7 @@ from datetime import date
 from .board import gather
 from .config import Config
 from .model import Model, NeedResult, NeedState
-from .status import active_decisions, group_state, principle_report, state_priority
+from .status import active_decisions, group_state, state_priority
 
 _LABEL = {
     NeedState.DELIVERED: "DELIVERED",
@@ -156,15 +156,15 @@ def render_markdown(
         out += [
             "## Principles (the vision — held as given)",
             "",
-            "| principle | scope | stated | needs declined under it |",
-            "|---|---|---|---|",
+            "| principle | scope | state | stated | needs declined under it |",
+            "|---|---|---|---|---|",
         ]
-        for rep in principle_report(list(model.needs), list(model.principles)):
+        for rep in board.principles:
             text = rep.principle.text.replace("|", "\\|")
             declined = ", ".join(n.id for n in rep.declined) or "—"
             stale = f" _(re-review {', '.join(n.id for n in rep.stale)})_" if rep.stale else ""
             out.append(
-                f"| {rep.principle.id}: {text} | {rep.principle.scope} "
+                f"| {rep.principle.id}: {text} | {rep.principle.scope} | {rep.state.value.upper()} "
                 f"| {rep.principle.revised_at or '—'} | {declined}{stale} |"
             )
         out.append("")
