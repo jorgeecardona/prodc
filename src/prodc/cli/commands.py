@@ -557,6 +557,7 @@ def cmd_add(args: argparse.Namespace) -> int:
                 text,
                 file=args.file,
                 revised_at=date.today().isoformat(),
+                scope=args.scope,
                 sources=sources,
                 expect_sha=args.expect_sha,
                 dry_run=args.dry_run,

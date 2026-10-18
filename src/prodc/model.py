@@ -162,11 +162,18 @@ class Principle:
     client), and ``revised_at`` dates its latest statement. A decision taken under an older version
     of the principle is flagged for re-review when the principle is revised — the ripple. A separate noun
     (like :class:`Role`), not a Need marker: a principle is a stance, not what a person wants, so it
-    never enters coverage, the plan, or the opinion check.
+    never enters coverage, the plan, or the opinion check — in every ``scope`` (#88).
+
+    ``scope`` says which kind of commitment it is — product, design, visual, engineering — so design,
+    visual and engineering principles live on the board beside product ones instead of in prose docs
+    and code comments, where a Decision or an ``out_of_scope`` withdrawal cannot cite them. The scope
+    must be one declared in ``[principles].scopes`` (default ``["product"]``); an undeclared scope is a
+    load error the author owns.
     """
 
     id: str
     text: str
+    scope: str = "product"  # product/design/visual/engineering — declared in [principles].scopes (#88)
     revised_at: str | None = None  # ISO date the principle was last stated or revised
     sources: tuple[Source, ...] = ()  # the signals that surfaced it — provenance, not validation
 

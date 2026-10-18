@@ -119,6 +119,7 @@ class Config:
     default_draft: bool = False  # [add].default_draft — `add` stages as draft by default (#60)
     callbacks: tuple[Callback, ...] = ()  # [[callbacks.hooks]] — lifecycle callbacks (#71)
     callback_state_file: str = ".prodc/state.json"  # [callbacks].state_file — the state ledger
+    principle_scopes: tuple[str, ...] = ("product",)  # [principles].scopes — allowed scopes (#88)
 
     def importance_label(self, level: int | None) -> str | None:
         """The declared label for an importance level, or None if unset/undeclared (#59)."""
@@ -302,6 +303,15 @@ class Config:
 
         callbacks, callback_state_file = _callbacks(raw)
 
+        principles_tbl = _as_dict(raw.get("principles", {}), "[principles]")
+        if "scopes" in principles_tbl:
+            scopes = _as_str_list(principles_tbl["scopes"], "[principles].scopes")
+            if not scopes:
+                raise ConfigError("[principles].scopes must list at least one scope")
+            principle_scopes = tuple(scopes)
+        else:
+            principle_scopes = ("product",)
+
         return cls(
             root=root,
             need_globs=need_globs,
@@ -315,4 +325,5 @@ class Config:
             default_draft=default_draft,
             callbacks=callbacks,
             callback_state_file=callback_state_file,
+            principle_scopes=principle_scopes,
         )

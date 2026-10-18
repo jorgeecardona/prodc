@@ -182,6 +182,13 @@ def main(argv: list[str] | None = None) -> int:
         "overrides) and its sources as the provenance that surfaced it; the need stays on the board",
     )
     ad.add_argument(
+        "--scope",
+        default="product",
+        metavar="SCOPE",
+        help="principle only: its scope — product (default), design, visual, engineering; "
+        "must be declared in [principles].scopes",
+    )
+    ad.add_argument(
         "--needs",
         default=None,
         metavar="IDS",

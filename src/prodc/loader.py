@@ -349,6 +349,7 @@ def _principle(raw: object, where: str) -> Principle:
     return Principle(
         id=_as_str(tbl.get("id"), f"{where}.id"),
         text=_as_str(tbl.get("text"), f"{where}.text"),
+        scope=_opt_str(tbl.get("scope"), f"{where}.scope") or "product",
         revised_at=_opt_str(tbl.get("revised_at"), f"{where}.revised_at"),
         sources=tuple(
             _source(s, f"{where}.sources[{i}]")
@@ -534,6 +535,7 @@ def load(config: Config) -> Model:
     _check_withdrawal_of(acc.needs)
     _check_source_roles(acc.needs, acc.principles, {p.id for p in acc.roles})
     _check_decisions(acc.decisions, {n.id for n in acc.needs}, {p.id for p in acc.principles})
+    _check_principle_scopes(acc.principles, config.principle_scopes)
     acc.needs = _symmetrize_contradicts(acc.needs)
     return Model(
         needs=tuple(acc.needs),
@@ -585,6 +587,17 @@ def _check_children(needs: list[Need]) -> None:
         for c in need.children:
             if c.id not in known:
                 raise LoaderError(f"need {need.id!r}: child {c.id!r} is not a known need id")
+
+
+def _check_principle_scopes(principles: list[Principle], allowed: tuple[str, ...]) -> None:
+    """Every principle's ``scope`` must be one declared in ``[principles].scopes`` (#88)."""
+    allowed_set = set(allowed)
+    for p in principles:
+        if p.scope not in allowed_set:
+            raise LoaderError(
+                f"principle {p.id!r}: scope {p.scope!r} is not declared in "
+                f"[principles].scopes ({', '.join(allowed)})"
+            )
 
 
 def _check_withdrawal_of(needs: list[Need]) -> None:

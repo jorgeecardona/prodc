@@ -285,11 +285,12 @@ def render_principles(reports: list[PrincipleReport]) -> str:
     An principle is held as given, not validated; ``declined`` are the needs withdrawn citing it, and
     ``stale`` (the ripple) are those decided before its latest ``revised_at`` — flagged to re-review.
     """
-    out = ["\nprinciples (the product vision — held as given):"]
+    out = ["\nprinciples (the vision — held as given):"]
     for rep in reports:
         a = rep.principle
         rev = f"revised {a.revised_at}" if a.revised_at else "undated"
-        out.append(f"  {a.id:<6} {rev}  {a.text}")
+        scope = "" if a.scope == "product" else f"[{a.scope}] "
+        out.append(f"  {a.id:<6} {scope}{rev}  {a.text}")
         if rep.declined:
             out.append(f"        declined: {', '.join(n.id for n in rep.declined)}")
         if rep.stale:

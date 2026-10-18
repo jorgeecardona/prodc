@@ -132,6 +132,53 @@ principles:
         load(Config.load(_project(tmp_path, needs=needs)))
 
 
+# --- scope (#88) ------------------------------------------------------------
+
+_SCOPED_TOML = """
+[prodc]
+needs = ["needs/*.yaml"]
+
+[principles]
+scopes = ["product", "visual", "engineering"]
+"""
+
+
+def test_principle_scope_defaults_to_product(tmp_path: Path) -> None:
+    needs = "principles:\n  - id: P-1\n    text: a principle\n"
+    model = load(Config.load(_project(tmp_path, needs=needs)))
+    assert model.principles[0].scope == "product"
+
+
+def test_declared_scope_loads(tmp_path: Path) -> None:
+    needs = "principles:\n  - id: P-1\n    text: colour is load-bearing\n    scope: visual\n"
+    model = load(Config.load(_project(tmp_path, toml=_SCOPED_TOML, needs=needs)))
+    assert model.principles[0].scope == "visual"
+
+
+def test_undeclared_scope_rejected(tmp_path: Path) -> None:
+    # default [principles].scopes is just ["product"], so "visual" is undeclared here.
+    needs = "principles:\n  - id: P-1\n    text: a principle\n    scope: visual\n"
+    with pytest.raises(LoaderError, match="scope 'visual' is not declared"):
+        load(Config.load(_project(tmp_path, needs=needs)))
+
+
+def test_add_principle_writes_scope(tmp_path: Path) -> None:
+    from prodc.writer import add_principle
+
+    cfg = Config.load(_project(tmp_path, toml=_SCOPED_TOML, needs="principles:\n  - id: P-0\n    text: seed\n"))
+    add_principle(
+        cfg,
+        "P-9",
+        "colour is load-bearing",
+        file="needs/a.yaml",
+        revised_at=date.today().isoformat(),
+        scope="visual",
+        dry_run=False,
+    )
+    model = load(cfg)
+    assert next(p for p in model.principles if p.id == "P-9").scope == "visual"
+
+
 # --- principle_report (declined / stale) ------------------------------------
 
 
@@ -275,7 +322,7 @@ def test_status_text_shows_principles_section(
 
     main(["status", "--config", str(_project(tmp_path))])
     out = capsys.readouterr().out
-    assert "principles (the product vision — held as given):" in out
+    assert "principles (the vision — held as given):" in out
     assert "P-1" in out and "revised 2026-10-15" in out
     assert "declined: N-7, N-9" in out
     assert "decided before the latest revision: N-7 — re-review" in out

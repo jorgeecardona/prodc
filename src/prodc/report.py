@@ -154,18 +154,18 @@ def render_markdown(
 
     if model.principles:
         out += [
-            "## Principles (the product vision — held as given)",
+            "## Principles (the vision — held as given)",
             "",
-            "| principle | stated | needs declined under it |",
-            "|---|---|---|",
+            "| principle | scope | stated | needs declined under it |",
+            "|---|---|---|---|",
         ]
         for rep in principle_report(list(model.needs), list(model.principles)):
             text = rep.principle.text.replace("|", "\\|")
             declined = ", ".join(n.id for n in rep.declined) or "—"
             stale = f" _(re-review {', '.join(n.id for n in rep.stale)})_" if rep.stale else ""
             out.append(
-                f"| {rep.principle.id}: {text} | {rep.principle.revised_at or '—'} "
-                f"| {declined}{stale} |"
+                f"| {rep.principle.id}: {text} | {rep.principle.scope} "
+                f"| {rep.principle.revised_at or '—'} | {declined}{stale} |"
             )
         out.append("")
 

@@ -914,6 +914,7 @@ def add_principle(
     *,
     file: str,
     revised_at: str,
+    scope: str = "product",
     sources: tuple[Source, ...] = (),
     expect_sha: str | None = None,
     dry_run: bool,
@@ -943,7 +944,10 @@ def add_principle(
         for a in principles
     ):
         raise WriteError(f"principle {principle_id!r} already exists in {target.name}")
-    entry: dict[str, object] = {"id": principle_id, "text": text, "revised_at": revised_at}
+    entry: dict[str, object] = {"id": principle_id, "text": text}
+    if scope != "product":
+        entry["scope"] = scope  # written only when non-default, to keep the common case clean
+    entry["revised_at"] = revised_at
     if sources:
         entry["sources"] = [_source_dict(s) for s in sources]
     principles.append(entry)
