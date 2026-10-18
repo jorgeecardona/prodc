@@ -32,6 +32,9 @@ importance_revisit_days = 60
 
 [add]
 default_draft = false
+
+[flows]
+steps = ["trigger", "act", "conclude"]
 ```
 
 ## `[proofs.<name>]`
@@ -103,6 +106,25 @@ timeout = 10                           # seconds, optional (default 10)
 | Key | Means | Default |
 |---|---|---|
 | `default_draft` | `add need` stages as `draft: true` unless told otherwise | `false` |
+
+## `[flows]`
+
+| Key | Means | Default |
+|---|---|---|
+| `steps` | ordered step vocabulary for flow edges (`children: [{id, step}]`); the **last** entry is the terminal step that ends a journey | none (step is free text) |
+
+A flow is a need with `children`; each edge can name the `step` it plays in the journey (a use
+case = flow + role + per-edge step). Declaring `steps` turns that free text into a checked axis:
+
+- An edge whose `step` is not in the list is a **hard load error** (a typo like `conlcude` is
+  refused at load, and because the writer re-loads and reverts, refused at write time too).
+- `lint` then grades each journey's shape (warnings, keyed by flow id; `--strict` makes them fail):
+  a flow whose stepped edges never reach the terminal step, steps that run **out of order**, or a
+  flow that **mixes** stepped and bare edges. A flow with no stepped edges is exempt — it is a
+  plain flow, not a use case.
+
+Order is the journey and must not repeat a step. Leaving `[flows].steps` unset keeps the old
+behaviour: any step (or none) passes, and the lint is silent.
 
 ## `[callbacks]` — lifecycle callbacks (#71)
 
