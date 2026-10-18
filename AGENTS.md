@@ -29,5 +29,5 @@ prodc: Product management as code: roles, flows, and features traced to evidence
 
 ## Gotchas
 
-- Version lives only in `pyproject.toml`. The pre-commit hook auto-bumps it when `src/` changes. Do not edit versions by hand elsewhere.
+- The version is the `__version__` literal in `src/prodc/__init__.py`; hatchling reads it so `pyproject.toml` never disagrees. The pre-commit hook auto-bumps it when `src/` changes. Do not edit versions by hand.
 - Record follow-ups in `docs/issues/`, not as scattered TODO comments.

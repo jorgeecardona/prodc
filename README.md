@@ -1,7 +1,9 @@
 # prodc
 
-[![PyPI](https://img.shields.io/pypi/v/prodc)](https://pypi.org/project/prodc/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://gitlab.com/cardona-oss/prodc/-/blob/main/LICENSE)
+[![pipeline status](https://gitlab.com/cardona-oss/prodc/badges/main/pipeline.svg)](https://gitlab.com/cardona-oss/prodc/-/pipelines)
+[![PyPI version](https://img.shields.io/pypi/v/prodc.svg)](https://pypi.org/project/prodc/)
+[![Python versions](https://img.shields.io/pypi/pyversions/prodc.svg)](https://pypi.org/project/prodc/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Product management as code: the *needs* your product exists to meet, each traced to the evidence a real user gave for it and the test that proves it is delivered. For teams that keep product work in the repo, next to the code, and want a tool to check it holds together.
 
