@@ -1,7 +1,7 @@
 site_name: prodc
 site_description: Product management as code — roles, flows, and features traced to evidence.
-repo_url: https://gitlab.com/jorgeecardona/prodc
-repo_name: jorgeecardona/prodc
+repo_url: https://gitlab.com/cardona-oss/prodc
+repo_name: cardona-oss/prodc
 
 theme:
   name: material

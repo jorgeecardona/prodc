@@ -32,9 +32,10 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://gitlab.com/jorgeecardona/prodc"
-Repository = "https://gitlab.com/jorgeecardona/prodc"
-Changelog = "https://gitlab.com/jorgeecardona/prodc/-/blob/main/CHANGELOG.md"
+Homepage = "https://gitlab.com/cardona-oss/prodc"
+Repository = "https://gitlab.com/cardona-oss/prodc"
+Changelog = "https://gitlab.com/cardona-oss/prodc/-/blob/main/CHANGELOG.md"
+Documentation = "https://cardona-oss.gitlab.io/prodc/"
 
 [build-system]
 requires = ["hatchling"]
