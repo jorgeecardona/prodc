@@ -554,6 +554,7 @@ def load(config: Config) -> Model:
     _check_source_roles(acc.needs, acc.principles, {p.id for p in acc.roles})
     _check_decisions(acc.decisions, {n.id for n in acc.needs}, {p.id for p in acc.principles})
     _check_principle_scopes(acc.principles, config.principle_scopes)
+    _check_flow_steps(acc.needs, config.flow_steps)
     acc.needs = _symmetrize_contradicts(acc.needs)
     return Model(
         needs=tuple(acc.needs),
@@ -616,6 +617,27 @@ def _check_principle_scopes(principles: list[Principle], allowed: tuple[str, ...
                 f"principle {p.id!r}: scope {p.scope!r} is not declared in "
                 f"[principles].scopes ({', '.join(allowed)})"
             )
+
+
+def _check_flow_steps(needs: list[Need], allowed: tuple[str, ...]) -> None:
+    """Every flow edge's ``step`` must be one declared in ``[flows].steps`` (#90).
+
+    Membership is integrity, not judgment — a mis-spelled step (``conlcude``) is a typo, the
+    same severity as an undeclared principle scope, so it is a hard load error. Because the
+    writer re-loads and reverts on ``LoaderError``, this also refuses to *write* a bad step.
+    Skipped entirely when no vocabulary is declared: a bare step stays free text, as it was
+    before this. Order and completeness are the lint's job, not the loader's.
+    """
+    if not allowed:
+        return
+    allowed_set = set(allowed)
+    for need in needs:
+        for c in need.children:
+            if c.step is not None and c.step not in allowed_set:
+                raise LoaderError(
+                    f"need {need.id!r}: child {c.id!r} step {c.step!r} is not declared in "
+                    f"[flows].steps ({', '.join(allowed)})"
+                )
 
 
 def _check_withdrawal_of(needs: list[Need]) -> None:

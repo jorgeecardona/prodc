@@ -120,6 +120,16 @@ class Config:
     callbacks: tuple[Callback, ...] = ()  # [[callbacks.hooks]] — lifecycle callbacks (#71)
     callback_state_file: str = ".prodc/state.json"  # [callbacks].state_file — the state ledger
     principle_scopes: tuple[str, ...] = ("product",)  # [principles].scopes — allowed scopes (#88)
+    flow_steps: tuple[str, ...] = ()  # [flows].steps — ordered step vocab; () = undeclared (#90)
+
+    @property
+    def terminal_step(self) -> str | None:
+        """The step that ends a journey: the last declared step, or None when no vocab (#90).
+
+        The single definition of 'terminal' — status/lint read it here, never recompute
+        ``flow_steps[-1]`` elsewhere. Order in ``[flows].steps`` *is* the journey.
+        """
+        return self.flow_steps[-1] if self.flow_steps else None
 
     def importance_label(self, level: int | None) -> str | None:
         """The declared label for an importance level, or None if unset/undeclared (#59)."""
@@ -312,6 +322,17 @@ class Config:
         else:
             principle_scopes = ("product",)
 
+        flows_tbl = _as_dict(raw.get("flows", {}), "[flows]")
+        if "steps" in flows_tbl:
+            steps = _as_str_list(flows_tbl["steps"], "[flows].steps")
+            if not steps:
+                raise ConfigError("[flows].steps must list at least one step")
+            if len(set(steps)) != len(steps):
+                raise ConfigError("[flows].steps must not repeat a step (order is its rank)")
+            flow_steps = tuple(steps)
+        else:
+            flow_steps = ()
+
         return cls(
             root=root,
             need_globs=need_globs,
@@ -326,4 +347,5 @@ class Config:
             callbacks=callbacks,
             callback_state_file=callback_state_file,
             principle_scopes=principle_scopes,
+            flow_steps=flow_steps,
         )

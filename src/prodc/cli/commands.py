@@ -39,6 +39,7 @@ from ..status import (
     contradictions,
     decisions_for,
     evidence_age_days,
+    flow_step_warnings,
     importance_revisit_due,
     orphaned_decisions,
     principle_report,
@@ -298,6 +299,9 @@ def cmd_lint(args: argparse.Namespace) -> int:
         | {n.client for n in needs if n.client is not None}
     )
     warnings += tag_warnings(needs, structural_ids, cfg.duplicate_threshold)
+    # Flow step hygiene (#90): once [flows].steps declares a vocabulary, grade each journey's
+    # shape — never-terminal, out-of-order, mixed bare/stepped. Silent when no vocab is declared.
+    warnings += flow_step_warnings(needs, cfg.flow_steps)
     if args.json:
         print(
             json.dumps(

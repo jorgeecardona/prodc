@@ -911,6 +911,51 @@ def flow_orphan_warnings(needs: list[Need]) -> set[str]:
     return {n.id for n in needs if not n.children and n.id not in in_a_flow}
 
 
+def flow_step_warnings(needs: list[Need], steps: tuple[str, ...]) -> list[tuple[str, str]]:
+    """Judgment-level hygiene on a flow's steps, once a ``[flows].steps`` vocabulary exists (#90).
+
+    Opt-in: silent when no vocabulary is declared — a board with no steps has no journey to
+    grade. Membership (a step word that isn't in the vocab) is the loader's hard error; this
+    catches the *shape* of the journey, keyed by flow id, as warnings:
+
+    - **never terminal**: a flow with stepped edges but none carrying the terminal step — the
+      journey never ends (Patton: the story must end). The message names the configured word.
+    - **out of order**: stepped edges whose rank decreases along ``children`` — the map runs
+      backwards. Warned once per flow.
+    - **mixed bare/stepped**: a flow where some edges carry a step and some don't — a use case
+      with a hole, which would otherwise pass clean.
+
+    A flow with zero stepped edges is exempt: it's a plain flow, not a use case (#90), and
+    warning it would punish every existing board the moment a vocabulary is declared.
+    """
+    if not steps:
+        return []
+    terminal = steps[-1]
+    rank = {s: i for i, s in enumerate(steps)}
+    out: list[tuple[str, str]] = []
+    for flow in needs:
+        if not flow.children:
+            continue
+        stepped = [c for c in flow.children if c.step is not None]
+        if not stepped:
+            continue  # a plain flow, not a use case — exempt
+        if len(stepped) != len(flow.children):
+            bare = next(c.id for c in flow.children if c.step is None)
+            out.append((flow.id, f"edge {bare!r} has no step while siblings do — a use case with a hole"))
+        if not any(c.step == terminal for c in stepped):
+            out.append(
+                (
+                    flow.id,
+                    f"no edge carries the terminal step {terminal!r} — the journey never ends; "
+                    "add it or drop the steps",
+                )
+            )
+        ranks = [rank[c.step] for c in stepped if c.step in rank]
+        if any(b < a for a, b in pairwise(ranks)):
+            out.append((flow.id, "steps run out of order — reorder children or re-step the edges"))
+    return out
+
+
 def shared_proof_warnings(results: list[NeedResult]) -> dict[str, str]:
     """Flag a need whose *every* proof is also claimed by another need (#45).
 
