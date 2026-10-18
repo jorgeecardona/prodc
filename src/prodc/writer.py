@@ -14,6 +14,7 @@ import datetime
 import difflib
 import hashlib
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -24,7 +25,7 @@ from .config import Config
 
 if TYPE_CHECKING:
     from .model import Source
-from .loader import LoaderError, load
+from .loader import LoaderError, load, yaml_error_message
 
 # Fields an agent may `set` on a need. Unknown keys are silently ignored by the loader, so the
 # write path allowlists instead — a typo'd key is an error here, not junk written to disk.
@@ -106,23 +107,24 @@ def _need_block_span(lines: list[str], need_id: str) -> tuple[int, int, int] | N
     return _block_span(lines, "needs", need_id)
 
 
-def _block_span(lines: list[str], key: str, item_id: str) -> tuple[int, int, int] | None:
-    """Line span [start, end) and item indent of the top-level ``key:`` list item ``item_id``.
+def _scan_list(lines: list[str], key: str) -> tuple[list[tuple[int, str | None]], int, int] | None:
+    """Scan the top-level ``key:`` list; returns ``(item_starts, region_end, item_indent)`` or None.
 
-    Line-based and deliberately conservative: it understands the common prodc layout (a
+    ``item_starts`` is ``(start_line, id)`` per list item, ``region_end`` is the line index just
+    past the list (before trailing blanks/comments are trimmed), and ``item_indent`` is the ``- ``
+    indent. Line-based and deliberately conservative: it understands the common prodc layout (a
     top-level list key — ``needs:``, ``principles:`` — whose items are ``- `` at a fixed indent) and
-    returns None for anything it is not sure about, so the caller can fall back to a full
-    re-dump. Trailing blank and comment lines are left out of the span, so a comment that
-    introduces the *next* item is never swallowed.
+    returns None for anything it is not sure about, so the caller can fall back to a full re-dump.
+    The single scanner behind both the edit splice (:func:`_block_span`) and the append (#85).
     """
     key_line = re.compile(rf"^{re.escape(key)}:\s*(#.*)?$")
-    needs_at = next((i for i, ln in enumerate(lines) if key_line.match(ln)), None)
-    if needs_at is None:
+    key_at = next((i for i, ln in enumerate(lines) if key_line.match(ln)), None)
+    if key_at is None:
         return None
     item_re = None
     item_indent = -1
-    i = needs_at + 1
-    spans: list[tuple[int, int, int, str | None]] = []  # start, end, indent, id
+    i = key_at + 1
+    starts: list[tuple[int, str | None]] = []
     while i < len(lines):
         line = lines[i]
         stripped = line.strip()
@@ -133,19 +135,33 @@ def _block_span(lines: list[str], key: str, item_id: str) -> tuple[int, int, int
         m = re.match(r"^(\s*)-\s", line)
         if item_re is None:
             if m is None:
-                return None  # first non-blank line under needs: isn't a list item — unknown shape
+                return None  # first non-blank line under the key isn't a list item — unknown shape
             item_indent = len(m.group(1))
             item_re = re.compile(rf"^\s{{{item_indent}}}-\s")
         if indent < item_indent and m is None:
-            break  # dedented past the list — end of needs:
+            break  # dedented past the list — end of the key's region
         if item_re.match(line):
-            spans.append((i, i, item_indent, _item_id(lines, i, item_indent)))
+            starts.append((i, _item_id(lines, i, item_indent)))
         elif indent <= item_indent and m is None:
             break
         i += 1
-    # close each span at the start of the next item (or `i`, the end of the list region)
-    bounds = [s[0] for s in spans] + [i]
-    for idx, (start, _e, indent, iid) in enumerate(spans):
+    return starts, i, item_indent
+
+
+def _block_span(lines: list[str], key: str, item_id: str) -> tuple[int, int, int] | None:
+    """Line span [start, end) and item indent of the top-level ``key:`` list item ``item_id``.
+
+    Trailing blank and comment lines are left out of the span, so a comment that introduces the
+    *next* item is never swallowed. None when the key is absent, the shape is unrecognised, or no
+    item carries ``item_id`` — the caller then falls back to a full re-dump.
+    """
+    scanned = _scan_list(lines, key)
+    if scanned is None:
+        return None
+    starts, region_end, item_indent = scanned
+    # close each span at the start of the next item (or `region_end`, the end of the list region)
+    bounds = [s[0] for s in starts] + [region_end]
+    for idx, (start, iid) in enumerate(starts):
         if iid != item_id:
             continue
         end = bounds[idx + 1]
@@ -153,7 +169,7 @@ def _block_span(lines: list[str], key: str, item_id: str) -> tuple[int, int, int
             lines[end - 1].strip() == "" or lines[end - 1].strip().startswith("#")
         ):
             end -= 1
-        return start, end, indent
+        return start, end, item_indent
     return None
 
 
@@ -234,6 +250,48 @@ def _render_item_edit(old_text: str, doc: dict[str, object], key: str, item_id: 
     return "".join(lines[:start]) + block + "".join(lines[end:])
 
 
+def _render_item_append(old_text: str, doc: dict[str, object], key: str, item_id: str) -> str:
+    """Append the new ``key:`` list item ``item_id`` to ``old_text``, every comment intact (#85).
+
+    The insert mirror of :func:`_render_item_edit`: dump only the new item and splice it in after
+    the last existing item of the list, so the header, the other items, and their comments stay
+    byte-for-byte. Falls back to a full re-dump when the file has no recognised ``key:`` list to
+    append to (a brand-new file or key, where there are no in-list comments to lose); the reload
+    gate in :func:`_validated` guards correctness either way.
+    """
+    lines = old_text.splitlines(keepends=True)
+    scanned = _scan_list(lines, key)
+    items = doc.get(key)
+    if scanned is None or not isinstance(items, list):
+        return _dump(doc)
+    starts, region_end, item_indent = scanned
+    if not starts:  # the key exists but holds no recognised item — re-dump rather than guess indent
+        return _dump(doc)
+    item = next(
+        (
+            cast("dict[str, object]", n)
+            for n in cast("list[object]", items)
+            if isinstance(n, dict) and cast("dict[str, object]", n).get("id") == item_id
+        ),
+        None,
+    )
+    if item is None:
+        return _dump(doc)
+    # insert after the last item's content, before any trailing blank/comment lines of the section
+    insert_at = region_end
+    first_start = starts[0][0]
+    while insert_at - 1 >= first_start and (
+        lines[insert_at - 1].strip() == "" or lines[insert_at - 1].strip().startswith("#")
+    ):
+        insert_at -= 1
+    dumped = yaml.safe_dump([item], sort_keys=False, allow_unicode=True, default_flow_style=False)
+    pad = " " * item_indent
+    block = "".join(pad + ln if ln.strip() else ln for ln in dumped.splitlines(keepends=True))
+    if insert_at > 0 and not lines[insert_at - 1].endswith("\n"):
+        block = "\n" + block  # the item before the insert point had no trailing newline
+    return "".join(lines[:insert_at]) + block + "".join(lines[insert_at:])
+
+
 def _render_delete(old_text: str, doc: dict[str, object], need_id: str) -> str:
     """Re-render after removing a need, excising only its block to keep every other comment (#60).
 
@@ -255,7 +313,7 @@ def _read_doc(path: Path) -> tuple[dict[str, object], str]:
     try:
         doc = yaml.safe_load(text)
     except yaml.YAMLError as exc:
-        raise WriteError(f"{path.name}: invalid YAML: {exc}") from exc
+        raise WriteError(yaml_error_message(path.name, text, exc)) from exc
     if doc is None:
         doc = {}
     if not isinstance(doc, dict):
@@ -268,6 +326,14 @@ def _need_list(doc: dict[str, object], path: Path) -> list[object]:
     if not isinstance(raw, list):
         raise WriteError(f"{path.name}: 'needs' is not a list")
     return cast("list[object]", raw)
+
+
+def _proof_list(need: dict[str, object], path: Path) -> list[object]:
+    """A fresh copy of a need's ``proofs`` list, erroring if the field is present but not a list."""
+    current = need.get("proofs", [])
+    if not isinstance(current, list):
+        raise WriteError(f"{path.name}: 'proofs' is not a list")
+    return list(cast("list[object]", current))
 
 
 def _config_files(config: Config) -> list[Path]:
@@ -364,19 +430,44 @@ def _validated(config: Config, path: Path, old_text: str, new_text: str, dry_run
     return Edit(path=path, old_text=old_text, new_text=new_text)
 
 
-def set_field(
-    config: Config, need_id: str, assignment: str, *, expect_sha: str | None, dry_run: bool
+def _edit_one_need(
+    config: Config,
+    need_id: str,
+    *,
+    expect_sha: str | None,
+    dry_run: bool,
+    mutate: Callable[[dict[str, object], Path], None],
 ) -> Edit:
-    """Set or list-append one field on an existing need, validated against the loader."""
+    """Run ``mutate`` on one existing need's raw mapping, comment-safe and reload-gated (#82).
+
+    The shared skeleton of every single-need writer: locate the file → read it → check the
+    optimistic lock → find the need by id → apply ``mutate`` (the only part that differs) → splice
+    just that need's block back (#53) → re-load as the schema and revert on failure (:func:`_validated`).
+    ``mutate`` receives the need's mapping and the file path (for field-level errors) and edits the
+    mapping in place; raising :class:`WriteError` from it aborts before anything is written.
+    """
     path, _ = _locate(config, need_id)
     doc, old_text = _read_doc(path)
     if expect_sha is not None and _sha256(old_text) != expect_sha:
         raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
     for raw in _need_list(doc, path):
         if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
-            _apply_assignment(cast("dict[str, object]", raw), assignment, path)
+            mutate(cast("dict[str, object]", raw), path)
             break
     return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
+
+
+def set_field(
+    config: Config, need_id: str, assignment: str, *, expect_sha: str | None, dry_run: bool
+) -> Edit:
+    """Set or list-append one field on an existing need, validated against the loader."""
+    return _edit_one_need(
+        config,
+        need_id,
+        expect_sha=expect_sha,
+        dry_run=dry_run,
+        mutate=lambda need, path: _apply_assignment(need, assignment, path),
+    )
 
 
 def set_importance(
@@ -387,17 +478,14 @@ def set_importance(
     The level is already resolved against the rubric by the caller; this just writes both fields
     together so ranking never refines on a number nobody has revisited.
     """
-    path, _ = _locate(config, need_id)
-    doc, old_text = _read_doc(path)
-    if expect_sha is not None and _sha256(old_text) != expect_sha:
-        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
-    for raw in _need_list(doc, path):
-        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
-            need = cast("dict[str, object]", raw)
-            need["importance"] = level
-            need["importance_set_at"] = when
-            break
-    return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
+
+    def _mutate(need: dict[str, object], _path: Path) -> None:
+        need["importance"] = level
+        need["importance_set_at"] = when
+
+    return _edit_one_need(
+        config, need_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate
+    )
 
 
 def capture_source(
@@ -423,10 +511,6 @@ def capture_source(
     next load) — whose signal it is, orthogonal to the evidence tier (#52 follow-up).
     """
     kind = _canonical_kind(kind)
-    path, _ = _locate(config, need_id)
-    doc, old_text = _read_doc(path)
-    if expect_sha is not None and _sha256(old_text) != expect_sha:
-        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
     source: dict[str, object] = {"kind": kind}
     for key, value in (
         ("who", who),
@@ -438,17 +522,18 @@ def capture_source(
     ):
         if value is not None:
             source[key] = value
-    for raw in _need_list(doc, path):
-        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
-            need = cast("dict[str, object]", raw)
-            current = need.get("sources", [])
-            if not isinstance(current, list):
-                raise WriteError(f"{path.name}: 'sources' is not a list")
-            sources = cast("list[object]", current)
-            sources.append(source)
-            need["sources"] = sources
-            break
-    return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
+
+    def _mutate(need: dict[str, object], path: Path) -> None:
+        current = need.get("sources", [])
+        if not isinstance(current, list):
+            raise WriteError(f"{path.name}: 'sources' is not a list")
+        sources = cast("list[object]", current)
+        sources.append(source)
+        need["sources"] = sources
+
+    return _edit_one_need(
+        config, need_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate
+    )
 
 
 def attest(
@@ -475,15 +560,13 @@ def attest(
         att["verdict"] = verdict
     if comment is not None:
         att["comment"] = comment
-    path, _ = _locate(config, need_id)
-    doc, old_text = _read_doc(path)
-    if expect_sha is not None and _sha256(old_text) != expect_sha:
-        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
-    for raw in _need_list(doc, path):
-        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
-            cast("dict[str, object]", raw)["attestation"] = att
-            break
-    return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
+    return _edit_one_need(
+        config,
+        need_id,
+        expect_sha=expect_sha,
+        dry_run=dry_run,
+        mutate=lambda need, _path: need.__setitem__("attestation", att),
+    )
 
 
 def withdraw(
@@ -515,15 +598,13 @@ def withdraw(
         mark["principle"] = principle
     if of is not None:
         mark["of"] = of
-    path, _ = _locate(config, need_id)
-    doc, old_text = _read_doc(path)
-    if expect_sha is not None and _sha256(old_text) != expect_sha:
-        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
-    for raw in _need_list(doc, path):
-        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
-            cast("dict[str, object]", raw)["withdrawn"] = mark
-            break
-    return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
+    return _edit_one_need(
+        config,
+        need_id,
+        expect_sha=expect_sha,
+        dry_run=dry_run,
+        mutate=lambda need, _path: need.__setitem__("withdrawn", mark),
+    )
 
 
 def reinstate(config: Config, need_id: str, *, expect_sha: str | None, dry_run: bool) -> Edit:
@@ -532,18 +613,15 @@ def reinstate(config: Config, need_id: str, *, expect_sha: str | None, dry_run: 
     Errors if the need is not currently withdrawn — reinstating a live need is a mistake worth
     surfacing, not a silent no-op.
     """
-    path, _ = _locate(config, need_id)
-    doc, old_text = _read_doc(path)
-    if expect_sha is not None and _sha256(old_text) != expect_sha:
-        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
-    for raw in _need_list(doc, path):
-        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
-            need = cast("dict[str, object]", raw)
-            if "withdrawn" not in need:
-                raise WriteError(f"need {need_id!r} is not withdrawn")
-            del need["withdrawn"]
-            break
-    return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
+
+    def _mutate(need: dict[str, object], _path: Path) -> None:
+        if "withdrawn" not in need:
+            raise WriteError(f"need {need_id!r} is not withdrawn")
+        del need["withdrawn"]
+
+    return _edit_one_need(
+        config, need_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate
+    )
 
 
 def _locate_decision(config: Config, decision_id: str) -> tuple[Path, dict[str, object], str]:
@@ -644,24 +722,19 @@ def accept(
     one-liner instead of a hand edit. Idempotent: re-accepting the same who/date is a no-op.
     """
     locator = f"accept:{who}@{date}"
-    path, _ = _locate(config, need_id)
-    doc, old_text = _read_doc(path)
-    if expect_sha is not None and _sha256(old_text) != expect_sha:
-        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
-    for raw in _need_list(doc, path):
-        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
-            need = cast("dict[str, object]", raw)
-            current = need.get("proofs", [])
-            if not isinstance(current, list):
-                raise WriteError(f"{path.name}: 'proofs' is not a list")
-            proofs = [p for p in cast("list[object]", current)]
-            if revoke:
-                proofs = [p for p in proofs if p != locator]
-            elif locator not in proofs:
+
+    def _mutate(need: dict[str, object], path: Path) -> None:
+        proofs = _proof_list(need, path)
+        if revoke:
+            need["proofs"] = [p for p in proofs if p != locator]
+        else:
+            if locator not in proofs:
                 proofs.append(locator)
             need["proofs"] = proofs
-            break
-    return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
+
+    return _edit_one_need(
+        config, need_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate
+    )
 
 
 def add_proof(
@@ -673,22 +746,15 @@ def add_proof(
     batch apply can call it per need and show each need's diff. Re-adding a locator already on the
     need is a no-op, so applying the same suggestion twice does not duplicate it (#54).
     """
-    path, _ = _locate(config, need_id)
-    doc, old_text = _read_doc(path)
-    if expect_sha is not None and _sha256(old_text) != expect_sha:
-        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
-    for raw in _need_list(doc, path):
-        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
-            need = cast("dict[str, object]", raw)
-            current = need.get("proofs", [])
-            if not isinstance(current, list):
-                raise WriteError(f"{path.name}: 'proofs' is not a list")
-            proofs = list(cast("list[object]", current))
-            if locator not in proofs:
-                proofs.append(locator)
-            need["proofs"] = proofs
-            break
-    return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
+    def _mutate(need: dict[str, object], path: Path) -> None:
+        proofs = _proof_list(need, path)
+        if locator not in proofs:
+            proofs.append(locator)
+        need["proofs"] = proofs
+
+    return _edit_one_need(
+        config, need_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate
+    )
 
 
 def relink_proof(
@@ -708,27 +774,20 @@ def relink_proof(
     old locator is not actually on the need. One reload-gated single-file splice, like
     :func:`add_proof`.
     """
-    path, _ = _locate(config, need_id)
-    doc, old_text = _read_doc(path)
-    if expect_sha is not None and _sha256(old_text) != expect_sha:
-        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
-    for raw in _need_list(doc, path):
-        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
-            need = cast("dict[str, object]", raw)
-            current = need.get("proofs", [])
-            if not isinstance(current, list):
-                raise WriteError(f"{path.name}: 'proofs' is not a list")
-            proofs = list(cast("list[object]", current))
-            if old_locator not in proofs:
-                raise WriteError(f"{old_locator!r} is not a proof on {need_id!r}")
-            swapped = [new_locator if p == old_locator else p for p in proofs]
-            deduped: list[object] = []
-            for p in swapped:
-                if p not in deduped:
-                    deduped.append(p)
-            need["proofs"] = deduped
-            break
-    return _validated(config, path, old_text, _render_edit(old_text, doc, need_id), dry_run)
+    def _mutate(need: dict[str, object], path: Path) -> None:
+        proofs = _proof_list(need, path)
+        if old_locator not in proofs:
+            raise WriteError(f"{old_locator!r} is not a proof on {need_id!r}")
+        swapped = [new_locator if p == old_locator else p for p in proofs]
+        deduped: list[object] = []
+        for p in swapped:
+            if p not in deduped:
+                deduped.append(p)
+        need["proofs"] = deduped
+
+    return _edit_one_need(
+        config, need_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate
+    )
 
 
 def add_need(
@@ -748,7 +807,8 @@ def add_need(
     An agent-authored need must carry a source — and never ``primary``, which only a real user
     signal earns. ``kind`` is restricted to ``assumption`` (the agent's own guess) or ``secondary``
     (citing an existing document). A ``draft`` need is staged: it loads but is kept off the counted
-    board until promoted (#60).
+    board until promoted (#60). The need is appended with the comment-preserving splice (#85), so
+    existing needs and their comments stay byte-for-byte; a brand-new file is dumped fresh.
     """
     kind = _SOURCE_KIND_ALIASES.get(kind, kind)
     if kind not in ("assumption", "secondary"):
@@ -778,7 +838,8 @@ def add_need(
         new_need["draft"] = True
         new_need["draft_added"] = today  # stamped so a lint age-gate can fire later (#60)
     needs.append(new_need)
-    return _validated(config, target, old_text, _dump(doc), dry_run)
+    new_text = _render_item_append(old_text, doc, "needs", need_id)
+    return _validated(config, target, old_text, new_text, dry_run)
 
 
 def add_role(
@@ -793,9 +854,9 @@ def add_role(
     """Declare a new Role in ``file``'s top-level ``roles:`` list (#52 follow-up).
 
     The dedicated write-back for a role, so a roster entry is a one-liner instead of a hand
-    edit. Like :func:`add_need`, a new/edited file is re-dumped whole (comments in that file are
-    not preserved — use `set` on an existing need for a comment-safe splice); the reload gate
-    still rejects anything that does not load. A duplicate role id is refused.
+    edit. Like :func:`add_need`, the new role is appended with the comment-preserving splice (#85),
+    so an existing file's comments stay byte-for-byte and only a brand-new file is dumped fresh;
+    the reload gate still rejects anything that does not load. A duplicate role id is refused.
     """
     target = config.root / file
     if target.exists():
@@ -813,7 +874,8 @@ def add_role(
     ):
         raise WriteError(f"role {role_id!r} already exists in {target.name}")
     roles.append({"id": role_id, "text": text})
-    return _validated(config, target, old_text, _dump(doc), dry_run)
+    new_text = _render_item_append(old_text, doc, "roles", role_id)
+    return _validated(config, target, old_text, new_text, dry_run)
 
 
 def _source_dict(s: Source) -> dict[str, object]:
@@ -845,9 +907,9 @@ def add_principle(
 ) -> Edit:
     """Declare a new Principle in ``file``'s top-level ``principles:`` list, stamped ``revised_at``.
 
-    Mirrors :func:`add_role`: a new/edited file is re-dumped whole, the reload gate rejects
-    anything that does not load (including an id already declared in another file), and a
-    duplicate id in this file is refused. ``revised_at`` is stamped at creation so the first
+    Mirrors :func:`add_role`: the new principle is appended with the comment-preserving splice (#85),
+    the reload gate rejects anything that does not load (including an id already declared in another
+    file), and a duplicate id in this file is refused. ``revised_at`` is stamped at creation so the first
     revision has something to ripple against. ``sources`` carry the provenance that surfaced the
     principle — the signals (often a client) a ``--from-need`` promotion copies across, so the
     discovery history stays honest: the principle was discovered, not decreed.
@@ -872,7 +934,8 @@ def add_principle(
     if sources:
         entry["sources"] = [_source_dict(s) for s in sources]
     principles.append(entry)
-    return _validated(config, target, old_text, _dump(doc), dry_run)
+    new_text = _render_item_append(old_text, doc, "principles", principle_id)
+    return _validated(config, target, old_text, new_text, dry_run)
 
 
 def _locate_principle(config: Config, principle_id: str) -> tuple[Path, dict[str, object], str]:
@@ -934,7 +997,7 @@ def add_decision(
 ) -> Edit:
     """Declare a new Decision (the solution chosen for ``needs``) in ``file``'s ``decisions:`` list.
 
-    Mirrors :func:`add_principle` (whole-file re-dump, reload-gated, duplicate id refused). ``needs``
+    Mirrors :func:`add_principle` (comment-preserving append #85, reload-gated, duplicate id refused). ``needs``
     is required — the loader rejects a decision that serves none, and the reload gate rejects an id
     that is not a known need. Empty optional lists are omitted so the written block stays clean.
     """
@@ -965,7 +1028,8 @@ def add_decision(
     if draft:
         entry["draft"] = True
     decisions.append(entry)
-    return _validated(config, target, old_text, _dump(doc), dry_run)
+    new_text = _render_item_append(old_text, doc, "decisions", decision_id)
+    return _validated(config, target, old_text, new_text, dry_run)
 
 
 def _snapshot(paths: list[Path]) -> dict[Path, str | None]:

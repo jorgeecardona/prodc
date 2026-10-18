@@ -8,6 +8,7 @@ IDs are globally unique (children reference ids across files), so a duplicate is
 from __future__ import annotations
 
 import datetime
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -383,13 +384,44 @@ class _Loaded:
     decisions: list[Decision] = field(default_factory=list[Decision])
 
 
+def yaml_error_message(where: str, text: str, exc: yaml.YAMLError) -> str:
+    """Turn a raw PyYAML parse error into a prodc message naming the file, line and nearest need (#84).
+
+    PyYAML points at ``"<unicode string>", line N`` with no file or need id; on a 200-line board that
+    leaves the author hunting by hand. We name the file and line, scan back to the nearest ``id:`` so
+    the offending need is identified, and — for the common ``": "``-in-prose case — spell out the fix.
+    """
+    mark = getattr(exc, "problem_mark", None)
+    problem = getattr(exc, "problem", None) or "invalid YAML"
+    if mark is None:
+        return f"{where}: invalid YAML: {exc}"
+    lines = text.splitlines()
+    loc = f"{where}: line {mark.line + 1}"
+    nid: str | None = None
+    for j in range(min(mark.line, len(lines) - 1), -1, -1):
+        m = re.match(r"^\s*-?\s*id:\s*(\S+)", lines[j])
+        if m:
+            nid = m.group(1).strip("\"'")
+            break
+    if nid is not None:
+        loc += f" (need {nid!r})"
+    msg = f"{loc}: {problem}"
+    if "mapping values are not allowed here" in problem:
+        msg += (
+            " — a ': ' in an unquoted claim/text reads as a nested mapping; "
+            "quote the value in single quotes or rephrase"
+        )
+    return msg
+
+
 def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
     """Parse one prodc file for every noun list it carries (``needs:``/``goals:``/``principles:``/…)."""
     where = path.name
+    text = path.read_text(encoding="utf-8")
     try:
-        doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+        doc = yaml.safe_load(text)
     except yaml.YAMLError as exc:
-        raise LoaderError(f"{where}: invalid YAML: {exc}") from exc
+        raise LoaderError(yaml_error_message(where, text, exc)) from exc
     out = _Loaded()
     if doc is None:
         return out

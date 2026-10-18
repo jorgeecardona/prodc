@@ -366,3 +366,24 @@ def test_seam_only_on_flows(tmp_path: Path) -> None:
     cfg = _config(tmp_path, ("a.yaml", "needs:\n  - id: N-1\n    text: t\n    seam: [web:x#y]\n"))
     with pytest.raises(LoaderError, match="'seam' is for a flow"):
         load_needs(cfg)
+
+
+def test_unquoted_colon_in_claim_names_the_need_and_the_fix(tmp_path: Path) -> None:
+    # #84: a ': ' in an unquoted prose claim must give a field-level error, not a raw YAML trace.
+    cfg = _config(
+        tmp_path,
+        (
+            "a.yaml",
+            "needs:\n"
+            "  - id: N-5\n"
+            "    text: original\n"
+            "    claim: clear BOTH conditions with margin: (1) a and (2) b\n",
+        ),
+    )
+    with pytest.raises(LoaderError) as exc:
+        load_needs(cfg)
+    msg = str(exc.value)
+    assert "a.yaml" in msg
+    assert "N-5" in msg  # the offending need, not just a line/column
+    assert "line 4" in msg
+    assert "quote the value" in msg  # the actionable hint

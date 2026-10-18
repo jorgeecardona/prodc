@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from prodc.config import Config
-from prodc.writer import accept, capture_source, set_field
+from prodc.writer import accept, add_need, capture_source, set_field
 
 _TOML = """
 [prodc]
@@ -111,3 +111,48 @@ def test_inline_list_file_falls_back_but_still_edits(tmp_path: Path) -> None:
     set_field(cfg, "N-1", "text=edited via fallback", expect_sha=None, dry_run=False)
     out = _read(tmp_path)
     assert "edited via fallback" in out
+
+
+def test_add_appends_and_preserves_comments(tmp_path: Path) -> None:
+    # #85: `add` must splice the new need in, not re-dump the whole file and drop every comment.
+    cfg = _project(tmp_path)
+    add_need(
+        cfg,
+        "N-3",
+        "a freshly added need",
+        who="agent",
+        kind="assumption",
+        file="needs/a.yaml",
+        expect_sha=None,
+        dry_run=False,
+    )
+    out = _read(tmp_path)
+    # every authored comment survives
+    assert "# Provenance contract: interview quotes are VERBATIM" in out
+    assert "# ids are minted in the N-16xx range." in out
+    assert "# this comment introduces the second need" in out
+    # the existing needs are untouched and the 2-space item indent is matched, not reflowed
+    assert "  - id: N-1\n" in out
+    assert "    text: second need stays untouched" in out
+    assert "  - id: N-3\n" in out
+    assert "a freshly added need" in out
+    # the new need lands after N-2, not before it
+    assert out.index("id: N-3") > out.index("id: N-2")
+
+
+def test_add_into_new_file_dumps_fresh(tmp_path: Path) -> None:
+    # No existing list to append to: fall back to a whole-file dump, which must still load.
+    cfg = _project(tmp_path)
+    add_need(
+        cfg,
+        "N-9",
+        "a need in a brand-new file",
+        who="agent",
+        kind="assumption",
+        file="needs/b.yaml",
+        expect_sha=None,
+        dry_run=False,
+    )
+    out = (tmp_path / "needs" / "b.yaml").read_text(encoding="utf-8")
+    assert "id: N-9" in out
+    assert "a need in a brand-new file" in out
