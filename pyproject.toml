@@ -1,6 +1,6 @@
 [project]
 name = "prodc"
-version = "0.4.7"
+dynamic = ["version"]  # the single source of truth is __version__ in src/prodc/__init__.py (see [tool.hatch.version])
 description = "Product management as code: roles, flows, and features traced to evidence."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -40,6 +40,11 @@ Documentation = "https://cardona-oss.gitlab.io/prodc/"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+# The version lives as __version__ in the package itself; hatchling reads it (by regex, no import) so
+# pyproject and the runtime never disagree. scripts/bump-version rewrites that literal.
+path = "src/prodc/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/prodc"]
