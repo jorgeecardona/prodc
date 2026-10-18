@@ -262,6 +262,16 @@ def test_goals_loaded_and_need_traces_up(tmp_path: Path) -> None:
     assert model.needs[0].goal == "G-1"
 
 
+def test_need_loads_tags(tmp_path: Path) -> None:
+    # #80: tags are a flat, many-to-many label list on a need.
+    cfg = _config(
+        tmp_path,
+        ("a.yaml", "needs:\n  - id: N-1\n    text: a need\n    tags: [search, onboarding]\n"),
+    )
+    (need,) = load_needs(cfg)
+    assert need.tags == ("search", "onboarding")
+
+
 def test_goal_loads_description_and_target(tmp_path: Path) -> None:
     # #80: a goal is the home for the initiative — a description and an optional target window.
     from prodc.loader import load

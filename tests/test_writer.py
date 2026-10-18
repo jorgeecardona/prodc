@@ -302,6 +302,14 @@ def test_children_append_bare_id(tmp_path: Path) -> None:
     assert [(c.id, c.step) for c in flow.children] == [("N-2", None), ("N-3", None)]
 
 
+def test_tags_append(tmp_path: Path) -> None:
+    # #80: tags are a plain string list; `tags+=X` appends like proofs.
+    cfg = _proj(tmp_path, "needs:\n  - id: N-1\n    text: a need\n    tags: [search]\n")
+    set_field(cfg, "N-1", "tags+=onboarding", expect_sha=None, dry_run=False)
+    need = next(n for n in load(cfg).needs if n.id == "N-1")
+    assert need.tags == ("search", "onboarding")
+
+
 def test_delete_need_unknown_id_rejected(tmp_path: Path) -> None:
     cfg = _proj(tmp_path, "needs:\n  - id: N-1\n    text: t\n")
     with pytest.raises(WriteError, match="no need 'N-9'"):

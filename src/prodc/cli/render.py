@@ -422,6 +422,8 @@ def render_show(
         lines.append(f"  children: {rendered}")
     if need.contradicts:
         lines.append(f"  contradicts: {', '.join(need.contradicts)}")
+    if need.tags:
+        lines.append(f"  tags: {', '.join(need.tags)}")
     if need.seam:
         lines.append(f"  seam: {', '.join(need.seam)}")
     if need.proofs:

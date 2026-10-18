@@ -24,6 +24,7 @@ from ..dedup import (
     VariantGroup,
     duplicate_pairs,
     matches_for,
+    tag_warnings,
     variant_suggestions,
     who_variants,
 )
@@ -288,6 +289,15 @@ def cmd_lint(args: argparse.Namespace) -> int:
                 f"decided {d.decided_at} under principle {pid}, revised later — re-review this solution",
             )
         )
+    # Tag hygiene (#80): the flat tag space is undeclared, so flag singletons, near-duplicate
+    # spellings, and a tag standing in for a declared goal/role/release/client (structure hiding).
+    structural_ids = (
+        {g.id for g in model.goals}
+        | {p.id for p in model.roles}
+        | {r.id for r in model.releases}
+        | {n.client for n in needs if n.client is not None}
+    )
+    warnings += tag_warnings(needs, structural_ids, cfg.duplicate_threshold)
     if args.json:
         print(
             json.dumps(
@@ -331,6 +341,8 @@ def cmd_status(args: argparse.Namespace) -> int:
         needs = applicable_needs(needs, args.client)
     if args.goal:
         needs = [n for n in needs if n.goal == args.goal]
+    if args.tag:
+        needs = [n for n in needs if args.tag in n.tags]
     if args.stale is not None:
         today = date.today()
         needs = [

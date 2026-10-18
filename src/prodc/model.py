@@ -350,6 +350,7 @@ class Need:
     contradicts: tuple[
         str, ...
     ] = ()  # ids of needs this one opposes; symmetric, a principle decides
+    tags: tuple[str, ...] = ()  # flat, many-to-many, stateless labels — a filter axis, not a group (#80)
 
     @property
     def is_variant(self) -> bool:

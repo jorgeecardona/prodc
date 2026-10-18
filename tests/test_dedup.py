@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from prodc.config import Config, ConfigError
-from prodc.dedup import duplicate_pairs, matches_for, similarity
+from prodc.dedup import duplicate_pairs, matches_for, similarity, tag_warnings
 from prodc.model import Need
 
 
@@ -228,3 +228,20 @@ def test_score_prune_matches_brute_force() -> None:
                 if s >= threshold:
                     brute[frozenset((needs[i].id, needs[j].id))] = round(s, 10)
         assert got == brute, f"mismatch at threshold {threshold}"
+
+
+def test_tag_warnings_singleton_nearspelling_and_structure() -> None:
+    needs = [
+        _n("N-1", "a", tags=("search", "searching", "onboarding")),
+        _n("N-2", "b", tags=("search", "onboarding")),
+        _n("N-3", "c", tags=("search", "G-1")),  # G-1 is a declared goal id
+    ]
+    warns = tag_warnings(needs, structural_ids={"G-1"}, threshold=0.4)
+    msgs = {(t, m) for t, m in warns}
+    tags_warned = {t for t, _ in warns}
+    # G-1 is structural, searching is a singleton, search is used 4x (no singleton warning)
+    assert any(t == "G-1" and "declared goal/role/release/client" in m for t, m in msgs)
+    assert any(t == "searching" and "singleton" in m for t, m in msgs)
+    assert any("near-duplicate spelling" in m for _, m in msgs)
+    assert "search" not in {t for t, m in msgs if "singleton" in m}  # 4 uses, not a singleton
+    assert tags_warned  # sanity

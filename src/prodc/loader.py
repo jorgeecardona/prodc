@@ -278,6 +278,10 @@ def _need(
         _as_str(c, f"{where}.contradicts[{i}]")
         for i, c in enumerate(_as_list(tbl.get("contradicts"), f"{where}.contradicts"))
     )
+    tags = tuple(
+        _as_str(t, f"{where}.tags[{i}]")
+        for i, t in enumerate(_as_list(tbl.get("tags"), f"{where}.tags"))
+    )
     if children and proofs:
         raise LoaderError(
             f"{where} ({nid}): a flow (need with children) proves its steps via the "
@@ -308,6 +312,7 @@ def _need(
         not_duplicate_of=not_duplicate_of,
         not_variant_of=not_variant_of,
         contradicts=contradicts,
+        tags=tags,
         importance_set_at=importance_set_at,
         draft=draft,
         draft_added=draft_added,

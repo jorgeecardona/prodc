@@ -237,3 +237,35 @@ def who_variants(needs: list[Need], threshold: float) -> list[WhoVariant]:
             out.append(WhoVariant(client, tuple(sorted(members)), tuple(ids)))
     out.sort(key=lambda v: (v.client or "", v.whos))
     return out
+
+
+def tag_warnings(
+    needs: list[Need], structural_ids: set[str], threshold: float
+) -> list[tuple[str, str]]:
+    """Keep the flat tag space from rotting (#80): singletons, near-dup spellings, hidden structure.
+
+    Tags are undeclared and many-to-many, so nothing stops a typo (`search` vs `searching`) or a
+    one-off from accumulating. Three cheap hygiene signals, each a warning keyed by the tag:
+    a tag equal to a declared goal/role/release/client id ("structure hiding in a tag" — use the
+    first-class field instead), a singleton (one need only — a likely typo or a tag not worth it),
+    and a near-duplicate spelling of another tag (same :func:`similarity` the dedup checks use).
+    """
+    counts: dict[str, int] = {}
+    for n in needs:
+        for t in n.tags:
+            counts[t] = counts.get(t, 0) + 1
+    out: list[tuple[str, str]] = []
+    tags = sorted(counts)
+    for t in tags:
+        if t in structural_ids:
+            out.append(
+                (t, "tag equals a declared goal/role/release/client id — use that field, not a tag")
+            )
+        elif counts[t] == 1:
+            out.append((t, "tag used on only one need — a singleton (likely a typo or not worth a tag)"))
+    for i in range(len(tags)):
+        for j in range(i + 1, len(tags)):
+            a, b = tags[i], tags[j]
+            if _normalise(a) != _normalise(b) and similarity(a, b) >= threshold:
+                out.append((a, f"tag may be a near-duplicate spelling of {b!r}"))
+    return out

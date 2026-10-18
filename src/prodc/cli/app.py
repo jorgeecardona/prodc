@@ -68,6 +68,12 @@ def main(argv: list[str] | None = None) -> int:
         help="scope the board + coverage to the needs serving one goal",
     )
     st.add_argument(
+        "--tag",
+        default=None,
+        metavar="TAG",
+        help="scope the board + coverage to the needs carrying one tag (#80)",
+    )
+    st.add_argument(
         "--columns",
         default=None,
         type=lambda s: [c.strip() for c in s.split(",")],
