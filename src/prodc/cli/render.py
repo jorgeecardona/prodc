@@ -382,7 +382,10 @@ def render_show(
     else:
         lines.append("  sources: (none — opinion)")
     if need.children:
-        lines.append(f"  children: {', '.join(need.children)}")
+        rendered = ", ".join(
+            c.id if c.step is None else f"{c.id}@{c.step}" for c in need.children
+        )
+        lines.append(f"  children: {rendered}")
     if need.contradicts:
         lines.append(f"  contradicts: {', '.join(need.contradicts)}")
     if need.seam:

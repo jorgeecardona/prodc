@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from prodc.adapters import FrontmatterAdapter, ProofResult, SourceAdapter
-from prodc.model import Need, NeedState, ProofState, Source, SourceKind
+from prodc.model import Child, Need, NeedState, ProofState, Source, SourceKind
 from prodc.status import resolve
 
 
@@ -52,7 +52,7 @@ def test_flow_aggregates_two_of_three() -> None:
         Need(id="C-2", text="two", proofs=("web:2",)),
         Need(id="C-3", text="three", proofs=()),  # a HOLE
     )
-    flow = Need(id="F-1", text="a flow", children=("C-1", "C-2", "C-3"))
+    flow = Need(id="F-1", text="a flow", children=(Child("C-1"), Child("C-2"), Child("C-3")))
     results = {r.need.id: r for r in resolve([flow, *children], {"web": _delivered()})}
     flow_result = results["F-1"]
     assert flow_result.state is NeedState.PENDING  # not all delivered → pending
@@ -234,7 +234,7 @@ def test_coverage_counts_leaves_not_flow_parents() -> None:
     from prodc.status import summarize
 
     needs = [
-        Need(id="F-1", text="roast day flow", children=("L-1", "L-2")),
+        Need(id="F-1", text="roast day flow", children=(Child("L-1"), Child("L-2"))),
         Need(id="L-1", text="step one", proofs=("x:1",)),
         Need(id="L-2", text="step two", proofs=("x:1",)),
     ]
@@ -296,7 +296,7 @@ def test_flow_orphan_warning() -> None:
     from prodc.status import flow_orphan_warnings
 
     needs = [
-        Need(id="F-1", text="a flow", children=("L-1",)),
+        Need(id="F-1", text="a flow", children=(Child("L-1"),)),
         Need(id="L-1", text="in the flow"),
         Need(id="L-2", text="in no flow"),
     ]
@@ -354,7 +354,7 @@ def test_flow_seam_proof_gates_delivered() -> None:
     # all children delivered but the seam proof pending → flow is PENDING, not DELIVERED (#44)
     from prodc.adapters import Adapter
 
-    flow = Need(id="F-1", text="roast day", children=("L-1", "L-2"), seam=("web:seam#E2E",))
+    flow = Need(id="F-1", text="roast day", children=(Child("L-1"), Child("L-2")), seam=("web:seam#E2E",))
     children = [
         Need(id="L-1", text="a", proofs=("x:1",)),
         Need(id="L-2", text="b", proofs=("x:1",)),
@@ -368,14 +368,14 @@ def test_flow_seam_proof_gates_delivered() -> None:
 
 
 def test_flow_seam_green_delivers() -> None:
-    flow = Need(id="F-1", text="roast day", children=("L-1",), seam=("web:seam#E2E",))
+    flow = Need(id="F-1", text="roast day", children=(Child("L-1"),), seam=("web:seam#E2E",))
     child = Need(id="L-1", text="a", proofs=("x:1",))
     by_id = {r.need.id: r for r in resolve([flow, child], {"x": _delivered(), "web": _delivered()})}
     assert by_id["F-1"].state is NeedState.DELIVERED
 
 
 def test_flow_seam_broken_breaks_flow() -> None:
-    flow = Need(id="F-1", text="roast day", children=("L-1",), seam=("nope:x",))
+    flow = Need(id="F-1", text="roast day", children=(Child("L-1"),), seam=("nope:x",))
     child = Need(id="L-1", text="a", proofs=("x:1",))
     by_id = {r.need.id: r for r in resolve([flow, child], {"x": _delivered()})}
     assert by_id["F-1"].state is NeedState.BROKEN  # no 'nope' adapter → seam BROKEN

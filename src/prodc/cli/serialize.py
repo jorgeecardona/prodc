@@ -160,7 +160,7 @@ def show_json(r: NeedResult, decisions: list[Decision] | None = None) -> str:
                 for s in need.sources
             ],
             "proofs": list(need.proofs),
-            "children": list(need.children),
+            "children": [{"id": c.id, "step": c.step} for c in need.children],
             "seam": list(need.seam),
         }
     )

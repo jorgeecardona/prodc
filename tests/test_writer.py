@@ -275,6 +275,33 @@ def test_delete_need_removes_the_block_keeping_others(tmp_path: Path) -> None:
     assert "# keep me" in text  # header comment survives the splice
 
 
+def test_children_append_stepped_edge(tmp_path: Path) -> None:
+    # #90: `children+=id@step` appends a {id, step} edge; a bare id stays a plain string.
+    body = (
+        "needs:\n"
+        "  - id: F-1\n    text: a flow\n    children: [N-2]\n"
+        "  - id: N-2\n    text: step two\n    proofs: ['x:1']\n"
+        "  - id: N-3\n    text: step three\n    proofs: ['x:2']\n"
+    )
+    cfg = _proj(tmp_path, body)
+    set_field(cfg, "F-1", "children+=N-3@conclude", expect_sha=None, dry_run=False)
+    flow = next(n for n in load(cfg).needs if n.id == "F-1")
+    assert [(c.id, c.step) for c in flow.children] == [("N-2", None), ("N-3", "conclude")]
+
+
+def test_children_append_bare_id(tmp_path: Path) -> None:
+    body = (
+        "needs:\n"
+        "  - id: F-1\n    text: a flow\n    children: [N-2]\n"
+        "  - id: N-2\n    text: step two\n    proofs: ['x:1']\n"
+        "  - id: N-3\n    text: step three\n    proofs: ['x:2']\n"
+    )
+    cfg = _proj(tmp_path, body)
+    set_field(cfg, "F-1", "children+=N-3", expect_sha=None, dry_run=False)
+    flow = next(n for n in load(cfg).needs if n.id == "F-1")
+    assert [(c.id, c.step) for c in flow.children] == [("N-2", None), ("N-3", None)]
+
+
 def test_delete_need_unknown_id_rejected(tmp_path: Path) -> None:
     cfg = _proj(tmp_path, "needs:\n  - id: N-1\n    text: t\n")
     with pytest.raises(WriteError, match="no need 'N-9'"):

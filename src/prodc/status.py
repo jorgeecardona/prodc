@@ -293,11 +293,11 @@ class Resolver:
         warnings: list[str] = []
         child_states: list[NeedState] = []
         declared = False
-        for cid in need.children:
-            if cid not in self._by_id:
-                warnings.append(f"unknown child id '{cid}'")
+        for c in need.children:
+            if c.id not in self._by_id:
+                warnings.append(f"unknown child id '{c.id}'")
                 continue
-            cr = self.resolve(cid)
+            cr = self.resolve(c.id)
             child_states.append(cr.state)
             declared = declared or cr.declared
         delivered = sum(1 for s in child_states if s is NeedState.DELIVERED)
@@ -806,7 +806,7 @@ def handoffs(needs: list[Need]) -> list[Handoff]:
     for flow in needs:
         if not flow.children:
             continue
-        steps = [by_id[c] for c in flow.children if c in by_id]
+        steps = [by_id[c.id] for c in flow.children if c.id in by_id]
         for a, b in pairwise(steps):
             if a.role and b.role and a.role != b.role:
                 out.append(Handoff(flow, a, b, a.role, b.role))
@@ -844,7 +844,7 @@ def flow_orphan_warnings(needs: list[Need]) -> set[str]:
         return set()
     in_a_flow: set[str] = set()
     for flow in flows:
-        in_a_flow.update(flow.children)
+        in_a_flow.update(c.id for c in flow.children)
     return {n.id for n in needs if not n.children and n.id not in in_a_flow}
 
 

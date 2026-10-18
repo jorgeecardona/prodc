@@ -258,6 +258,21 @@ class Withdrawal:
 
 
 @dataclass(frozen=True)
+class Child:
+    """One edge of a flow: the sub-need and, optionally, the ``step`` it plays in the journey (#90).
+
+    A flow's ``children`` are ordered, and a use case ("job") is just a flow with a ``role`` set and
+    a ``step`` on each edge (locate / execute / conclude). The step annotates the *edge*, not the
+    sub-need — the same need can be the ``execute`` step of one flow and the ``locate`` of another —
+    so it lives here, not on :class:`Need`. A bare ``US-050`` in YAML loads as ``Child("US-050")``
+    with no step, so every existing flow keeps working unchanged.
+    """
+
+    id: str
+    step: str | None = None
+
+
+@dataclass(frozen=True)
 class Need:
     """What a named person wants, with its provenance and its proofs."""
 
@@ -269,7 +284,7 @@ class Need:
     must: bool = False
     sources: tuple[Source, ...] = ()
     proofs: tuple[str, ...] = ()  # locators, "<adapter>:<payload>" (leaf needs)
-    children: tuple[str, ...] = ()  # ids of sub-needs (a flow is a Need with children)
+    children: tuple[Child, ...] = ()  # ordered sub-need edges (a flow is a Need with children)
     seam: tuple[str, ...] = ()  # end-to-end proof locators for a flow's between-steps behaviour
     client: str | None = None  # which client this instance is for; None = shared baseline
     variant_of: str | None = None  # id of the baseline need this specialises; None = standalone

@@ -365,6 +365,19 @@ def _coerce(value: str) -> object:
         return value
 
 
+def _child_item(raw: str) -> object:
+    """Parse a ``children+=`` value into a flow edge: ``id`` stays a bare string, ``id@step`` a map.
+
+    Mirrors the loader's dual shape (#90): ``children+=US-050`` appends the bare id (unstepped),
+    ``children+=US-052@execute`` appends ``{id: US-052, step: execute}``. A bare id keeps the file's
+    existing plain-string style; the ``@`` suffix mirrors the ``need:A@yes`` proof-locator idiom.
+    """
+    head, sep, step = raw.partition("@")
+    if not sep:
+        return raw
+    return {"id": head.strip(), "step": step.strip()}
+
+
 def _apply_assignment(need: dict[str, object], assignment: str, path: Path) -> None:
     if "+=" in assignment:
         key, _, raw = assignment.partition("+=")
@@ -377,7 +390,7 @@ def _apply_assignment(need: dict[str, object], assignment: str, path: Path) -> N
         if not isinstance(current, list):
             raise WriteError(f"{path.name}: {key!r} is not a list")
         items = cast("list[object]", current)
-        items.append(raw.strip())
+        items.append(_child_item(raw.strip()) if key == "children" else raw.strip())
         need[key] = items
         return
     key, sep, raw = assignment.partition("=")

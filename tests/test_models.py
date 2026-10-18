@@ -14,7 +14,7 @@ from dataclasses import dataclass, replace
 from musil import Action, Model, check, explore, reaches
 
 from prodc.adapters import Adapter, ProofResult
-from prodc.model import Decision, Need, NeedState, ProofState, Withdrawal, board_needs
+from prodc.model import Child, Decision, Need, NeedState, ProofState, Withdrawal, board_needs
 from prodc.status import Resolver, active_decisions
 
 
@@ -141,7 +141,7 @@ def flow_state(f: Flow) -> NeedState:
     """The NeedState prodc's real aggregate gives this set of children + seam."""
     children = [_child_need(f"c{i}", s) for i, s in enumerate(f.children)]
     seam = tuple(f"stub:{s}" for s in f.seam if s != "none")
-    flow = Need(id="flow", text="f", children=tuple(c.id for c in children), seam=seam)
+    flow = Need(id="flow", text="f", children=tuple(Child(c.id) for c in children), seam=seam)
     return Resolver([flow, *children], _ADAPTERS).resolve("flow").state
 
 

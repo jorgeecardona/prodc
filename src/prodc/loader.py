@@ -21,6 +21,7 @@ from .model import (
     Answer,
     Attestation,
     AttestationKind,
+    Child,
     Decision,
     Goal,
     Model,
@@ -203,6 +204,21 @@ def _source(raw: object, where: str) -> Source:
     )
 
 
+def _child(raw: object, where: str) -> Child:
+    """Parse one flow edge: a bare id string, or a ``{id, step}`` mapping (#90).
+
+    A bare ``US-050`` stays valid (``Child("US-050")`` with no step), so existing flows load
+    unchanged; a mapping adds the optional ``step`` the edge plays in the journey.
+    """
+    if isinstance(raw, str):
+        return Child(id=raw)
+    tbl = _as_mapping(raw, where)
+    return Child(
+        id=_as_str(tbl.get("id"), f"{where}.id"),
+        step=_opt_str(tbl.get("step"), f"{where}.step"),
+    )
+
+
 def _need(
     raw: object,
     where: str,
@@ -243,7 +259,7 @@ def _need(
         for i, p in enumerate(_as_list(tbl.get("proofs"), f"{where}.proofs"))
     )
     children = tuple(
-        _as_str(c, f"{where}.children[{i}]")
+        _child(c, f"{where}.children[{i}]")
         for i, c in enumerate(_as_list(tbl.get("children"), f"{where}.children"))
     )
     seam = tuple(
@@ -564,9 +580,9 @@ def _check_children(needs: list[Need]) -> None:
     """Every id in a need's ``children`` must name a known need."""
     known = {n.id for n in needs}
     for need in needs:
-        for cid in need.children:
-            if cid not in known:
-                raise LoaderError(f"need {need.id!r}: child {cid!r} is not a known need id")
+        for c in need.children:
+            if c.id not in known:
+                raise LoaderError(f"need {need.id!r}: child {c.id!r} is not a known need id")
 
 
 def _check_withdrawal_of(needs: list[Need]) -> None:

@@ -109,6 +109,26 @@ def test_flow_with_proofs_raises(tmp_path: Path) -> None:
         load_needs(cfg)
 
 
+def test_children_load_as_bare_id_or_stepped_mapping(tmp_path: Path) -> None:
+    # #90: a flow's children take either a bare id (unstepped) or a {id, step} mapping, mixed.
+    cfg = _config(
+        tmp_path,
+        (
+            "a.yaml",
+            "needs:\n"
+            "  - id: F-1\n"
+            "    text: a flow\n"
+            "    children:\n"
+            "      - C-1\n"
+            "      - {id: C-2, step: execute}\n"
+            "  - id: C-1\n    text: one\n"
+            "  - id: C-2\n    text: two\n",
+        ),
+    )
+    flow = next(n for n in load_needs(cfg) if n.id == "F-1")
+    assert [(c.id, c.step) for c in flow.children] == [("C-1", None), ("C-2", "execute")]
+
+
 def test_variant_scope_shared_baseline_across_clients(tmp_path: Path) -> None:
     cfg = _config(
         tmp_path,
