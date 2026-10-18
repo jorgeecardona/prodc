@@ -7,6 +7,7 @@ formatting: it reads the resolved model and returns strings, never loads or writ
 
 from __future__ import annotations
 
+import datetime
 import shutil
 from collections.abc import Callable
 
@@ -27,6 +28,7 @@ from ..status import (
     PrincipleReport,
     Recurrence,
     Summary,
+    group_state,
     orphaned_decisions,
     rank,
     state_priority,
@@ -209,12 +211,21 @@ def render_out_of_scope(results: list[NeedResult]) -> str:
 
 
 def render_goals(goal_cov: list[tuple[Goal, Summary]], ungoaled: list[NeedResult]) -> str:
-    """Per-goal coverage, plus the needs that serve no objective (#27)."""
+    """Per-goal coverage with a derived state and target, plus the needs that serve no objective (#27, #80)."""
+    today = datetime.date.today().isoformat()
     out = ["\ngoals (objectives needs trace up to):"]
     for goal, gsum in goal_cov:
+        state = group_state(gsum)
         metric = f"  [{goal.metric}]" if goal.metric else ""
         pct = round(gsum.coverage * 100)
-        out.append(f"  {goal.id:<12} {gsum.delivered}/{gsum.total} ({pct}%){metric}  {goal.text}")
+        overdue = goal.target is not None and goal.target < today and state is not NeedState.DELIVERED
+        target = ""
+        if goal.target:
+            target = f"  ⚠ overdue {goal.target}" if overdue else f"  target {goal.target}"
+        out.append(
+            f"  {goal.id:<12} {_LABEL[state]:<10} {gsum.delivered}/{gsum.total} ({pct}%)"
+            f"{metric}{target}  {goal.text}"
+        )
     if ungoaled:
         ids = ", ".join(r.need.id for r in ungoaled)
         out.append(f"  ⚠ {len(ungoaled)} need(s) serve no goal: {ids}")

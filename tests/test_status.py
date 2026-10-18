@@ -7,7 +7,23 @@ from pathlib import Path
 
 from prodc.adapters import FrontmatterAdapter, ProofResult, SourceAdapter
 from prodc.model import Child, Need, NeedState, ProofState, Source, SourceKind
-from prodc.status import resolve
+from prodc.status import Summary, group_state, resolve
+
+
+def _summary(**kw: int) -> Summary:
+    base = dict(total=0, delivered=0, pending=0, hole=0, must_hole=0, broken=0, unresolved=0, opinion=0)
+    base.update(kw)
+    return Summary(**base)
+
+
+def test_group_state_rolls_up_members() -> None:
+    # #80: a goal/release/role state is derived from its members, never hand-set.
+    assert group_state(_summary()) is NeedState.HOLE  # empty group
+    assert group_state(_summary(total=2, hole=2)) is NeedState.HOLE  # nothing started
+    assert group_state(_summary(total=2, delivered=2)) is NeedState.DELIVERED
+    assert group_state(_summary(total=2, delivered=1, pending=1)) is NeedState.PENDING
+    assert group_state(_summary(total=2, delivered=1, broken=1)) is NeedState.BROKEN  # broken wins
+    assert group_state(_summary(total=2, delivered=1, unresolved=1)) is NeedState.UNRESOLVED
 
 
 @dataclass(frozen=True)

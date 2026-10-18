@@ -322,6 +322,8 @@ def _goal(raw: object, where: str) -> Goal:
         id=_as_str(tbl.get("id"), f"{where}.id"),
         text=_as_str(tbl.get("text"), f"{where}.text"),
         metric=_opt_str(tbl.get("metric"), f"{where}.metric"),
+        description=_opt_str(tbl.get("description"), f"{where}.description"),
+        target=_opt_str(tbl.get("target"), f"{where}.target"),
     )
 
 

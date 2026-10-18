@@ -102,11 +102,20 @@ class Goal:
 
     A need with no ``goal`` is flagged the way an unsourced need is flagged an opinion — it
     lets the board answer "are we moving the objective", not only "is this need delivered".
+
+    A goal is also the home for the long-lived container other trackers call an *initiative* or
+    *epic* (#80): a ``description`` and an optional ``target`` window give it a title, a blurb and a
+    deadline, and its state is *derived* from the needs that cite it (:func:`~prodc.status.group_state`),
+    never hand-set — so an "is this big piece of work done" rolls up from the proofs, not a status
+    field that drifts. No separate ``initiative`` noun: an output bundle that is neither an outcome
+    (goal) nor a ship slice (release) is engineering tracking, not product.
     """
 
     id: str
     text: str
     metric: str | None = None  # how the objective is measured, e.g. "churn < 5%"
+    description: str | None = None  # optional longer blurb — the initiative's prose (#80)
+    target: str | None = None  # optional ISO date the objective is aimed at; past + not DELIVERED warns
 
 
 @dataclass(frozen=True)

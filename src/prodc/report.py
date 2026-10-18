@@ -14,7 +14,7 @@ from datetime import date
 from .board import gather
 from .config import Config
 from .model import Model, NeedResult, NeedState
-from .status import active_decisions, principle_report, state_priority
+from .status import active_decisions, group_state, principle_report, state_priority
 
 _LABEL = {
     NeedState.DELIVERED: "DELIVERED",
@@ -97,11 +97,12 @@ def render_markdown(
             out.append("")
 
     if model.goals:
-        out += ["## Goals", "", "| goal | delivered | goal |", "|---|---|---|"]
+        out += ["## Goals", "", "| goal | state | delivered | target | goal |", "|---|---|---|---|---|"]
         for goal, gsum in goal_cov:
             out.append(
-                f"| {goal.id} | {gsum.delivered}/{gsum.total} ({round(gsum.coverage * 100)}%) "
-                f"| {goal.text} |"
+                f"| {goal.id} | {_LABEL[group_state(gsum)]} "
+                f"| {gsum.delivered}/{gsum.total} ({round(gsum.coverage * 100)}%) "
+                f"| {goal.target or ''} | {goal.text} |"
             )
         if ungoaled:
             out.append("")

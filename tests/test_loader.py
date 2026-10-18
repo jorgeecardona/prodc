@@ -262,6 +262,26 @@ def test_goals_loaded_and_need_traces_up(tmp_path: Path) -> None:
     assert model.needs[0].goal == "G-1"
 
 
+def test_goal_loads_description_and_target(tmp_path: Path) -> None:
+    # #80: a goal is the home for the initiative — a description and an optional target window.
+    from prodc.loader import load
+
+    cfg = _config(
+        tmp_path,
+        (
+            "goals.yaml",
+            "goals:\n"
+            "  - id: INIT-SEARCH\n"
+            "    text: Second-generation search\n"
+            "    description: the long blurb\n"
+            "    target: 2026-12-15\n",
+        ),
+    )
+    goal = load(cfg).goals[0]
+    assert goal.description == "the long blurb"
+    assert goal.target == "2026-12-15"
+
+
 def test_need_goal_unknown_raises(tmp_path: Path) -> None:
     cfg = _config(tmp_path, ("a.yaml", "needs:\n  - id: N-1\n    text: t\n    goal: NOPE\n"))
     with pytest.raises(LoaderError, match="goal 'NOPE' is not a known goal id"):

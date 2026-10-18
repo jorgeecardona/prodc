@@ -13,7 +13,7 @@ from ..board import need_payload
 from ..board import warrant as _warrant
 from ..dedup import DupPair, VariantGroup
 from ..model import Decision, Goal, NeedResult, NeedState, Release, Role
-from ..status import Handoff, PrincipleReport, Recurrence, Summary, rank
+from ..status import Handoff, PrincipleReport, Recurrence, Summary, group_state, rank
 from .common import brief_open
 
 
@@ -119,6 +119,9 @@ def to_json(
                 "id": goal.id,
                 "text": goal.text,
                 "metric": goal.metric,
+                "description": goal.description,
+                "target": goal.target,
+                "state": group_state(gsum).value,
                 "coverage": round(gsum.coverage, 4),
                 "delivered": gsum.delivered,
                 "total": gsum.total,

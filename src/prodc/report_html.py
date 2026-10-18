@@ -15,7 +15,7 @@ from datetime import date
 from .board import gather, need_payload
 from .config import Config
 from .model import Model
-from .status import active_decisions, principle_report
+from .status import active_decisions, group_state, principle_report
 
 
 def board_payload(
@@ -55,7 +55,16 @@ def board_payload(
             for r in results
             if r.need.product and not r.need.is_withdrawn
         ],
-        "goals": [{"id": g.id, "text": g.text, **_cov(s.delivered, s.total)} for g, s in goal_cov],
+        "goals": [
+            {
+                "id": g.id,
+                "text": g.text,
+                "target": g.target,
+                "state": group_state(s).value,
+                **_cov(s.delivered, s.total),
+            }
+            for g, s in goal_cov
+        ],
         "ungoaled": [r.need.id for r in ungoaled],
         "releases": [
             {"id": rel.id, "text": rel.text, **_cov(s.delivered, s.total)} for rel, s in rel_cov

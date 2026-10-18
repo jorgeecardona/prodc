@@ -385,6 +385,26 @@ def summarize(results: list[NeedResult]) -> Summary:
     )
 
 
+def group_state(s: Summary) -> NeedState:
+    """The derived state of an FK group (goal, release, role) — the roll-up of its members (#80).
+
+    One function behind every group's state, so a goal/initiative, a release slice and a role all
+    read the same way and none carries a hand-set status that can drift from its needs: BROKEN if
+    any member proof is broken, UNRESOLVED if any source couldn't be read, DELIVERED only when every
+    member is, HOLE when nothing is covered yet, else PENDING (in progress). An empty group is a
+    HOLE (nothing delivered, nothing pending).
+    """
+    if s.broken:
+        return NeedState.BROKEN
+    if s.unresolved:
+        return NeedState.UNRESOLVED
+    if s.total and s.delivered == s.total:
+        return NeedState.DELIVERED
+    if s.delivered == 0 and s.pending == 0:
+        return NeedState.HOLE
+    return NeedState.PENDING
+
+
 @dataclass(frozen=True)
 class Recurrence:
     """A baseline need and the clients that carry a variant of it (#32)."""
