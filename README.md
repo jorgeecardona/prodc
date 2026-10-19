@@ -3,7 +3,7 @@
 [![pipeline status](https://gitlab.com/cardona-oss/prodc/badges/main/pipeline.svg)](https://gitlab.com/cardona-oss/prodc/-/pipelines)
 [![PyPI version](https://img.shields.io/pypi/v/prodc.svg)](https://pypi.org/project/prodc/)
 [![Python versions](https://img.shields.io/pypi/pyversions/prodc.svg)](https://pypi.org/project/prodc/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://gitlab.com/cardona-oss/prodc/-/blob/main/LICENSE)
 
 Product management as code: user *needs* in YAML, each traced to the evidence a real user gave
 and the test that proves it is delivered. For teams that keep product work in the repo, next to
@@ -190,4 +190,4 @@ then `make check` (lint + typecheck + test); `moon run :ci` is what CI runs.
 
 ## License
 
-MIT © Jorge Cardona. See [LICENSE](LICENSE).
+MIT © Jorge Cardona. See [LICENSE](https://gitlab.com/cardona-oss/prodc/-/blob/main/LICENSE).
