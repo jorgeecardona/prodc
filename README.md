@@ -171,9 +171,10 @@ That is the whole idea: the board cannot drift from the code.
   before a handoff. An agent may record `assumption` or `secondary` sources; `primary` is reserved
   for a real user's own words. `prodc guide` is the short human onboarding guide.
 
-prodc also models goals, releases, roles, principles, decisions, attestations, withdrawals and
-settled answers, and ships hygiene commands (`dupes`, `recurrence`, `suggest`); the
-[docs](https://cardona-oss.gitlab.io/prodc/) have the full surface.
+Beyond need, source and proof, prodc has five more nouns — goals, releases, roles, principles
+and decisions ([why each exists](https://cardona-oss.gitlab.io/prodc/model/)); attestations,
+withdrawals and settled answers are fields on a need. It also ships hygiene commands (`dupes`,
+`recurrence`, `suggest`); the [docs](https://cardona-oss.gitlab.io/prodc/) have the full surface.
 
 ## Links
 
