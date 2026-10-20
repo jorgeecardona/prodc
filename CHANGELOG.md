@@ -2,6 +2,34 @@
 
 All notable changes are documented here. Versioning is [SemVer](https://semver.org/).
 
+## [0.4.x]
+
+Patch releases on the 0.4 line. Highlights, newest first:
+
+- **Decisions wait on research** (#93) — `awaits: [Q-1@yes, Q-2]` on a decision names the
+  research needs (`product: false`, a `claim`) it waits on. Readiness is derived from their
+  proofs: `show`/`status` mark the decision BLOCKED or READY, and `lint` warns on a decision
+  committed before its research settled, decided against its own result, or waiting on a
+  withdrawn or product need. No new noun; `NeedState` is unchanged.
+- **The nouns, audited** (#92) — 8 nouns (Need, Source, Proof + Goal, Release, Role,
+  Principle, Decision), each with the reason it is not a field; see docs/model.md.
+- **vitest proof adapter** (#91) — `file.test.ts#title`, upgraded by a junit report, so a
+  failing frontend guard makes its principle VIOLATED.
+- **`[prodc].files`** (#95) — the neutral key for the prodc files (`needs` stays as an alias);
+  `prodc show D-1` prints a decision.
+- **Flow step vocabulary** — `[flows].steps`; an undeclared step is a load error, and lint
+  grades each journey (never reaches the terminal step, out of order, mixed).
+- **Tags** (#80) — `tags:` on a need, `status --tag X`, and tag hygiene lint.
+- **Enforced principles** (#89) and **principle scope** (#88) — guard `proofs` +
+  `implemented_in` give a principle a state (ENFORCED / STATED / VIOLATED / BROKEN); `scope`
+  puts product, design, visual and engineering principles on one board.
+- **Goals absorb initiatives** (#80) — `description`, `target`, and a derived group state.
+
+### Changed (breaking for the Python API)
+
+- `Need.children` is `tuple[Child, ...]` (`Child(id, step)`), not `tuple[str, ...]` (#90). YAML
+  is unaffected: a bare id still loads.
+
 ## [0.4.0] - 2026-10-16
 
 The OST is whole, and the board cannot lie.

@@ -36,7 +36,9 @@ from ..status import (
     ProofSuggestion,
     RelinkSuggestion,
     applicable_needs,
+    awaits_warnings,
     contradictions,
+    decision_readiness,
     decisions_for,
     evidence_age_days,
     flow_step_warnings,
@@ -292,6 +294,11 @@ def cmd_lint(args: argparse.Namespace) -> int:
                 f"decided {d.decided_at} under principle {pid}, revised later — re-review this solution",
             )
         )
+    # Research a decision waits on (#93): committed too early, decided against its own result,
+    # waiting on abandoned research, or on a product need.
+    warnings += awaits_warnings(
+        decisions, needs, decision_readiness(decisions, needs, cfg.adapters)
+    )
     # Tag hygiene (#80): the flat tag space is undeclared, so flag singletons, near-duplicate
     # spellings, and a tag standing in for a declared goal/role/release/client (structure hiding).
     structural_ids = (
@@ -425,7 +432,8 @@ def cmd_status(args: argparse.Namespace) -> int:
         if model.principles:
             print(render_principles(board.principles))
         if model.decisions:
-            print(render_decisions(list(model.decisions), needs=list(model.needs)))
+            ready = decision_readiness(list(model.decisions), list(model.needs), cfg.adapters)
+            print(render_decisions(list(model.decisions), needs=list(model.needs), readiness=ready))
         unresolved = [c for c in contradictions(list(model.needs)) if c.unresolved]
         if unresolved:
             print(render_contradictions(unresolved))
@@ -457,10 +465,14 @@ def cmd_show(args: argparse.Namespace) -> int:
             for d, pid in stale_decisions(list(model.decisions), list(model.principles))
             if d is decision
         ]
+        ready = decision_readiness([decision], needs, cfg.adapters).get(decision.id)
+        warnings += [
+            w for _, w in awaits_warnings([decision], needs, {decision.id: ready} if ready else {})
+        ]
         print(
-            decision_show_json(decision, warnings)
+            decision_show_json(decision, warnings, ready)
             if args.json
-            else render_decision_show(decision, needs, warnings)
+            else render_decision_show(decision, needs, warnings, ready)
         )
         return 0
     decisions = decisions_for(args.need_id, list(model.decisions))  # the 'how' behind this need

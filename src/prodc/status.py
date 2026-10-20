@@ -691,7 +691,8 @@ def principle_state(principle: Principle, adapters: dict[str, Adapter]) -> Princ
         return PrincipleState.VIOLATED  # a guard ran and failed — the code contradicts the stance
     if all(r.state is ProofState.DELIVERED for r in results):
         return PrincipleState.ENFORCED
-    return PrincipleState.STATED  # some declared-pending guards, none failing — honestly not yet active
+    # some declared-pending guards, none failing — honestly not yet active
+    return PrincipleState.STATED
 
 
 @dataclass(frozen=True)
@@ -807,6 +808,51 @@ def decision_readiness(
             r = resolver.resolve_ref(ref)
             waits.append(DecisionWait(ref, r.state, r.detail))
         out[d.id] = DecisionReadiness(d, tuple(waits))
+    return out
+
+
+def awaits_warnings(
+    decisions: list[Decision], needs: list[Need], readiness: dict[str, DecisionReadiness]
+) -> list[tuple[str, str]]:
+    """Lint for a decision's ``awaits`` (#93), keyed by decision id — warnings, never errors.
+
+    - committed (not ``draft``) while its research is still open;
+    - an awaited direction the research answered the other way — decided against its own result;
+    - waiting on a withdrawn need — abandoned research;
+    - waiting on a product need — research belongs on a ``product: false`` need, or it leaks into
+      coverage and blurs the line between research and a delivery proof.
+    """
+    by_id = {n.id: n for n in needs}
+    out: list[tuple[str, str]] = []
+    for d in decisions:
+        if d.withdrawn is not None:
+            continue  # a superseded decision's research no longer matters
+        r = readiness.get(d.id)
+        if r is None:
+            continue
+        if not d.draft and r.blocked:
+            out.append((d.id, f"committed before its research settled: {', '.join(r.open_refs)}"))
+        for ref in d.awaits:
+            nid, sep, direction = ref.partition("@")
+            n = by_id[nid]
+            if sep and n.answer is not None and n.answer.value != direction:
+                out.append(
+                    (
+                        d.id,
+                        f"awaits {ref} but {nid} answered {n.answer.value} — decided against its research",
+                    )
+                )
+            if n.withdrawn is not None:
+                out.append(
+                    (d.id, f"awaits {nid}, which is withdrawn — drop it or withdraw the decision")
+                )
+            if n.product:
+                out.append(
+                    (
+                        d.id,
+                        f"awaits {nid}, a product need — research belongs on a product: false need",
+                    )
+                )
     return out
 
 
@@ -993,7 +1039,9 @@ def flow_step_warnings(needs: list[Need], steps: tuple[str, ...]) -> list[tuple[
             continue  # a plain flow, not a use case — exempt
         if len(stepped) != len(flow.children):
             bare = next(c.id for c in flow.children if c.step is None)
-            out.append((flow.id, f"edge {bare!r} has no step while siblings do — a use case with a hole"))
+            out.append(
+                (flow.id, f"edge {bare!r} has no step while siblings do — a use case with a hole")
+            )
         if not any(c.step == terminal for c in stepped):
             out.append(
                 (

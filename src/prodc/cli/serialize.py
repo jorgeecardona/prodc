@@ -13,7 +13,15 @@ from ..board import need_payload
 from ..board import warrant as _warrant
 from ..dedup import DupPair, VariantGroup
 from ..model import Decision, Goal, NeedResult, NeedState, Release, Role
-from ..status import Handoff, PrincipleReport, Recurrence, Summary, group_state, rank
+from ..status import (
+    DecisionReadiness,
+    Handoff,
+    PrincipleReport,
+    Recurrence,
+    Summary,
+    group_state,
+    rank,
+)
 from .common import brief_open
 
 
@@ -146,9 +154,21 @@ def to_json(
     return json.dumps(payload, indent=2)
 
 
-def decision_show_json(d: Decision, warnings: list[str]) -> str:
-    """``prodc show D-1 --json`` (#95): the decision record plus its lint-style warnings."""
+def decision_show_json(
+    d: Decision, warnings: list[str], readiness: DecisionReadiness | None = None
+) -> str:
+    """``prodc show D-1 --json`` (#95): the decision record, its readiness (#93), its warnings."""
     payload = _decision_payload(d)
+    payload["readiness"] = (
+        {
+            "blocked": readiness.blocked,
+            "waits": [
+                {"ref": w.ref, "state": w.state.value, "detail": w.detail} for w in readiness.waits
+            ],
+        }
+        if readiness is not None
+        else None
+    )
     payload["warnings"] = warnings
     return json.dumps(payload, indent=2)
 

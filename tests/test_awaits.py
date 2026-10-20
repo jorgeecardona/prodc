@@ -10,7 +10,7 @@ from prodc.adapters import AcceptAdapter, Adapter
 from prodc.config import Config
 from prodc.loader import LoaderError, load
 from prodc.model import Answer, Decision, Model, Need, ProofState
-from prodc.status import decision_readiness
+from prodc.status import awaits_warnings, decision_readiness
 
 _ADAPTERS: dict[str, Adapter] = {"accept": AcceptAdapter()}
 
@@ -116,3 +116,98 @@ def test_loader_rejects_bad_direction(tmp_path: Path) -> None:
 def test_loader_rejects_serves_and_awaits_same_need(tmp_path: Path) -> None:
     with pytest.raises(LoaderError, match="in both needs"):
         _load(tmp_path, "[US-1]")
+
+
+# --- surfacing: lint / show / status (#93 step 2) ----------------------------
+
+
+def _warns(d: Decision, *needs: Need) -> list[str]:
+    all_needs = [_US, *needs]
+    return [
+        w for _, w in awaits_warnings([d], all_needs, decision_readiness([d], all_needs, _ADAPTERS))
+    ]
+
+
+def test_lint_committed_before_research_settled() -> None:
+    w = _warns(_decision("Q-1"), _research("Q-1", settled=False))
+    assert any("committed before its research settled: Q-1" in x for x in w)
+
+
+def test_lint_draft_waiting_is_fine() -> None:
+    d = Decision(id="D-1", text="x", needs=("US-1",), awaits=("Q-1",), draft=True)
+    assert _warns(d, _research("Q-1", settled=False)) == []
+
+
+def test_lint_decided_against_its_research() -> None:
+    w = _warns(_decision("Q-1@yes"), _research("Q-1", settled=True, answer=Answer.NO))
+    assert any("answered no — decided against its research" in x for x in w)
+
+
+def test_lint_awaits_withdrawn_need() -> None:
+    from prodc.model import Withdrawal, WithdrawalKind
+
+    q = Need(
+        id="Q-1",
+        text="r",
+        product=False,
+        proofs=("accept:j@2026-10-20",),
+        withdrawn=Withdrawal(reason="dropped", date="2026-10-20", kind=WithdrawalKind.WONT_DO),
+    )
+    assert any("which is withdrawn" in x for x in _warns(_decision("Q-1"), q))
+
+
+def test_lint_awaits_product_need() -> None:
+    q = Need(id="Q-1", text="r", proofs=("accept:j@2026-10-20",))  # product defaults to True
+    assert any("a product need" in x for x in _warns(_decision("Q-1"), q))
+
+
+def _cli_project(tmp_path: Path, awaits: str, draft: bool = False) -> Path:
+    (tmp_path / "p").mkdir()
+    (tmp_path / "prodc.toml").write_text(_TOML, encoding="utf-8")
+    (tmp_path / "p" / "n.yaml").write_text(
+        _NEEDS
+        + "decisions:\n  - id: D-1\n    text: a ledger\n    needs: [US-1]\n"
+        + f"    awaits: {awaits}\n"
+        + ("    draft: true\n" if draft else ""),
+        encoding="utf-8",
+    )
+    return tmp_path / "prodc.toml"
+
+
+def test_show_decision_blocked(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from prodc.cli import main
+
+    assert main(["show", "D-1", "--config", str(_cli_project(tmp_path, "[Q-1]", True))]) == 0
+    out = capsys.readouterr().out
+    assert "D-1 (proposed) BLOCKED: Q-1" in out
+    assert "awaits (0 of 1 settled):" in out
+
+
+def test_show_decision_json_readiness(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    import json
+
+    from prodc.cli import main
+
+    cfg = _cli_project(tmp_path, "[Q-1]", True)
+    assert main(["show", "D-1", "--json", "--config", str(cfg)]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["awaits"] == ["Q-1"]
+    assert payload["readiness"]["blocked"] is True
+
+
+def test_status_tags_blocked_decision(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from prodc.cli import main
+
+    main(["status", "--config", str(_cli_project(tmp_path, "[Q-1]", True))])
+    assert "D-1    (proposed) BLOCKED: Q-1 a ledger" in capsys.readouterr().out
+
+
+def test_lint_command_warns_committed_early(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from prodc.cli import main
+
+    code = main(["lint", "--config", str(_cli_project(tmp_path, "[Q-1]"))])
+    out = capsys.readouterr().out
+    assert "D-1: committed before its research settled: Q-1" in out
+    assert code == 0  # a warning, not a gate failure

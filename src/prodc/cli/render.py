@@ -25,6 +25,7 @@ from ..model import (
 )
 from ..status import (
     Contradiction,
+    DecisionReadiness,
     Handoff,
     PrincipleReport,
     Recurrence,
@@ -329,7 +330,17 @@ def render_contradictions(contras: list[Contradiction]) -> str:
     return "\n".join(out)
 
 
-def render_decisions(decisions: list[Decision], needs: list[Need]) -> str:
+def _readiness_tag(r: DecisionReadiness | None) -> str:
+    if r is None:
+        return ""
+    return f" BLOCKED: {', '.join(r.open_refs)}" if r.blocked else " READY"
+
+
+def render_decisions(
+    decisions: list[Decision],
+    needs: list[Need],
+    readiness: dict[str, DecisionReadiness] | None = None,
+) -> str:
     """The solution chosen for each need (OST), what it rejected, and the needs it serves.
 
     Shows the decisions still in force (a superseded one is off the board, its record kept). A
@@ -340,7 +351,7 @@ def render_decisions(decisions: list[Decision], needs: list[Need]) -> str:
     active = sorted((d for d in decisions if d.withdrawn is None), key=lambda x: x.id)
     out = ["\ndecisions (the solution chosen for a need — how it gets built):"]
     for d in active:
-        tag = " (proposed)" if d.draft else ""
+        tag = (" (proposed)" if d.draft else "") + _readiness_tag((readiness or {}).get(d.id))
         out.append(f"  {d.id:<6}{tag} {d.text}")
         out.append(f"        serves: {', '.join(d.needs)}")
         if d.alternatives:
@@ -352,7 +363,12 @@ def render_decisions(decisions: list[Decision], needs: list[Need]) -> str:
     return "\n".join(out)
 
 
-def render_decision_show(d: Decision, needs: list[Need], warnings: list[str]) -> str:
+def render_decision_show(
+    d: Decision,
+    needs: list[Need],
+    warnings: list[str],
+    readiness: DecisionReadiness | None = None,
+) -> str:
     """One decision as a citable answer (#95): the chosen solution, what it serves and rejected.
 
     The decision counterpart of :func:`render_show` — ``prodc show D-1`` answers "how is this
@@ -360,7 +376,11 @@ def render_decision_show(d: Decision, needs: list[Need], warnings: list[str]) ->
     """
     by_id = {n.id: n for n in needs}
     tag = " (proposed)" if d.draft else ""
-    lines = [f"{d.id}{tag}  {d.text}"]
+    lines = [f"{d.id}{tag}{_readiness_tag(readiness)}  {d.text}"]
+    if readiness is not None:
+        settled = len(readiness.waits) - len(readiness.open_refs)
+        lines.append(f"  awaits ({settled} of {len(readiness.waits)} settled):")
+        lines += [f"    - {w.ref:<20} {w.state.value:<10} {w.detail}" for w in readiness.waits]
     lines.append("  serves:")
     for nid in d.needs:
         n = by_id.get(nid)
