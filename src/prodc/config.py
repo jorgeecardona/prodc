@@ -25,6 +25,7 @@ from .adapters import (
     PrototypeAdapter,
     PytestAdapter,
     SourceAdapter,
+    VitestAdapter,
 )
 from .callbacks import Callback
 from .model import NeedState
@@ -219,6 +220,12 @@ class Config:
                     root=proof_root / (sub if isinstance(sub, str) else "."),
                     results=results_s,
                 )
+            elif kind == "vitest":
+                sub = tbl.get("root", ".")
+                inner = VitestAdapter(
+                    root=proof_root / (sub if isinstance(sub, str) else "."),
+                    results=results_s,
+                )
             elif kind == "files":
                 sub = tbl.get("root", ".")
                 inner = FilesAdapter(root=proof_root / (sub if isinstance(sub, str) else "."))
@@ -250,7 +257,7 @@ class Config:
             else:
                 raise ConfigError(
                     f"[proofs.{name}]: unknown kind {kind!r} "
-                    "(gherkin|pytest|files|accept|prototype|citation|coverage|field|external|evalgate|command)"
+                    "(gherkin|pytest|vitest|files|accept|prototype|citation|coverage|field|external|evalgate|command)"
                 )
             adapters[name] = (
                 External(inner, root / repo_field) if isinstance(repo_field, str) else inner

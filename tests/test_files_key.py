@@ -67,7 +67,12 @@ def test_write_outside_globs_names_files_key(tmp_path: Path) -> None:
     cfg = Config.load(_project(tmp_path, 'files = ["product/needs/*.yaml"]'))
     with pytest.raises(WriteError, match=r"\[prodc\]\.files glob"):
         add_principle(
-            cfg, "P-1", "local-first", file="elsewhere/p.yaml", revised_at="2026-10-20", dry_run=True
+            cfg,
+            "P-1",
+            "local-first",
+            file="elsewhere/p.yaml",
+            revised_at="2026-10-20",
+            dry_run=True,
         )
 
 

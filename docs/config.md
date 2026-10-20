@@ -45,6 +45,7 @@ A proof is `<name>:<payload>`.
 |---|---|---|---|
 | `gherkin` | `file.feature#Scenario title` or `tag:@X` | results report passes, else a `delivered` tag | `paths`, `delivered`, `pending`, `results` |
 | `pytest` | `tests/test_x.py::test_y` | junit passes, else the test exists (declared) | `root`, `results` |
+| `vitest` | `src/x.test.ts#test title` (or the `describe > it` path) | `vitest --reporter=junit` report passes, else the file and title exist (declared); a failing test is PENDING *not* declared, so a principle it guards reads VIOLATED; skipped/todo stays declared | `root` (the vitest root), `results` |
 | `files` | `path/to/script` | file exists (declared) | `root` |
 | `accept` | `who@date` | always (a human sign-off, declared) | — |
 | `prototype` | `ref@who@date` | always (validated with a user, declared) | — |

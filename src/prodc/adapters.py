@@ -351,6 +351,85 @@ class PytestAdapter:
         return ProofResult(ProofState.DELIVERED, True, "test exists")
 
 
+@dataclass(frozen=True)
+class _JunitCase:
+    """One ``<testcase>`` of a vitest junit report: where it lives, its title path, its outcome."""
+
+    file: str  # the test file, relative to the vitest root (``classname`` or ``file``)
+    name: str  # the full title path, ``describe > describe > it``
+    outcome: str  # "passed" | "failed" | "skipped"
+
+
+class VitestAdapter:
+    """Resolves ``path/x.test.ts#title`` by existence, upgraded by a vitest junit report (#91).
+
+    ``title`` is the ``it``/``test`` title, or the full ``describe > it`` path to pin one test
+    when a leaf title repeats. Without a report the test is DELIVERED by existence (declared),
+    like :class:`PytestAdapter`. With ``vitest --reporter=junit`` output it is real: passing →
+    DELIVERED, failing → PENDING with ``declared=False`` (so a principle guarded by it reads
+    VIOLATED), skipped/todo → PENDING declared (it did not run, so it says nothing either way).
+
+    Report matching follows vitest's defaults: ``classname`` is the file path relative to the
+    vitest root (``root`` here) and ``name`` the title path joined by ``" > "``. A
+    ``classnameTemplate`` that drops the path is still matched when ``addFileAttribute`` is on.
+    """
+
+    def __init__(self, root: Path, results: str | None) -> None:
+        self._root = root
+        self._results_path = results
+        self._cases: list[_JunitCase] | None = None
+
+    def _load_cases(self) -> list[_JunitCase]:
+        if self._cases is not None:
+            return self._cases
+        out: list[_JunitCase] = []
+        if self._results_path:
+            rp = self._root / self._results_path
+            if rp.exists():
+                for case in ET.parse(rp).iter("testcase"):
+                    if any(c.tag in ("failure", "error") for c in case):
+                        outcome = "failed"
+                    elif any(c.tag == "skipped" for c in case):
+                        outcome = "skipped"
+                    else:
+                        outcome = "passed"
+                    file = case.get("file") or case.get("classname", "")
+                    out.append(_JunitCase(file, case.get("name", ""), outcome))
+        self._cases = out
+        return out
+
+    def resolve(self, payload: str) -> ProofResult:
+        file_part, sep, title = payload.partition("#")
+        if not sep or not title:
+            return ProofResult(ProofState.BROKEN, False, "vitest locator must be file#test title")
+        fp = self._root / file_part
+        if not fp.exists():
+            return ProofResult(ProofState.BROKEN, False, f"no file '{file_part}'")
+        text = fp.read_text(encoding="utf-8")
+        # Each title segment must appear in the source; tolerate a quote escaped in the literal.
+        segments = [seg.strip() for seg in title.split(" > ")]
+        missing = [
+            seg
+            for seg in segments
+            if seg not in text and seg.replace("'", "\\'") not in text
+            and seg.replace('"', '\\"') not in text
+        ]
+        if missing:
+            return ProofResult(ProofState.BROKEN, False, f"no test {missing[-1]!r} in {file_part}")
+        hits = [
+            c
+            for c in self._load_cases()
+            if c.file == file_part and (c.name == title or c.name.endswith(" > " + title))
+        ]
+        if not hits:
+            return ProofResult(ProofState.DELIVERED, True, "test exists")
+        if any(c.outcome == "failed" for c in hits):
+            return ProofResult(ProofState.PENDING, False, "junit: failing")
+        if all(c.outcome == "passed" for c in hits):
+            return ProofResult(ProofState.DELIVERED, False, "junit: passed")
+        return ProofResult(ProofState.PENDING, True, "junit: skipped")
+
+
 class FilesAdapter:
     """Resolves ``path`` to a verification script's existence.
 
