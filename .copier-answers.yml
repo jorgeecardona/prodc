@@ -1,0 +1,15 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: v0.1.0
+_src_path: ../_starter
+author_email: jorgeecardona@gmail.com
+author_name: Jorge Cardona
+description: 'Product management as code: roles, flows, and features traced to evidence.'
+dist_name: prodc
+gitlab_group: cardona-oss
+has_examples: true
+has_rust: false
+import_package: prodc
+license_year: 2026
+project_slug: prodc
+python_floor: '3.12'
+test_dir: tests
