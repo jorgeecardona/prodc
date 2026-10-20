@@ -219,7 +219,9 @@ def render_goals(goal_cov: list[tuple[Goal, Summary]], ungoaled: list[NeedResult
         state = group_state(gsum)
         metric = f"  [{goal.metric}]" if goal.metric else ""
         pct = round(gsum.coverage * 100)
-        overdue = goal.target is not None and goal.target < today and state is not NeedState.DELIVERED
+        overdue = (
+            goal.target is not None and goal.target < today and state is not NeedState.DELIVERED
+        )
         target = ""
         if goal.target:
             target = f"  ⚠ overdue {goal.target}" if overdue else f"  target {goal.target}"
@@ -314,9 +316,7 @@ def _principle_tally(reports: list[PrincipleReport]) -> str:
         counts[rep.state] = counts.get(rep.state, 0) + 1
     parts: list[str] = []
     for scope, counts in by_scope.items():
-        inner = ", ".join(
-            f"{counts[s]} {s.value}" for s in PrincipleState if counts.get(s)
-        )
+        inner = ", ".join(f"{counts[s]} {s.value}" for s in PrincipleState if counts.get(s))
         parts.append(f"{scope}: {inner}")
     return "  ·  ".join(parts)
 
@@ -350,6 +350,35 @@ def render_decisions(decisions: list[Decision], needs: list[Need]) -> str:
         if d.id in orphans:
             out.append("        ⚠ serves only withdrawn/non-product needs — re-tie or withdraw")
     return "\n".join(out)
+
+
+def render_decision_show(d: Decision, needs: list[Need], warnings: list[str]) -> str:
+    """One decision as a citable answer (#95): the chosen solution, what it serves and rejected.
+
+    The decision counterpart of :func:`render_show` — ``prodc show D-1`` answers "how is this
+    built, over what, and why" the way ``prodc show N-1`` answers "is this delivered".
+    """
+    by_id = {n.id: n for n in needs}
+    tag = " (proposed)" if d.draft else ""
+    lines = [f"{d.id}{tag}  {d.text}"]
+    lines.append("  serves:")
+    for nid in d.needs:
+        n = by_id.get(nid)
+        lines.append(f"    - {nid}: {n.text}" if n else f"    - {nid}")
+    if d.alternatives:
+        lines.append(f"  over: {', '.join(d.alternatives)}")
+    if d.consequences:
+        lines.append(f"  consequences: {d.consequences}")
+    if d.principles:
+        lines.append(f"  rests on: {', '.join(d.principles)}")
+    if d.decided_at:
+        lines.append(f"  decided: {d.decided_at}")
+    if d.withdrawn:
+        lines.append(
+            f"  withdrawn ({d.withdrawn.kind.value}, {d.withdrawn.date}): {d.withdrawn.reason}"
+        )
+    lines += [f"  ⚠ {w}" for w in warnings]
+    return "\n".join(lines)
 
 
 def render_show(
@@ -416,9 +445,7 @@ def render_show(
     else:
         lines.append("  sources: (none — opinion)")
     if need.children:
-        rendered = ", ".join(
-            c.id if c.step is None else f"{c.id}@{c.step}" for c in need.children
-        )
+        rendered = ", ".join(c.id if c.step is None else f"{c.id}@{c.step}" for c in need.children)
         lines.append(f"  children: {rendered}")
     if need.contradicts:
         lines.append(f"  contradicts: {', '.join(need.contradicts)}")

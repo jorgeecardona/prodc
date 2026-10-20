@@ -17,7 +17,7 @@ Three files make a board.
 
 ```toml
 [prodc]
-needs = ["needs/*.yaml"]
+files = ["needs/*.yaml"]
 ```
 
 `needs/needs.yaml`:

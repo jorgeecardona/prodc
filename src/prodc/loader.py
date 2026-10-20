@@ -529,15 +529,14 @@ def load(config: Config) -> Model:
         "principle": {},
         "decision": {},
     }
-    for pattern in config.need_globs:
-        for path in sorted(config.root.glob(pattern)):
-            f = _load_file(path, seen)
-            acc.needs.extend(f.needs)
-            acc.goals.extend(f.goals)
-            acc.releases.extend(f.releases)
-            acc.roles.extend(f.roles)
-            acc.principles.extend(f.principles)
-            acc.decisions.extend(f.decisions)
+    for path in config.prodc_files():
+        f = _load_file(path, seen)
+        acc.needs.extend(f.needs)
+        acc.goals.extend(f.goals)
+        acc.releases.extend(f.releases)
+        acc.roles.extend(f.roles)
+        acc.principles.extend(f.principles)
+        acc.decisions.extend(f.decisions)
     _check_variants(acc.needs)
     _check_children(acc.needs)
     _check_contradicts(acc.needs)
@@ -652,12 +651,16 @@ def _check_withdrawal_of(needs: list[Need]) -> None:
         if w is None:
             continue
         if w.kind is WithdrawalKind.DUPLICATE and w.of is None:
-            raise LoaderError(f"need {need.id!r}: a duplicate withdrawal must name 'of' (the original)")
+            raise LoaderError(
+                f"need {need.id!r}: a duplicate withdrawal must name 'of' (the original)"
+            )
         if w.of is not None:
             if w.of == need.id:
                 raise LoaderError(f"need {need.id!r}: withdrawn 'of' cannot be itself")
             if w.of not in known:
-                raise LoaderError(f"need {need.id!r}: withdrawn 'of' {w.of!r} is not a known need id")
+                raise LoaderError(
+                    f"need {need.id!r}: withdrawn 'of' {w.of!r} is not a known need id"
+                )
 
 
 def _check_decisions(

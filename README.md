@@ -53,7 +53,7 @@ Three files: where prodc looks, what people need, and a test you have probably a
 
 ```toml
 [prodc]
-needs = ["needs/*.yaml"]
+files = ["needs/*.yaml"]
 
 [proofs.web]
 kind = "gherkin"

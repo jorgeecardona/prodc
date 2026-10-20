@@ -88,6 +88,7 @@ from .render import (
     render_brief,
     render_columns,
     render_contradictions,
+    render_decision_show,
     render_decisions,
     render_goals,
     render_handoffs,
@@ -104,6 +105,7 @@ from .render import (
 )
 from .serialize import (
     brief_json,
+    decision_show_json,
     dup_payload,
     plan_json,
     show_json,
@@ -442,8 +444,25 @@ def cmd_show(args: argparse.Namespace) -> int:
     by_id = {r.need.id: r for r in resolve(needs, cfg.adapters, cfg.source_adapters)}
     r = by_id.get(args.need_id)
     if r is None:
-        print(f"prodc: no need '{args.need_id}'", file=sys.stderr)
-        return 2
+        decision = next((d for d in model.decisions if d.id == args.need_id), None)
+        if decision is None:
+            print(f"prodc: no need or decision '{args.need_id}'", file=sys.stderr)
+            return 2
+        # A decision is citable too (#95): the same warnings lint raises for it, shown inline.
+        warnings: list[str] = []
+        if decision in orphaned_decisions(list(model.decisions), needs):
+            warnings.append("serves only withdrawn/non-product needs — re-tie it or withdraw it")
+        warnings += [
+            f"decided {decision.decided_at} under principle {pid}, revised later — re-review"
+            for d, pid in stale_decisions(list(model.decisions), list(model.principles))
+            if d is decision
+        ]
+        print(
+            decision_show_json(decision, warnings)
+            if args.json
+            else render_decision_show(decision, needs, warnings)
+        )
+        return 0
     decisions = decisions_for(args.need_id, list(model.decisions))  # the 'how' behind this need
     print(
         show_json(r, decisions=decisions)
@@ -970,8 +989,6 @@ def cmd_capture(args: argparse.Namespace) -> int:
         print(f"prodc: {exc}", file=sys.stderr)
         return 2
     return emit_edit(edit, args.dry_run, args.json)
-
-
 
 
 def _repo_row(config_path: str) -> RepoRow:

@@ -1,6 +1,6 @@
 # Config
 
-Everything lives in `prodc.toml`. Only `[prodc].needs` is required.
+Everything lives in `prodc.toml`. Only `[prodc].files` is required (`[prodc].needs` is the older alias; the two are merged). Every matched file may carry any noun list — `needs:`, `roles:`, `principles:`, `decisions:`, … — so decisions can live in their own folder.
 
 The EARS / solution-verb text lint fires only on a need that has not stated its `claim` (the
 warrant — what delivering it would establish). State the claim and the lint goes quiet: one board
@@ -10,7 +10,7 @@ Source-hygiene warnings (about evidence, not phrasing) always run.
 
 ```toml
 [prodc]
-needs = ["needs/*.yaml"]
+files = ["needs/*.yaml"]
 
 [proofs.web]
 kind = "gherkin"

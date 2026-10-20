@@ -6,7 +6,7 @@ You only need three files to get going. One tells prodc where to look, one is wh
 
 ```toml
 [prodc]
-needs = ["needs/*.yaml"]
+files = ["needs/*.yaml"]
 
 [proofs.web]
 kind = "gherkin"

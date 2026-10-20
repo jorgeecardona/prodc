@@ -1,6 +1,6 @@
 # Model
 
-All nouns live in the files matched by `[prodc].needs`. Any file may carry `needs:`, `goals:`, `releases:`, `roles:`, `principles:`, `decisions:`. Cross-references are string ids, checked at load.
+All nouns live in the files matched by `[prodc].files` (or its older alias `[prodc].needs`). Any file may carry `needs:`, `goals:`, `releases:`, `roles:`, `principles:`, `decisions:`. Cross-references are string ids, checked at load.
 
 ## Nouns
 

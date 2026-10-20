@@ -145,6 +145,13 @@ def to_json(
     return json.dumps(payload, indent=2)
 
 
+def decision_show_json(d: Decision, warnings: list[str]) -> str:
+    """``prodc show D-1 --json`` (#95): the decision record plus its lint-style warnings."""
+    payload = _decision_payload(d)
+    payload["warnings"] = warnings
+    return json.dumps(payload, indent=2)
+
+
 def show_json(r: NeedResult, decisions: list[Decision] | None = None) -> str:
     need = r.need
     payload = need_payload(r)  # the shared core — never drifts from the board

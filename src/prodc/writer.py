@@ -336,20 +336,9 @@ def _proof_list(need: dict[str, object], path: Path) -> list[object]:
     return list(cast("list[object]", current))
 
 
-def _config_files(config: Config) -> list[Path]:
-    seen: set[Path] = set()
-    out: list[Path] = []
-    for pattern in config.need_globs:
-        for path in sorted(config.root.glob(pattern)):
-            if path not in seen:
-                seen.add(path)
-                out.append(path)
-    return out
-
-
 def _locate(config: Config, need_id: str) -> tuple[Path, dict[str, object]]:
     """Find the file and the raw need mapping for ``need_id``."""
-    for path in _config_files(config):
+    for path in config.prodc_files():
         doc, _ = _read_doc(path)
         for raw in _need_list(doc, path):
             if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == need_id:
@@ -411,7 +400,7 @@ def _guard_target(config: Config, path: Path) -> None:
     except ValueError:
         raise WriteError(f"{path} is outside the project root") from None
     if not any(rel.match(pattern) for pattern in config.need_globs):
-        raise WriteError(f"{path.name} does not match any [prodc].needs glob")
+        raise WriteError(f"{path.name} does not match any [prodc].files glob")
 
 
 def _validated(config: Config, path: Path, old_text: str, new_text: str, dry_run: bool) -> Edit:
@@ -496,9 +485,7 @@ def set_importance(
         need["importance"] = level
         need["importance_set_at"] = when
 
-    return _edit_one_need(
-        config, need_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate
-    )
+    return _edit_one_need(config, need_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate)
 
 
 def capture_source(
@@ -544,9 +531,7 @@ def capture_source(
         sources.append(source)
         need["sources"] = sources
 
-    return _edit_one_need(
-        config, need_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate
-    )
+    return _edit_one_need(config, need_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate)
 
 
 def attest(
@@ -632,14 +617,12 @@ def reinstate(config: Config, need_id: str, *, expect_sha: str | None, dry_run: 
             raise WriteError(f"need {need_id!r} is not withdrawn")
         del need["withdrawn"]
 
-    return _edit_one_need(
-        config, need_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate
-    )
+    return _edit_one_need(config, need_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate)
 
 
 def _locate_decision(config: Config, decision_id: str) -> tuple[Path, dict[str, object], str]:
     """The file holding ``decision_id``, its parsed doc, and its raw text."""
-    for path in _config_files(config):
+    for path in config.prodc_files():
         doc, text = _read_doc(path)
         raw = doc.get("decisions")
         if not isinstance(raw, list):
@@ -745,9 +728,7 @@ def accept(
                 proofs.append(locator)
             need["proofs"] = proofs
 
-    return _edit_one_need(
-        config, need_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate
-    )
+    return _edit_one_need(config, need_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate)
 
 
 def add_proof(
@@ -759,15 +740,14 @@ def add_proof(
     batch apply can call it per need and show each need's diff. Re-adding a locator already on the
     need is a no-op, so applying the same suggestion twice does not duplicate it (#54).
     """
+
     def _mutate(need: dict[str, object], path: Path) -> None:
         proofs = _proof_list(need, path)
         if locator not in proofs:
             proofs.append(locator)
         need["proofs"] = proofs
 
-    return _edit_one_need(
-        config, need_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate
-    )
+    return _edit_one_need(config, need_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate)
 
 
 def relink_proof(
@@ -787,6 +767,7 @@ def relink_proof(
     old locator is not actually on the need. One reload-gated single-file splice, like
     :func:`add_proof`.
     """
+
     def _mutate(need: dict[str, object], path: Path) -> None:
         proofs = _proof_list(need, path)
         if old_locator not in proofs:
@@ -798,9 +779,7 @@ def relink_proof(
                 deduped.append(p)
         need["proofs"] = deduped
 
-    return _edit_one_need(
-        config, need_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate
-    )
+    return _edit_one_need(config, need_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate)
 
 
 def add_need(
@@ -963,7 +942,7 @@ def add_principle(
 
 def _locate_principle(config: Config, principle_id: str) -> tuple[Path, dict[str, object], str]:
     """The file holding ``principle_id``, its parsed doc, and its raw text."""
-    for path in _config_files(config):
+    for path in config.prodc_files():
         doc, text = _read_doc(path)
         raw = doc.get("principles")
         if not isinstance(raw, list):
@@ -1110,7 +1089,7 @@ def link_variant_group(
     snapshotted up front; any rejection — or ``dry_run`` — restores every one, so the group is
     linked all-or-nothing.
     """
-    touched = _config_files(config)
+    touched = config.prodc_files()
     if create_baseline:
         if not baseline_file or baseline_text is None:
             raise WriteError("creating a baseline needs both a file and text")

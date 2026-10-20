@@ -106,7 +106,9 @@ def _callbacks(raw: dict[str, object]) -> tuple[tuple[Callback, ...], str]:
 @dataclass
 class Config:
     root: Path
-    need_globs: list[str]  # the prodc files; each may carry any noun list (needs:, goals:, …)
+    # [prodc].files (+ the older alias [prodc].needs): the prodc files. Every matched file may
+    # carry any noun list (needs:, goals:, roles:, principles:, decisions:, …) — #95.
+    need_globs: list[str]
     adapters: dict[str, Adapter] = field(default_factory=dict[str, Adapter])
     source_adapters: dict[str, SourceAdapter] = field(default_factory=dict[str, SourceAdapter])
     duplicate_threshold: float = 0.8  # [lint].duplicate_threshold — dupe score to flag (#55)
@@ -130,6 +132,21 @@ class Config:
         ``flow_steps[-1]`` elsewhere. Order in ``[flows].steps`` *is* the journey.
         """
         return self.flow_steps[-1] if self.flow_steps else None
+
+    def prodc_files(self) -> list[Path]:
+        """Every file matched by the configured globs, each once, in glob-then-name order.
+
+        A path matched by two globs (say ``files`` and ``needs`` overlap) is read once, so
+        its ids are not reported as duplicates of themselves.
+        """
+        seen: set[Path] = set()
+        out: list[Path] = []
+        for pattern in self.need_globs:
+            for path in sorted(self.root.glob(pattern)):
+                if path not in seen:
+                    seen.add(path)
+                    out.append(path)
+        return out
 
     def importance_label(self, level: int | None) -> str | None:
         """The declared label for an importance level, or None if unset/undeclared (#59)."""
@@ -166,9 +183,14 @@ class Config:
         raw = _as_dict(tomllib.loads(path.read_text(encoding="utf-8")), "prodc.toml")
 
         prodc_tbl = _as_dict(raw.get("prodc", {}), "[prodc]")
-        need_globs = _as_str_list(prodc_tbl.get("needs", []), "[prodc].needs")
+        # `files` is the neutral name (#95); `needs` stays as an alias and the two are merged, so
+        # an existing config keeps working and a repo can split decisions/roles into their own
+        # folder without listing them under a key that says "needs".
+        files = _as_str_list(prodc_tbl.get("files", []), "[prodc].files")
+        needs = _as_str_list(prodc_tbl.get("needs", []), "[prodc].needs")
+        need_globs = files + [g for g in needs if g not in files]
         if not need_globs:
-            raise ConfigError("[prodc].needs must list at least one glob")
+            raise ConfigError("[prodc].files must list at least one glob")
 
         adapters: dict[str, Adapter] = {}
         proofs = _as_dict(raw.get("proofs", {}), "[proofs]")

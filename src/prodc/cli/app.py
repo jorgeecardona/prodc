@@ -122,8 +122,8 @@ def main(argv: list[str] | None = None) -> int:
     ln.add_argument("--strict", action="store_true", help="also fail on any hygiene warning")
     ln.set_defaults(func=cmd_lint)
 
-    sh = sub.add_parser("show", help="show one need as a citable answer")
-    sh.add_argument("need_id", help="the need id to show, e.g. N-1")
+    sh = sub.add_parser("show", help="show one need or decision as a citable answer")
+    sh.add_argument("need_id", help="the need or decision id to show, e.g. N-1 or D-1")
     sh.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     sh.add_argument("--json", action="store_true", help="machine-readable output")
     sh.set_defaults(func=cmd_show)
@@ -546,7 +546,7 @@ def main(argv: list[str] | None = None) -> int:
         "--file",
         default=None,
         metavar="PATH",
-        help="file to write a created baseline into (must match a [prodc].needs glob)",
+        help="file to write a created baseline into (must match a [prodc].files glob)",
     )
     rc.add_argument(
         "--dry-run", action="store_true", help="with --apply: validate and show diffs, don't write"
