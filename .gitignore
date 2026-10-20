@@ -41,3 +41,6 @@ CLAUDE.local.md
 
 # Local multi-agent coordination state — not part of the package
 .cabildo/
+
+# Copier template answers (_starter) — local tooling, not part of the package
+.copier-answers.yml
