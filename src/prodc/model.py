@@ -1,9 +1,11 @@
-"""The prodc data model: Need, Source, and the derived status states.
+"""The prodc data model: the nouns and the derived status states.
 
-Three nouns (Torres): a Need is what a named person wants (an opportunity); a
+Three core nouns (Torres): a Need is what a named person wants (an opportunity); a
 Source is its provenance (evidence) — a Need with no Source is an opinion; a proof
-is a locator to a delivery test, resolved by an adapter. Everything else is
-expressed with these: a flow is a Need with children, a role is ``who``.
+is a locator to a delivery test, resolved by an adapter. Five more earn a place by
+the admission test in docs/model.md (#92): Goal, Release, Role, Principle, Decision.
+Everything else is a field: a flow is a Need with children, a question is a Need with
+``claim``/``answer``, a review is ``draft`` plus an Attestation.
 """
 
 from __future__ import annotations
@@ -229,6 +231,11 @@ class Decision:
     decided_at: str | None = None  # ISO date decided — the comparand for the principle ripple
     draft: bool = False  # proposed, not yet committed (reuses the Need draft lifecycle)
     withdrawn: Withdrawal | None = None  # superseded / abandoned — the record stays as its trace
+    # The research this choice waits on (#93): ``<need-id>`` or ``<need-id>@yes|no|inconclusive``,
+    # the ``need:`` proof grammar. Each is an ordinary need (``product: false`` + ``claim``) whose
+    # state comes from its own proofs, so readiness is derived, never hand-set. "Waits on" is not
+    # "serves" (``needs``): the loader refuses an id in both.
+    awaits: tuple[str, ...] = ()
 
 
 class AttestationKind(StrEnum):

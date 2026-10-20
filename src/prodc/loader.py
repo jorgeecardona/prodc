@@ -406,6 +406,10 @@ def _decision(raw: object, where: str) -> Decision:
         decided_at=_opt_str(tbl.get("decided_at"), f"{where}.decided_at"),
         draft=_as_bool(tbl["draft"], f"{where}.draft") if "draft" in tbl else False,
         withdrawn=_withdrawal(tbl.get("withdrawn"), f"{where}.withdrawn"),
+        awaits=tuple(
+            _as_str(a, f"{where}.awaits[{i}]")
+            for i, a in enumerate(_as_list(tbl.get("awaits"), f"{where}.awaits"))
+        ),
     )
 
 
@@ -686,6 +690,19 @@ def _check_decisions(
                 f"decision {d.id!r}: withdrawn principle {d.withdrawn.principle!r} "
                 "is not a known principle id"
             )
+        for ref in d.awaits:
+            nid, sep, direction = ref.partition("@")
+            if nid not in known_needs:
+                raise LoaderError(f"decision {d.id!r}: awaits {nid!r} is not a known need id")
+            if sep and direction not in {a.value for a in Answer}:
+                answers = "|".join(a.value for a in Answer)
+                raise LoaderError(
+                    f"decision {d.id!r}: awaits {ref!r} has unknown answer {direction!r} ({answers})"
+                )
+            if nid in d.needs:
+                raise LoaderError(
+                    f"decision {d.id!r}: {nid!r} is in both needs (serves) and awaits (waits on)"
+                )
 
 
 def _check_contradicts(needs: list[Need]) -> None:

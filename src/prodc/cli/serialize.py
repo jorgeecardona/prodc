@@ -28,6 +28,7 @@ def _decision_payload(d: Decision) -> dict[str, object]:
         "principles": list(d.principles),
         "decided_at": d.decided_at,
         "draft": d.draft,
+        "awaits": list(d.awaits),
         "withdrawn": (
             {
                 "reason": d.withdrawn.reason,

@@ -215,10 +215,10 @@ class Resolver:
         """
         name, sep, payload = locator.partition(":")
         if sep and name == _NEEDREF:
-            return self._resolve_needref(payload)
+            return self.resolve_ref(payload)
         return _resolve_proof(locator, self._adapters)
 
-    def _resolve_needref(self, payload: str) -> ProofResult:
+    def resolve_ref(self, payload: str) -> ProofResult:
         """Resolve ``need:<id>`` (or ``need:<id>@<answer>``) against another need (#research step 2).
 
         A research question can depend on a peer: "B cannot be posed until A is settled." That
@@ -227,7 +227,8 @@ class Resolver:
         free (a back-edge hits the ``_visiting`` guard and returns BROKEN). ``need:A`` resolves on
         A's *settledness* (DELIVERED); the optional ``need:A@yes`` form additionally requires A's
         authored :attr:`~prodc.model.Need.answer` to match. B never inherits A's answer — the
-        dependency only requires A settled, optionally in a given direction.
+        dependency only requires A settled, optionally in a given direction. Public because a
+        decision's ``awaits`` (#93) reads the same edge (see :func:`decision_readiness`).
         """
         ref_id, sep, direction = payload.partition("@")
         ref_id = ref_id.strip()
@@ -756,6 +757,57 @@ def active_decisions(decisions: list[Decision]) -> list[Decision]:
 def decisions_for(need_id: str, decisions: list[Decision]) -> list[Decision]:
     """The in-force decisions whose chosen solution serves ``need_id`` — the 'how' behind a need."""
     return [d for d in active_decisions(decisions) if need_id in d.needs]
+
+
+@dataclass(frozen=True)
+class DecisionWait:
+    """One entry of a decision's ``awaits``, resolved: the research it names, and how far it got."""
+
+    ref: str  # as authored: ``<need-id>`` or ``<need-id>@<answer>``
+    state: ProofState  # DELIVERED = settled (in the wanted direction, when one is named)
+    detail: str
+
+
+@dataclass(frozen=True)
+class DecisionReadiness:
+    """Whether a decision's research has settled (#93) — derived from the awaited needs' proofs.
+
+    BLOCKED is a property of the decision, not a :class:`NeedState`: the awaited needs keep their
+    ordinary states, and nothing about coverage or delivery changes.
+    """
+
+    decision: Decision
+    waits: tuple[DecisionWait, ...]
+
+    @property
+    def blocked(self) -> bool:
+        return any(w.state is not ProofState.DELIVERED for w in self.waits)
+
+    @property
+    def open_refs(self) -> list[str]:
+        return [w.ref for w in self.waits if w.state is not ProofState.DELIVERED]
+
+
+def decision_readiness(
+    decisions: list[Decision], needs: list[Need], adapters: dict[str, Adapter]
+) -> dict[str, DecisionReadiness]:
+    """Readiness for each decision that ``awaits`` research, keyed by decision id (#93).
+
+    Each awaited ref resolves exactly like a ``need:`` proof (:meth:`Resolver.resolve_ref`), over
+    every need in the model — a research need is often ``product: false`` and off the board, but it
+    is still what the decision waits on. Decisions with no ``awaits`` are absent.
+    """
+    resolver = Resolver(needs, adapters)
+    out: dict[str, DecisionReadiness] = {}
+    for d in decisions:
+        if not d.awaits:
+            continue
+        waits: list[DecisionWait] = []
+        for ref in d.awaits:
+            r = resolver.resolve_ref(ref)
+            waits.append(DecisionWait(ref, r.state, r.detail))
+        out[d.id] = DecisionReadiness(d, tuple(waits))
+    return out
 
 
 def stale_decisions(
