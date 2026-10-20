@@ -1,16 +1,17 @@
 # Commands
 
-Every command takes `--config prodc.toml` (default) and `--json`. `prodc -C DIR …` runs as if started in `DIR`. Exit 0 ok · 1 gate failed · 2 config/load error.
+Commands take `--config prodc.toml` (default) and `--json`, except: `report` and `sync` have no `--json`; `agent` and `guide` take neither; `portfolio` takes paths instead of `--config`. `prodc -C DIR …` runs as if started in `DIR`. Exit 0 ok · 1 gate failed · 2 config/load error.
 
 ## Read
 
 | Command | Does | Example |
 |---|---|---|
 | `status` | The board: needs vs proofs, per who, with goals/releases/roster/handoffs/recurrence/orphans | `prodc status --only-must` |
-| `lint` | CI gate: exit 1 on BROKEN proof or a must-have with no evidence; warns on dupes, unlinked recurrence, stale evidence, importance off-scale/unrevisited, `who`-name variants (see `[lint]`) | `prodc lint --strict` |
-| `show <id>` | One need as a citable answer: grounds, warrant, sources, proofs | `prodc show N-1` |
+| `lint` | CI gate. **Fails** on: a BROKEN proof, a BROKEN principle guard or `implemented_in`, a must-have with no evidence. **Warns** on: dupes, unlinked recurrence, stale evidence, importance off-scale/unrevisited, `who`-name variants, a contradiction left both-live, an orphaned or stale decision, a decision committed before its research settled or decided against it (`awaits`), a BROKEN source locator, a VIOLATED principle, tag hygiene, flow-step shape (out of order, mixed, never reaches the terminal step). `--strict` makes warnings fail. See `[lint]`, `[flows]`, `[principles]` | `prodc lint --strict` |
+| `show <id>` | One need as a citable answer (grounds, warrant, sources, proofs) — or one decision (what it serves, rejected, rests on, and BLOCKED/READY on the research it `awaits`) | `prodc show N-1` |
 | `brief <client>` | Pre-meeting agenda for one client: its opinions and HOLEs, must first | `prodc brief acme` |
-| `plan` | Ranked backlog: must + state + evidence + recurrence; `importance` refines | `prodc plan --json` |
+| `plan` | Ranked backlog: must + state + evidence + recurrence; `importance` refines; `--revisit DAYS` lists only needs whose importance is undated or older than DAYS; `--include-drafts` | `prodc plan --json` |
+| `review` | Triage staged drafts: `--promote ID…`, `--promote-all` (except any in `--drop`), `--drop ID…` (deletes a draft, never a real need); `--dry-run` | `prodc review --promote N-9` |
 | `diff <snapshot>` | State changes since a saved `status --json` | `prodc diff last.json` |
 | `portfolio <path>…` | Many boards, one scoreboard (+ totals footer); a path is a prodc.toml or a dir to discover boards under (prunes VCS/vendor/hidden dirs, `--max-depth` default 4) | `prodc portfolio projects/` |
 | `dupes` | Candidate duplicate need pairs by text similarity; `--threshold` overrides `[lint].duplicate_threshold` | `prodc dupes --threshold 0.7` |
@@ -30,7 +31,7 @@ Every command takes `--config prodc.toml` (default) and `--json`. `prodc -C DIR 
 | `--only-must` | must-haves only |
 | `--include-drafts` | include draft (staged) needs; by default they are hidden and uncounted (#60) |
 | `--stale DAYS` | only needs whose newest `observed_at` is older than DAYS (`[lint].stale_after_days` makes it a lint warning) |
-| `--client ID` / `--goal ID` | scope board and coverage to one client / goal |
+| `--client ID` / `--goal ID` / `--tag TAG` | scope board and coverage to one client / goal / tag |
 | `--strict` | also exit 1 on any opinion |
 | `--min-coverage 0.8` | exit 1 below that delivered/total |
 | `--max-dangling N` | tolerate N BROKEN proofs (default 0) |
@@ -44,17 +45,17 @@ Each rewrites one YAML file, re-loads the whole model as validation, reverts on 
 
 | Command | Does | Example |
 |---|---|---|
-| `set <id> key=value` | set one field; `key+=value` appends to `proofs`/`children`; `importance=<n\|label>` is checked against the `[importance]` rubric and stamps `importance_set_at` | `prodc set N-2 importance=needed` |
+| `set <id> key=value` | set one field; `key+=value` appends to a list (`children+=ID@step` adds a stepped edge); `importance=<n\|label>` is checked against the `[importance]` rubric and stamps `importance_set_at` | `prodc set N-2 importance=needed` |
 | `capture <id> --kind K` | append a source (`K` = `primary`\|`secondary`\|`assumption`; old `interview`/`artifact`/`proxy`/`internal` still accepted); `--who --date --quote --locator --observed-at` (observed-at defaults to today, for staleness) | `prodc capture N-3 --kind primary --who Ana --date 2026-10-05 --quote "…"` |
 | `accept <id> --who W --date D` | add an `accept:W@D` proof; `--revoke` removes it | `prodc accept N-2 --who jorge --date 2026-10-05` |
 | `attest <id> --by X --date D` | record a review that the proofs establish the need; `--verdict pass\|concerns\|fail` (only pass clears it — anything else warns), `--ai --comment` | `prodc attest N-1 --by claude-fable-5-1 --ai --date 2026-10-05 --verdict pass` |
 | `withdraw <id> --reason R` | record a decision against the need: off the board + out of coverage, the record kept; `--kind wont_do\|out_of_scope\|duplicate`, `--of` (the original, required for duplicate), `--principle` (the vision it rests on); `--date` defaults to today | `prodc withdraw N-7 --reason "dup" --kind duplicate --of N-3` |
 | `withdraw decision <id> --reason R` / `reinstate decision <id>` | supersede / restore a decision (noun-first; ids are unique per noun) | `prodc withdraw decision D-1 --reason "superseded by D-7"` |
 | `reinstate <id>` | remove a need's withdrawal, putting it back on the board (errors if not withdrawn) | `prodc reinstate N-7` |
-| `add need <id> --text T --who W --file F` | new need with agent provenance; `--kind assumption\|secondary` (never primary — that's earned by a real user); warns on a possible duplicate, `--strict-dupes` refuses, `--no-dupe-check` skips; `--draft` stages it off the board (promote later with `set <id> draft=false`) | `prodc add need N-9 --text "…" --who bot --file needs/bot.yaml --draft` |
+| `add need <id> --text T --who W --file F` | new need with agent provenance; `--kind assumption\|secondary` (never primary — that's earned by a real user); warns on a possible duplicate, `--strict-dupes` refuses, `--no-dupe-check` skips; `--draft` stages it off the board (promote with `review --promote <id>`, or `set <id> draft=false`) | `prodc add need N-9 --text "…" --who bot --file needs/bot.yaml --draft` |
 | `add role <id> --text T --file F` | declare a Role in `F`'s `roles:` list (new file created if needed); duplicate id refused | `prodc add role owner --text "owns the roastery" --file needs/roles.yaml` |
-| `add principle <id> --text T --file F` | declare a product principle (the vision); `--from-need <id>` promotes a need, copying its text + sources | `prodc add principle P-1 --text "local-first" --file needs/principles.yaml` |
+| `add principle <id> --text T --file F` | declare a principle (the vision); `--scope` (must be in `[principles].scopes`, default `product`), `--implemented-in LOCATOR` (the one place the values live), `--proof LOCATOR` (repeatable guard tests → ENFORCED/VIOLATED); `--from-need <id>` promotes a need, copying its text + sources | `prodc add principle P-1 --text "local-first" --file needs/principles.yaml` |
 | `revise principle <id> [--text] [--date]` | re-state a principle; re-stamps `revised_at`, which flags decisions taken under the old version for re-review | `prodc revise principle P-1 --text "…"` |
 | `add decision <id> --text T --needs IDS --file F` | the solution chosen for a need (OST); `--alternative` (repeatable, the rejected options), `--consequences`, `--principles`, `--date` | `prodc add decision D-1 --text "store as FLAC" --needs N-1 --alternative WAV --file needs/decisions.yaml` |
 
-`set` fields: `text who must importance claim goal release variant_of client product draft`; lists: `proofs children contradicts`.
+`set` fields: `text description who role must importance claim goal release variant_of client product draft`; lists: `proofs children contradicts tags`. A decision's `awaits` is edited in the YAML (no setter yet).

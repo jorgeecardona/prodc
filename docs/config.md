@@ -33,6 +33,9 @@ importance_revisit_days = 60
 [add]
 default_draft = false
 
+[principles]
+scopes = ["product", "design", "engineering"]
+
 [flows]
 steps = ["trigger", "act", "conclude"]
 ```
@@ -101,12 +104,19 @@ timeout = 10                           # seconds, optional (default 10)
 | `duplicate_threshold` | text similarity in `(0, 1]` that flags a pair in `dupes`, `add`, `recurrence --suggest` and lint | `0.8` |
 | `stale_after_days` | lint warns when a need's newest `observed_at` is older than this | off |
 | `importance_revisit_days` | lint warns when `importance_set_at` is older than this | off |
+| `draft_max_age_days` | lint warns when a staged draft's `draft_added` is older than this, so a batch is not forgotten (triage with `prodc review`) | off |
 
 ## `[add]`
 
 | Key | Means | Default |
 |---|---|---|
 | `default_draft` | `add need` stages as `draft: true` unless told otherwise | `false` |
+
+## `[principles]`
+
+| Key | Means | Default |
+|---|---|---|
+| `scopes` | the allowed principle scopes — a principle's `scope` (and `add principle --scope`) must be one of these, or the load fails; lets product, design, visual and engineering principles share one board | `["product"]` |
 
 ## `[flows]`
 

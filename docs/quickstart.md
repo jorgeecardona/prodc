@@ -63,6 +63,6 @@ prodc status
 
 N-1 is DELIVERED (tagged scenario), N-2 is a HOLE, N-3 is an opinion. Exit 0; a BROKEN proof would exit 1.
 
-The same project is checked in at `examples/quickstart/`.
+A slightly larger version is checked in at `examples/quickstart/` — it adds N-4, a hypothesis that settled NO, so its board reads `coverage 2/4`.
 
 Other proof kinds (`pytest`, `files`, `accept`, …) and every `prodc.toml` section: [Config](config.md).

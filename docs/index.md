@@ -4,7 +4,7 @@ prodc is about sharing product work across a team. Understanding what users need
 
 The work lives as plain files: you note what a person needs, where the need came from, and the test that proves it's done. They get reviewed in pull requests like anything else, so when someone asks "is this feature done?", the answer is read from the repo, not remembered from the last standup.
 
-prodc only records that structure and checks it holds together. It doesn't call a model or ping a tracker — it reads your files and your tests and shows you the gaps.
+prodc only records that structure and checks it holds together. It doesn't call a model or ping a tracker on its own — it reads your files and your tests and shows you the gaps. (A `gitlab` source adapter can check a ticket exists, read-only, and a `command` hook runs only the script you configure.)
 
 ## Two rules
 
@@ -31,3 +31,5 @@ That's enough to run the board against a project that already has needs defined.
 | [Commands](commands.md) | every verb and flag |
 | [Model](model.md) | the nouns, the Need and Source fields, the two ladders |
 | [Config](config.md) | every `prodc.toml` section |
+| [Lifecycle](lifecycle.md) | how a need moves through its states as evidence arrives |
+| [Grounding (Torres)](grounding-torres.md) | how prodc maps onto *Continuous Discovery Habits* |

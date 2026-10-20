@@ -128,6 +128,19 @@ withdrawn or product need. No need state changes: BLOCKED belongs to the decisio
 | BROKEN | a locator resolves to nothing | yes |
 | UNRESOLVED | a source could not be read (sibling absent) | no, excluded from coverage |
 
+## Principle states
+
+A principle with guard `proofs` (and an optional `implemented_in` locator) gets a state of its
+own (#89); it never enters coverage.
+
+| State | Means | Fails `lint`? |
+|---|---|---|
+| ENFORCED | every guard test passes | no |
+| STATED | no active guard — no proofs, or only declared-pending ones | no |
+| VIOLATED | a guard ran and failed: the code contradicts the stance | warns |
+| BROKEN | a guard or `implemented_in` locator points at nothing | yes |
+| UNRESOLVED | a guard could not be read (sibling repo absent) | no |
+
 ## Source fields
 
 | Field | Means |
