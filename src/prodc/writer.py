@@ -633,6 +633,29 @@ def _locate_decision(config: Config, decision_id: str) -> tuple[Path, dict[str, 
     raise WriteError(f"no decision {decision_id!r} in any prodc file")
 
 
+def _edit_one_decision(
+    config: Config,
+    decision_id: str,
+    *,
+    expect_sha: str | None,
+    dry_run: bool,
+    mutate: Callable[[dict[str, object]], None],
+) -> Edit:
+    """The decision counterpart of :func:`_edit_one_need`: locate, lock-check, mutate, splice.
+
+    Comment-safe: only the decision's own block is spliced back, and the reload gate validates it.
+    """
+    path, doc, old_text = _locate_decision(config, decision_id)
+    if expect_sha is not None and _sha256(old_text) != expect_sha:
+        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
+    for raw in cast("list[object]", doc["decisions"]):
+        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == decision_id:
+            mutate(cast("dict[str, object]", raw))
+            break
+    new_text = _render_item_edit(old_text, doc, "decisions", decision_id)
+    return _validated(config, path, old_text, new_text, dry_run)
+
+
 def withdraw_decision(
     config: Config,
     decision_id: str,
@@ -646,35 +669,72 @@ def withdraw_decision(
 
     The decision's lifecycle reuses the Need verbs (no status enum): this is how a superseded
     decision leaves the in-force set while its record stays (e.g. ``--reason "superseded by D-7"``).
-    Comment-safe: only the decision's own block is spliced. Reinstate with :func:`reinstate_decision`.
+    Reinstate with :func:`reinstate_decision`.
     """
-    path, doc, old_text = _locate_decision(config, decision_id)
-    if expect_sha is not None and _sha256(old_text) != expect_sha:
-        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
-    for raw in cast("list[object]", doc["decisions"]):
-        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == decision_id:
-            cast("dict[str, object]", raw)["withdrawn"] = {"reason": reason, "date": date}
-            break
-    new_text = _render_item_edit(old_text, doc, "decisions", decision_id)
-    return _validated(config, path, old_text, new_text, dry_run)
+
+    def _mutate(d: dict[str, object]) -> None:
+        d["withdrawn"] = {"reason": reason, "date": date}
+
+    return _edit_one_decision(
+        config, decision_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate
+    )
 
 
 def reinstate_decision(
     config: Config, decision_id: str, *, expect_sha: str | None = None, dry_run: bool
 ) -> Edit:
     """Remove a decision's ``withdrawn`` mark, putting it back in force. Errors if not withdrawn."""
-    path, doc, old_text = _locate_decision(config, decision_id)
-    if expect_sha is not None and _sha256(old_text) != expect_sha:
-        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
-    for raw in cast("list[object]", doc["decisions"]):
-        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == decision_id:
-            d = cast("dict[str, object]", raw)
-            if "withdrawn" not in d:
-                raise WriteError(f"decision {decision_id!r} is not withdrawn")
-            del d["withdrawn"]
+
+    def _mutate(d: dict[str, object]) -> None:
+        if "withdrawn" not in d:
+            raise WriteError(f"decision {decision_id!r} is not withdrawn")
+        del d["withdrawn"]
+
+    return _edit_one_decision(
+        config, decision_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate
+    )
+
+
+def set_decision_awaits(
+    config: Config, decision_id: str, assignment: str, *, expect_sha: str | None, dry_run: bool
+) -> Edit:
+    """``awaits+=REF`` adds the research a decision waits on; ``awaits-=REF`` drops it (#93).
+
+    ``REF`` is ``<need-id>`` or ``<need-id>@yes|no|inconclusive``; the reload gate checks it
+    names a known need, a valid direction, and not a need the decision already serves. Dropping
+    the last entry removes the key, so a decision that waits on nothing reads as before.
+    """
+    for op in ("+=", "-="):
+        key, sep, raw = assignment.partition(op)
+        if sep:
             break
-    new_text = _render_item_edit(old_text, doc, "decisions", decision_id)
-    return _validated(config, path, old_text, new_text, dry_run)
+    else:
+        raise WriteError(f"expected awaits+=REF or awaits-=REF, got {assignment!r}")
+    if key.strip() != "awaits":
+        raise WriteError(f"a decision only supports awaits+= / awaits-= here, got {key.strip()!r}")
+    ref = raw.strip()
+
+    def _mutate(d: dict[str, object]) -> None:
+        current = d.get("awaits", [])
+        if not isinstance(current, list):
+            raise WriteError(f"decision {decision_id!r}: 'awaits' is not a list")
+        items = [str(x) for x in cast("list[object]", current)]
+        if op == "+=":
+            if ref in items:
+                raise WriteError(f"decision {decision_id!r} already awaits {ref!r}")
+            items.append(ref)
+        else:
+            if ref not in items:
+                raise WriteError(f"decision {decision_id!r} does not await {ref!r}")
+            items.remove(ref)
+        if items:
+            d["awaits"] = items
+        else:
+            d.pop("awaits", None)
+
+    return _edit_one_decision(
+        config, decision_id, expect_sha=expect_sha, dry_run=dry_run, mutate=_mutate
+    )
 
 
 def delete_need(

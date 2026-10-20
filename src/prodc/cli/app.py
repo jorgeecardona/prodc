@@ -149,9 +149,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     pl.set_defaults(func=cmd_plan)
 
-    st2 = sub.add_parser("set", help="set or append one field on a need (writes YAML)")
-    st2.add_argument("need_id", help="the need id to edit, e.g. N-1")
-    st2.add_argument("assignment", help="key=value, or key+=value to append (proofs/children)")
+    st2 = sub.add_parser(
+        "set", help="set or append one field on a need, or a decision's awaits (writes YAML)"
+    )
+    st2.add_argument("need_id", help="the need (or decision) id to edit, e.g. N-1 or D-1")
+    st2.add_argument(
+        "assignment",
+        help="key=value, or key+=value to append (proofs/children/…); on a decision, "
+        "awaits+=REF / awaits-=REF",
+    )
     st2.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     st2.add_argument("--json", action="store_true", help="machine-readable output")
     st2.add_argument(

@@ -69,6 +69,7 @@ from ..writer import (
     reinstate_decision,
     relink_proof,
     revise_principle,
+    set_decision_awaits,
     set_field,
     set_importance,
     withdraw,
@@ -547,7 +548,16 @@ def cmd_set(args: argparse.Namespace) -> int:
         # `set importance=…` goes through its own path so the value is checked against the
         # rubric and `importance_set_at` is stamped in the same edit (#59).
         key, sep, raw = args.assignment.partition("=")
-        if sep and "+" not in key and key.strip() == "importance":
+        if key.strip().rstrip("+-") == "awaits":
+            # A decision's research (#93): `set D-1 awaits+=Q-1@yes` / `awaits-=Q-1`.
+            edit = set_decision_awaits(
+                cfg,
+                args.need_id,
+                args.assignment,
+                expect_sha=args.expect_sha,
+                dry_run=args.dry_run,
+            )
+        elif sep and "+" not in key and key.strip() == "importance":
             level = cfg.resolve_importance(raw)
             edit = set_importance(
                 cfg,

@@ -11,8 +11,7 @@ and is BLOCKED until they settle. Reviewed with Fable; these were left out on pu
 
 ## Deferred
 
-- **A setter** — `prodc await <decision> <need>[@answer]` (or `set D-1 awaits+=Q-1`). The writer's
-  one-block splice is need-shaped; decisions are hand-edited until it learns decision blocks.
+- ~~A setter~~ — shipped: `prodc set D-1 awaits+=Q-1@yes` / `awaits-=Q-1@yes`.
 - **A status summary line** — "N decisions blocked". Only if boards grow enough decisions to
   need it; the per-decision tag is enough today.
 

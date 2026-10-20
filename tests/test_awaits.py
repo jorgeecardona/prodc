@@ -211,3 +211,62 @@ def test_lint_command_warns_committed_early(
     out = capsys.readouterr().out
     assert "D-1: committed before its research settled: Q-1" in out
     assert code == 0  # a warning, not a gate failure
+
+
+# --- the setter: set D-1 awaits+= / awaits-= ----------------------------------
+
+
+def _set(cfg: Path, *args: str) -> int:
+    from prodc.cli import main
+
+    return main(["set", *args, "--config", str(cfg)])
+
+
+def test_set_awaits_append_and_remove(tmp_path: Path) -> None:
+    cfg = _cli_project(tmp_path, "[]", True)
+    yaml_path = tmp_path / "p" / "n.yaml"
+    yaml_path.write_text("# research board\n" + yaml_path.read_text(), encoding="utf-8")
+    assert _set(cfg, "D-1", "awaits+=Q-1@yes") == 0
+    assert load(Config.load(cfg)).decisions[0].awaits == ("Q-1@yes",)
+    assert yaml_path.read_text().startswith("# research board\n")  # comments survive the splice
+    assert _set(cfg, "D-1", "awaits-=Q-1@yes") == 0
+    assert load(Config.load(cfg)).decisions[0].awaits == ()
+    assert "awaits" not in yaml_path.read_text()  # last entry gone → key removed
+
+
+def test_set_awaits_refuses_unknown_need_and_leaves_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cfg = _cli_project(tmp_path, "[]", True)
+    before = (tmp_path / "p" / "n.yaml").read_text()
+    assert _set(cfg, "D-1", "awaits+=Q-9") != 0  # the reload gate rejects it
+    assert (tmp_path / "p" / "n.yaml").read_text() == before
+    assert "not a known need id" in capsys.readouterr().err
+
+
+def test_set_awaits_refuses_duplicate_and_missing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cfg = _cli_project(tmp_path, "[Q-1]", True)
+    assert _set(cfg, "D-1", "awaits+=Q-1") != 0
+    assert "already awaits" in capsys.readouterr().err
+    assert _set(cfg, "D-1", "awaits-=Q-2") != 0
+    assert "does not await" in capsys.readouterr().err
+
+
+def test_set_awaits_on_a_need_id_says_no_decision(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cfg = _cli_project(tmp_path, "[]", True)
+    assert _set(cfg, "US-1", "awaits+=Q-1") != 0
+    assert "no decision 'US-1'" in capsys.readouterr().err
+
+
+def test_withdraw_and_reinstate_decision_still_work(tmp_path: Path) -> None:
+    from prodc.writer import reinstate_decision, withdraw_decision
+
+    cfg = Config.load(_cli_project(tmp_path, "[Q-1]", True))
+    withdraw_decision(cfg, "D-1", reason="superseded", date="2026-10-20", dry_run=False)
+    assert load(cfg).decisions[0].withdrawn is not None
+    reinstate_decision(cfg, "D-1", dry_run=False)
+    assert load(cfg).decisions[0].withdrawn is None
