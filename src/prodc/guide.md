@@ -91,5 +91,6 @@ A HOLE (no proof yet) or an opinion (no evidence yet) is honest output, not a fa
 
 - The vision, held as given: `prodc add principle <id> --text "..."`
 - How a need gets built (the chosen solution): `prodc add decision <id> --text "..." --needs <ids>`
+- A decision that needs evidence first: file the research as a need (`product: false`, a `claim`, the proof the experiment will produce) and list it in the decision's `awaits:` — the decision reads BLOCKED until it settles.
 - Full command list: `docs/commands.md`. The nouns: `docs/model.md`. Config: `docs/config.md`.
 - Teaching an AI agent to run prodc for you: `prodc agent`.

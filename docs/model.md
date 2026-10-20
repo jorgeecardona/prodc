@@ -16,7 +16,7 @@ id that other records point at and its own slot in the model; everything else is
 | **Release** | ship slice; list order = ship order; `id`, `text` | `releases:` |
 | **Role** | a named function in the product's world; `who`+`client` is an instance of it (John@Sincerely is the `owner`); `id`, `text` | `roles:` |
 | **Principle** | the vision, held as given (not validated); `scope`, `sources`, `revised_at`, guard `proofs` + `implemented_in`; an `out_of_scope` withdrawal cites it, and revising it re-opens decisions taken under it | `principles:` |
-| **Decision** | the solution chosen for a need over the `alternatives` rejected (OST), resting on which `principles`; `needs` required | `decisions:` |
+| **Decision** | the solution chosen for a need over the `alternatives` rejected (OST), resting on which `principles`; `needs` required (what it *serves*); optional `awaits` (the research it *waits on*) | `decisions:` |
 
 ### The nouns and why each exists (#92)
 
@@ -46,6 +46,46 @@ shipped with no consumer yet — `answer`, `claim`, `need:` proofs, `withdrawn`,
 should earn their keep before more are added.
 
 File-level `who`, `client` default every need in that file.
+
+## Research a decision waits on (#93)
+
+A decision can wait on evidence that does not exist yet — an interview, a fake-door test, a
+spike, a dataset. Each research item is an ordinary need, not a new noun:
+
+```yaml
+needs:
+  - id: Q-ledger-wanted
+    text: Roasters want balances derived from movements, not a stock column they edit
+    claim: A roaster who sees a derived balance does not ask for a "set stock" field
+    product: false            # research, not product coverage
+    tags: [research, interview]
+    proofs:
+      - accept:jordan@2026-10-27   # added after the interview; until then no proof = HOLE (planned)
+  - id: Q-ledger-cost
+    text: A transaction roll-up stays under 50 ms at 1M rows
+    claim: Deriving every balance is affordable at our scale
+    product: false
+    tags: [research, spike]
+    proofs:
+      - evalgate:rollup_ms<=50
+    answer: yes               # authored once it settles
+
+decisions:
+  - id: D-ledger
+    text: Model inventory as a double-entry ledger
+    draft: true
+    needs: [US-1403]          # what it serves
+    awaits:                   # what it waits on
+      - Q-ledger-wanted@yes   # only if the roaster confirms
+      - Q-ledger-cost         # settled either way is enough
+```
+
+The research need's state is its status — HOLE = planned, PENDING = in progress, DELIVERED =
+done (and `answer` gives the direction). The decision is **BLOCKED** until every awaited need is
+settled (in the named direction, when one is given), then **READY**. `show D-ledger` lists each
+awaited need with its state; `status` tags the decision; `lint` warns when a decision is
+committed (`draft: false`) while blocked, decided against its own research, or waits on a
+withdrawn or product need. No need state changes: BLOCKED belongs to the decision.
 
 ## Need fields
 
