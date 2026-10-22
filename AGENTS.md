@@ -6,7 +6,7 @@ Guidance for AI coding agents working in this repo. Humans: read README.md and C
 
 prodc is a product-management-as-code tool: roles, flows, and features traced to evidence. Needs live
 in YAML under `product/needs/`; each need carries sources, and "done" means a test proof. A need with
-no external evidence is an opinion — `primary` sources are real users' own words and are never added
+no external evidence is an opinion. `primary` sources are real users' own words and are never added
 via `prodc add`.
 
 ## Build
@@ -17,7 +17,7 @@ via `prodc add`.
 
 - `make test` runs the suite.
 - `make check` runs lint + typecheck + test. Everything in it must pass before you commit.
-  `moon run :ci` runs more (build, docs, version-guard) — use it before pushing.
+  `moon run :ci` runs more (build, docs, version-guard); use it before pushing.
 
 ## Style
 

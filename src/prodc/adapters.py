@@ -43,7 +43,7 @@ def _steps_passed(steps: list[object]) -> bool:
 def _as_score(val: object) -> float | None:
     """A numeric eval score from a results value: a bare number, or ``{"score": N}``.
 
-    ``bool`` is a subclass of ``int`` but is a pass/fail, not a score, so it is rejected — a
+    ``bool`` is a subclass of ``int`` but is a pass/fail, not a score, so it is rejected. A
     boolean result belongs to :class:`OutcomeAdapter`, not the gate.
     """
     if isinstance(val, bool):
@@ -80,7 +80,7 @@ def _git_head(repo: Path) -> str | None:
 _LOCATOR_PLACEHOLDER = "{locator}"
 
 #: A hook runner: given the built argv, the working dir, and a timeout, run the command
-#: and return its parsed-JSON stdout — or ``None`` for "could not read" (non-zero exit,
+#: and return its parsed-JSON stdout. ``None`` means "could not read" (non-zero exit,
 #: timeout, spawn failure, or unparseable output). Injected in tests so no process spawns.
 _HookRunner = Callable[[list[str], Path, float], object | None]
 
@@ -91,7 +91,7 @@ def _hook_argv(command: list[str], locator: str) -> list[str]:
     The locator is the need's, never a shell string: it is substituted for every
     ``{locator}`` placeholder in the configured template, or appended as the final
     argument when the template has no placeholder. It is passed as an argv element, so
-    it can never inject a command — the command comes only from trusted config (#70).
+    it can never inject a command. The command comes only from trusted config (#70).
     """
     has_placeholder = any(_LOCATOR_PLACEHOLDER in arg for arg in command)
     argv = [arg.replace(_LOCATOR_PLACEHOLDER, locator) for arg in command]
@@ -143,7 +143,7 @@ class Inventoried(Protocol):
     """An adapter that can list every proof unit it knows (for proof discovery, #54).
 
     Weaker than :class:`Enumerable`: discovery only needs the universe, not the per-payload
-    `covers` mapping the orphan report uses — so an adapter can offer suggestions without
+    `covers` mapping the orphan report uses. An adapter can offer suggestions without
     changing orphan behaviour.
     """
 
@@ -214,7 +214,7 @@ class GherkinAdapter:
 
         Keyed by ``file#name`` (matching :meth:`_id`), not the bare scenario name, so two
         features with a same-named scenario don't collide (#42). A Scenario Outline expands to
-        one row per Examples line, all sharing the name — those are AND-ed (every example must
+        one row per Examples line, all sharing the name. Those are AND-ed (every example must
         pass), not last-write-wins.
         """
         if self._results is not None:
@@ -261,7 +261,7 @@ class GherkinAdapter:
         return [s for s in scenarios if s.title == title and (not file_part or s.file == file_part)]
 
     def inventory(self) -> list[str]:
-        """Every scenario, as ``file#title`` — the universe the orphan report diffs against."""
+        """Every scenario, as ``file#title``: the universe the orphan report diffs against."""
         return sorted({self._id(s) for s in self._load()})
 
     def covers(self, payload: str) -> list[str]:
@@ -278,7 +278,7 @@ class GherkinAdapter:
             states = [results.get(self._id(s)) for s in matches]
             missing = [self._id(s) for s, v in zip(matches, states, strict=True) if v is None]
             if missing:
-                # Wired a results artifact but a matched scenario isn't in it — renamed,
+                # Wired a results artifact but a matched scenario isn't in it. Renamed,
                 # filtered, crashed, or sharded away. Do NOT fall through to the tag and
                 # call it delivered (#41); surface that it never ran.
                 return ProofResult(
@@ -411,7 +411,8 @@ class VitestAdapter:
         missing = [
             seg
             for seg in segments
-            if seg not in text and seg.replace("'", "\\'") not in text
+            if seg not in text
+            and seg.replace("'", "\\'") not in text
             and seg.replace('"', '\\"') not in text
         ]
         if missing:
@@ -434,7 +435,7 @@ class FilesAdapter:
     """Resolves ``path`` to a verification script's existence.
 
     For proofs that are executable models/scripts, not pytest tests. Existence is a
-    *declared* DELIVERED — a script existing is not a script passing; a run/result
+    *declared* DELIVERED. A script existing is not a script passing; a run/result
     marker (confirmed) is left for later, mirroring the gherkin/pytest results split.
     """
 
@@ -449,7 +450,7 @@ class FilesAdapter:
 
 
 class AcceptAdapter:
-    """Resolves ``who@date`` to a human sign-off — a functional acceptance, not a test.
+    """Resolves ``who@date`` to a human sign-off: a functional acceptance, not a test.
 
     Some needs are accepted by a person, not proven by an automated test. This records
     that as a *declared* DELIVERED (``*``), visibly distinct from a machine-checked proof;
@@ -465,8 +466,8 @@ class AcceptAdapter:
 class CoverageAdapter:
     """Resolves a category path against a catalog of existing categories (one per line).
 
-    DELIVERED when a category matches (already covered — point them at it); PENDING when
-    nothing matches (declared, not yet covered — an honest gap, not a build failure).
+    DELIVERED when a category matches (already covered: point them at it); PENDING when
+    nothing matches (declared, not yet covered: an honest gap, not a build failure).
     """
 
     def __init__(self, root: Path, catalog: str) -> None:
@@ -485,7 +486,7 @@ class CoverageAdapter:
         return self._cats
 
     def inventory(self) -> list[str]:
-        """Every catalog category — the universe a coverage proof can point at (#54)."""
+        """Every catalog category: the universe a coverage proof can point at (#54)."""
         return sorted(self._load())
 
     def resolve(self, payload: str) -> ProofResult:
@@ -499,7 +500,7 @@ class FieldAdapter:
 
     Schema: ``{"surfaced": [...], "received": [...]}``. DELIVERED if the field is surfaced;
     PENDING otherwise, with a distinct detail for 'received but not surfaced' vs 'not
-    received upstream' — a different fix. Never a hard failure.
+    received upstream'. A different fix. Never a hard failure.
     """
 
     def __init__(self, root: Path, schema: str) -> None:
@@ -523,7 +524,7 @@ class FieldAdapter:
         return self._data
 
     def inventory(self) -> list[str]:
-        """Every field the upstream schema knows (surfaced or received) — the universe (#54)."""
+        """Every field the upstream schema knows (surfaced or received): the universe (#54)."""
         surfaced, received = self._load()
         return sorted(surfaced | received)
 
@@ -539,12 +540,12 @@ class FieldAdapter:
 class OutcomeAdapter:
     """Resolves an observable-outcome key against a recorded results file (#25).
 
-    A proof that asserts externally-observable behaviour — an HTTP request/response pair, a UI
-    assertion — instead of binding to test internals (a pytest node, a Gherkin step), so it
+    A proof that asserts externally-observable behaviour: an HTTP request/response pair, a UI
+    assertion, instead of binding to test internals (a pytest node, a Gherkin step), so it
     survives a reimplementation and describes what a user can observe. The assertion runs
     *outside* prodc (a harness, a probe); its pass/fail is recorded in a JSON results file
     (``{"<outcome key>": true|false}``, or ``{"<key>": {"passed": bool}}``), and prodc only reads
-    that — records-only, never a live call, never a hard failure of its own.
+    that. Records-only, never a live call, never a hard failure of its own.
 
     DELIVERED when the key is recorded passing; PENDING when it is recorded failing or absent from
     a present file; BROKEN when the results file itself is absent (nothing to resolve against).
@@ -598,10 +599,10 @@ class EvalGateAdapter:
 
     A scored sibling of :class:`OutcomeAdapter`: where that reads a pass/fail bool, this reads a
     numeric score and gates it against a threshold carried in the locator (``accuracy>=0.9``), so
-    one adapter serves many metrics and cutoffs (``>=``, ``<=``, ``>``, ``<`` — ``<=`` for a loss
+    one adapter serves many metrics and cutoffs (``>=``, ``<=``, ``>``, ``<``; ``<=`` for a loss
     you want below a bound). The score is produced by an eval harness *outside* prodc and recorded
     in a JSON file (``{"accuracy": {"score": 0.82}}`` or the bare ``{"accuracy": 0.82}``); prodc
-    only reads it — records-only, never runs the eval.
+    only reads it. Records-only, never runs the eval.
 
     DELIVERED when the comparison holds; PENDING when the score is recorded but does not meet the
     gate, or the metric is absent from a present file (recorded-below and not-yet-recorded are both
@@ -656,7 +657,7 @@ class EvalGateAdapter:
 
 
 class CommandProof:
-    """Resolves a locator by running a user-supplied command — a proof hook (#70).
+    """Resolves a locator by running a user-supplied command: a proof hook (#70).
 
     The command comes only from the project config (trusted, like a git hook); the need's
     locator is passed to it as an argv element (never a shell string, never executed). The
@@ -666,7 +667,7 @@ class CommandProof:
         {"state": "delivered" | "pending" | "broken" | "unresolved", "detail": "..."}
 
     A non-zero exit, a timeout, unparseable output, or an unknown ``state`` all resolve to
-    UNRESOLVED ("could not read") — never a false DELIVERED. This lets a team resolve a
+    UNRESOLVED ("could not read"). Never a false DELIVERED. This lets a team resolve a
     proof against any tool with a small script, with no per-provider code in prodc, and the
     core stays dependency-free.
     """
@@ -706,7 +707,7 @@ class PrototypeAdapter:
     For perception/experience needs with no pass/fail test: a prototype shown to users in
     an interview is real evidence of the need and the chosen direction. A *declared*
     DELIVERED (``*``), distinct from a shipped-feature test and from a human sign-off
-    (accept) — this validates the need/direction, not the implementation.
+    (accept). This validates the need/direction, not the implementation.
     """
 
     def resolve(self, payload: str) -> ProofResult:
@@ -719,12 +720,12 @@ class PrototypeAdapter:
 
 
 class CitationAdapter:
-    """Resolves ``ref@author@year`` to a cited published result — a declared DELIVERED (#75).
+    """Resolves ``ref@author@year`` to a cited published result: a declared DELIVERED (#75).
 
     A research question can be settled by citing a result a human vouches for and prodc cannot
     check (a published paper, a textbook theorem). Modelled on :class:`PrototypeAdapter`: a
     *declared* DELIVERED (``*``), never BROKEN, because it is an assertion, like a tag. Kept
-    distinct from ``accept`` on purpose — ``accept`` records *who signed off*; a citation records
+    distinct from ``accept`` on purpose: ``accept`` records *who signed off``; a citation records
     *what external result settles it*, and ``ref`` (the thing a reader follows to check the claim)
     is the load-bearing payload ``accept`` has no slot for: ``accept:Smith2019@jorge@...`` would
     read as "jorge accepted it", hiding that the truth is "Smith 2019 shows it".
@@ -783,7 +784,7 @@ class FrontmatterAdapter:
     """Resolves ``file#anchor`` against markdown files (e.g. docs/issues/*.md).
 
     Confirms a heading matching the anchor exists, so a Source citing a ticket/section
-    that is absent or renamed surfaces as a dangling (BROKEN) source — the provenance-side
+    that is absent or renamed surfaces as a dangling (BROKEN) source: the provenance-side
     analogue of a BROKEN proof.
     """
 
@@ -847,13 +848,13 @@ class GitLabSource:
     """Resolves a GitLab issue locator against the GitLab REST API.
 
     Payload formats accepted:
-    - ``#123``              — issue iid in the adapter's configured project
-    - ``group/project#123`` — issue iid with an inline project path override
+    - ``#123``              : issue iid in the adapter's configured project
+    - ``group/project#123`` : issue iid with an inline project path override
 
     Resolution outcomes:
-    - ``ok=True``  with title/author/date — the issue exists and was read
-    - ``ok=False`` with "not found" detail — the issue does not exist (BROKEN source)
-    - ``ok=True``  with "unverified: …" detail — token absent, auth failed, or host
+    - ``ok=True``  with title/author/date: the issue exists and was read
+    - ``ok=False`` with "not found" detail: the issue does not exist (BROKEN source)
+    - ``ok=True``  with "unverified: …" detail: token absent, auth failed, or host
       unreachable; the source is *not* flagged BROKEN because we could not check it
 
     The token is never stored here; only the name of the env var that holds it.
@@ -912,7 +913,7 @@ class GitLabSource:
 
 
 class CommandSource:
-    """Resolves a Source locator by running a user-supplied command — a source hook (#70).
+    """Resolves a Source locator by running a user-supplied command: a source hook (#70).
 
     The command comes only from the project config (trusted); the locator is passed as an
     argv element, never executed. The hook resolves the locator against any system and
@@ -921,9 +922,9 @@ class CommandSource:
         {"exists": true | false, "who": "...", "date": "...", "quote": "..."}
 
     ``exists: true`` resolves the source (ok=True, provenance in the detail); ``exists:
-    false`` means the cited item is absent — a dangling (BROKEN) source (ok=False). A
+    false`` means the cited item is absent: a dangling (BROKEN) source (ok=False). A
     non-zero exit, a timeout, unparseable output, or a missing ``exists`` resolves to
-    ``unverified`` (ok=True) — a source we could not check is never flagged BROKEN, exactly
+    ``unverified`` (ok=True): a source we could not check is never flagged BROKEN, exactly
     as the GitLab adapter treats an absent token or an unreachable host.
     """
 

@@ -4,15 +4,23 @@ prodc is about sharing product work across a team. Understanding what users need
 
 The work lives as plain files: you note what a person needs, where the need came from, and the test that proves it's done. They get reviewed in pull requests like anything else, so when someone asks "is this feature done?", the answer is read from the repo, not remembered from the last standup.
 
-prodc only records that structure and checks it holds together. It doesn't call a model or ping a tracker on its own — it reads your files and your tests and shows you the gaps. (A `gitlab` source adapter can check a ticket exists, read-only, and a `command` hook runs only the script you configure.)
+prodc only records that structure and checks it holds together. It does not call a model or ping a tracker
+on its own. It reads your files and your tests and shows you the gaps. (A `gitlab` source adapter can
+check a ticket exists, read-only, and a `command` hook runs only the script you configure.)
 
 ## Two rules
 
-Everything in prodc comes down to two ideas, and both are about not fooling yourself.
+Both rules are about evidence.
 
-The first: **a need with no evidence is just an opinion.** If you write down that a user wants something, prodc wants to know who said so — a quote from an interview, a ticket, an email, anything real. A need with nothing behind it still loads, but it gets flagged as an opinion, because that's what it is until someone outside the room has asked for it.
+The first: **a need with no evidence is just an opinion.** When you write down that a user wants something,
+record the source: a quote from an interview, a ticket, an email. A need with nothing behind it still
+loads, but prodc flags it as an opinion, because no one outside the team has said so.
 
-The second: **"done" is a claim your tests have to back.** You don't mark a need delivered; you attach a *proof* — a locator that points into your actual test suite. `prodc status` then resolves those locators and reports each need as DELIVERED, PENDING, a HOLE (an honest gap, no proof yet), or BROKEN (a proof that points at nothing). The status comes from the repo, so it can't drift away from reality the way a standup update does.
+The second: **"done" is a claim your tests have to back.** You do not mark a need delivered by hand. You
+attach a *proof* (a locator that points into your actual test suite). `prodc status` then resolves those
+locators and reports each need as DELIVERED, PENDING, a HOLE (an honest gap, no proof yet), or BROKEN
+(a proof that points at nothing). The state comes from the repo; it cannot drift away from reality the
+way a standup update does.
 
 ## Install
 
@@ -21,7 +29,8 @@ pip install prodc
 prodc status
 ```
 
-That's enough to run the board against a project that already has needs defined. If you're starting from nothing, the Quickstart below walks through the three files you need.
+Run it against a project that already has needs defined. To start from nothing, the Quickstart covers
+the three files you need.
 
 ## Where to go next
 

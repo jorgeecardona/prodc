@@ -344,7 +344,7 @@ def test_ai_attestation_is_middle_rung_warning() -> None:
         attestation=Attestation(who="Jorge", date="2026-10-05", verdict=Verdict.PASS),
     )
     by_id = {r.need.id: r for r in resolve([ai, human], {"x": _delivered()})}
-    assert any("(AI) — not a human" in w for w in by_id["N-1"].warnings)
+    assert any("(AI), not a human" in w for w in by_id["N-1"].warnings)
     assert not any("#13" in w for w in by_id["N-2"].warnings)  # human review, verdict pass: clean
 
 

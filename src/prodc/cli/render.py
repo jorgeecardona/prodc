@@ -55,7 +55,7 @@ def provenance_counts(results: list[NeedResult]) -> dict[str, int]:
 
 
 def _provenance_line(results: list[NeedResult]) -> str:
-    """Per-role evidence mix — makes assumption-only needs (weak, but not sourceless) visible.
+    """Per-role evidence mix. Makes assumption-only needs (weak, but not sourceless) visible.
 
     The headline a PM wants is how many needs trace to a real user (primary), not just 'has any
     source'; a need resting only on an assumption is an opinion, shown here as its assumption tier.
@@ -183,7 +183,7 @@ COLUMNS: dict[str, tuple[str, Callable[[NeedResult], str]]] = {
 
 
 def render_columns(results: list[NeedResult], columns: list[str]) -> str:
-    """A flat table of exactly the chosen columns — the board cut to the question asked (#40)."""
+    """A flat table of exactly the chosen columns, cut to the question asked (#40)."""
     rows = sorted(results, key=state_priority)
     cells = [[COLUMNS[c][1](r) for c in columns] for r in rows]
     headers = [COLUMNS[c][0] for c in columns]
@@ -206,7 +206,7 @@ def render_orphans(orphan_map: dict[str, list[str]]) -> str:
 
 def render_out_of_scope(results: list[NeedResult]) -> str:
     """Non-product needs (infra/NFR/internal): listed, not counted, never a HOLE (#48)."""
-    out = [f"\nout of scope (not product — excluded from coverage): {len(results)}"]
+    out = [f"\nout of scope (not product, excluded from coverage): {len(results)}"]
     for r in sorted(results, key=lambda x: x.need.id):
         out.append(f"  {r.need.id:<12} {_LABEL[r.state]:<10} {r.need.text[:54]}")
     return "\n".join(out)
@@ -248,13 +248,13 @@ def render_releases(rel_cov: list[tuple[Release, Summary]]) -> str:
 
 def render_roles(role_cov: list[tuple[Role, Summary]], unroled: list[NeedResult]) -> str:
     """The roster: coverage per declared role, orphan roles (0 needs), and unroled needs (#52)."""
-    out = ["\nroles (the roster — who plays which function):"]
+    out = ["\nroles (the roster: who plays which function):"]
     for role, rsum in role_cov:
         if rsum.total:
             pct = round(rsum.coverage * 100)
             out.append(f"  {role.id:<12} {rsum.delivered}/{rsum.total} ({pct}%)  {role.text}")
         else:
-            out.append(f"  {role.id:<12} —  (orphan role: no need plays it yet)  {role.text}")
+            out.append(f"  {role.id:<12}   (orphan role: no need plays it yet)  {role.text}")
     if unroled:
         ids = ", ".join(r.need.id for r in unroled)
         out.append(f"  ⚠ need(s) whose who plays no declared role: {ids}")
@@ -272,10 +272,10 @@ def render_handoffs(hos: list[Handoff]) -> str:
 
 
 def render_recurrence(recs: list[Recurrence]) -> str:
-    """Baselines shared across clients, most-shared first — the #32 recurrence view."""
+    """Baselines shared across clients, most-shared first (#32 recurrence view)."""
     out = [f"\nrecurrence (needs shared across clients): {len(recs)}"]
     for rec in recs:
-        who = f" — {', '.join(rec.clients)}" if rec.clients else ""
+        who = f": {', '.join(rec.clients)}" if rec.clients else ""
         out.append(
             f"  {rec.baseline.id:<12} {rec.count} client{'s' if rec.count != 1 else ''}{who}"
             f"    {rec.baseline.text[:60]}"
@@ -287,9 +287,9 @@ def render_principles(reports: list[PrincipleReport]) -> str:
     """The product vision as principles, with the decisions resting on each and which have gone stale.
 
     An principle is held as given, not validated; ``declined`` are the needs withdrawn citing it, and
-    ``stale`` (the ripple) are those decided before its latest ``revised_at`` — flagged to re-review.
+    ``stale`` (the ripple) are those decided before its latest ``revised_at``, flagged to re-review.
     """
-    out = ["\nprinciples (the vision — held as given):"]
+    out = ["\nprinciples (the vision, held as given):"]
     for rep in reports:
         a = rep.principle
         rev = f"revised {a.revised_at}" if a.revised_at else "undated"
@@ -302,10 +302,10 @@ def render_principles(reports: list[PrincipleReport]) -> str:
             out.append(f"        declined: {', '.join(n.id for n in rep.declined)}")
         if rep.stale:
             ids = ", ".join(n.id for n in rep.stale)
-            out.append(f"        ⚠ decided before the latest revision: {ids} — re-review")
+            out.append(f"        ⚠ decided before the latest revision: {ids}: re-review")
     tally = _principle_tally(reports)
     if tally:
-        out.append(f"  — {tally}")
+        out.append(f"  {tally}")
     return "\n".join(out)
 
 
@@ -324,7 +324,7 @@ def _principle_tally(reports: list[PrincipleReport]) -> str:
 
 def render_contradictions(contras: list[Contradiction]) -> str:
     """Unresolved contradictions on the board: two needs in tension the vision has not decided."""
-    out = ["\ncontradictions (two needs in tension — the vision has not decided):"]
+    out = ["\ncontradictions (two needs in tension: the vision has not decided):"]
     for c in contras:
         out.append(f"  {c.a.id} vs {c.b.id}    {c.a.text[:32]}  /  {c.b.text[:32]}")
     return "\n".join(out)
@@ -344,12 +344,12 @@ def render_decisions(
     """The solution chosen for each need (OST), what it rejected, and the needs it serves.
 
     Shows the decisions still in force (a superseded one is off the board, its record kept). A
-    decision left serving only withdrawn/non-product needs is flagged orphaned — the 'how' lost its
-    'what'.
+    decision left serving only withdrawn/non-product needs is flagged orphaned (the 'how' without its
+    'what').
     """
     orphans = {d.id for d in orphaned_decisions(decisions, needs)}
     active = sorted((d for d in decisions if d.withdrawn is None), key=lambda x: x.id)
-    out = ["\ndecisions (the solution chosen for a need — how it gets built):"]
+    out = ["\ndecisions (the solution chosen for a need, how it gets built):"]
     for d in active:
         tag = (" (proposed)" if d.draft else "") + _readiness_tag((readiness or {}).get(d.id))
         out.append(f"  {d.id:<6}{tag} {d.text}")
@@ -359,7 +359,7 @@ def render_decisions(
         if d.principles:
             out.append(f"        rests on: {', '.join(d.principles)}")
         if d.id in orphans:
-            out.append("        ⚠ serves only withdrawn/non-product needs — re-tie or withdraw")
+            out.append("        ⚠ serves only withdrawn/non-product needs. Re-tie or withdraw")
     return "\n".join(out)
 
 
@@ -371,7 +371,7 @@ def render_decision_show(
 ) -> str:
     """One decision as a citable answer (#95): the chosen solution, what it serves and rejected.
 
-    The decision counterpart of :func:`render_show` — ``prodc show D-1`` answers "how is this
+    The decision counterpart of :func:`render_show`. ``prodc show D-1`` answers "how is this
     built, over what, and why" the way ``prodc show N-1`` answers "is this delivered".
     """
     by_id = {n.id: n for n in needs}
@@ -406,10 +406,10 @@ def render_show(
     importance_label: str | None = None,
     decisions: list[Decision] | None = None,
 ) -> str:
-    """One need as a citable answer — the artifact you drop into a thread."""
+    """One need as a citable answer. Drop it into a thread."""
     need = r.need
     who = need.who or "(unassigned)"
-    who += f" — {need.role}" if need.role else ""
+    who += f" ({need.role})" if need.role else ""
     nm = f"  {r.delivered}/{r.total}" if r.total else ""
     lines = [
         f"{need.id}{'  !!' if need.must else ''}{'  (draft)' if need.draft else ''}  {need.text}",
@@ -440,12 +440,12 @@ def render_show(
     if need.attestation:
         a = need.attestation
         tag = " (AI)" if a.kind.value == "ai" else ""
-        verdict = f" — {a.verdict}" if a.verdict else ""
+        verdict = f" ({a.verdict})" if a.verdict else ""
         lines.append(f"  attested: {a.who}{tag} ({a.date}){verdict}")
         if a.comment:
             lines.append(f"    ↳ {a.comment}")
     elif need.proofs and r.state is NeedState.DELIVERED:
-        lines.append("  attested: (none — proof link not reviewed, #13)")
+        lines.append("  attested: (none; proof link not reviewed, #13)")
     if need.sources:
         lines.append("  sources:")
         for s in need.sources:
@@ -463,7 +463,7 @@ def render_show(
             line = "    - " + "  ".join(bits)
             lines.append(line + (f'  "{s.quote}"' if s.quote else ""))
     else:
-        lines.append("  sources: (none — opinion)")
+        lines.append("  sources: (none, opinion)")
     if need.children:
         rendered = ", ".join(c.id if c.step is None else f"{c.id}@{c.step}" for c in need.children)
         lines.append(f"  children: {rendered}")
@@ -477,7 +477,7 @@ def render_show(
         lines.append("  proofs:")
         lines += [f"    - {d}" for d in r.detail]
     elif not need.children:
-        lines.append("  proofs: (none — HOLE)")
+        lines.append("  proofs: (none, HOLE)")
     if decisions:
         lines.append("  decisions (how it's built):")
         for d in decisions:
@@ -493,9 +493,9 @@ def render_brief(
     stale: list[tuple[NeedResult, int]] | None = None,
 ) -> str:
     open_ = brief_open(results)
-    out = [f"brief — {client}: {len(open_)} open question{'s' if len(open_) != 1 else ''}"]
+    out = [f"brief {client}: {len(open_)} open question{'s' if len(open_) != 1 else ''}"]
     if not open_:
-        out.append("  (nothing open — every applicable need has evidence and a proof)")
+        out.append("  (nothing open: every applicable need has evidence and a proof)")
     for r in open_:
         bang = "!!" if r.need.must else "  "
         gaps = " · ".join(
@@ -518,7 +518,7 @@ def _importance_cell(need: Need) -> str:
     """The importance column; a value entered by a weak-warrant author is flagged a guess."""
     if need.importance is None:
         return ""
-    # weak = no external evidence (only an assumption, or nothing) — the author is guessing
+    # weak = no external evidence (only an assumption, or nothing): the author is guessing
     weak = need.is_opinion
     return f"imp={need.importance}{' (guess)' if weak else ''}"
 
@@ -528,9 +528,9 @@ def render_plan(
 ) -> str:
     ranked = rank(results, recurrence_counts)
     header = (
-        f"plan — revisit: {len(ranked)} need(s) with undated or stale importance (#59)"
+        f"plan: revisit: {len(ranked)} need(s) with undated or stale importance (#59)"
         if revisit
-        else "plan — ranked backlog (must + state + evidence + recurrence, importance refines)"
+        else "plan: ranked backlog (must + state + evidence + recurrence, importance refines)"
     )
     out = [header]
     for i, r in enumerate(ranked, 1):

@@ -1,9 +1,11 @@
 # Config
 
-Everything lives in `prodc.toml`. Only `[prodc].files` is required (`[prodc].needs` is the older alias; the two are merged). Every matched file may carry any noun list — `needs:`, `roles:`, `principles:`, `decisions:`, … — so decisions can live in their own folder.
+Everything lives in `prodc.toml`. Only `[prodc].files` is required (`[prodc].needs` is the older alias;
+the two are merged). Every matched file may carry any noun list (`needs:`, `roles:`, `principles:`,
+`decisions:`, …), so decisions can live in their own folder.
 
 The EARS / solution-verb text lint fires only on a need that has not stated its `claim` (the
-warrant — what delivering it would establish). State the claim and the lint goes quiet: one board
+warrant, what delivering it would establish). State the claim and the lint goes quiet: one board
 serves a product PM and a research lab head with no mode, because "When a roaster opens the queue,
 she can see today's orders" and "Prove that π is irrational" are the same claim under uncertainty.
 Source-hygiene warnings (about evidence, not phrasing) always run.
@@ -50,21 +52,21 @@ A proof is `<name>:<payload>`.
 | `pytest` | `tests/test_x.py::test_y` | junit passes, else the test exists (declared) | `root`, `results` |
 | `vitest` | `src/x.test.ts#test title` (or the `describe > it` path) | `vitest --reporter=junit` report passes, else the file and title exist (declared); a failing test is PENDING *not* declared, so a principle it guards reads VIOLATED; skipped/todo stays declared | `root` (the vitest root), `results` |
 | `files` | `path/to/script` | file exists (declared) | `root` |
-| `accept` | `who@date` | always (a human sign-off, declared) | — |
-| `prototype` | `ref@who@date` | always (validated with a user, declared) | — |
-| `citation` | `ref@author@year` | always (a cited published result, declared) — records *what settles it*, vs `accept`'s *who signed off* | — |
+| `accept` | `who@date` | always (a human sign-off, declared) | (none) |
+| `prototype` | `ref@who@date` | always (validated with a user, declared) | (none) |
+| `citation` | `ref@author@year` | always (a cited published result, declared); records *what settles it*, vs `accept`'s *who signed off* | (none) |
 | `coverage` | category | category is in `catalog` | `catalog` |
 | `field` | field name | field is `surfaced` in `schema` | `schema` |
 | `external` | observable-outcome key | key recorded passing in `results` (a JSON `{key: bool}`); implementation-independent | `results` |
 | `evalgate` | `metric>=threshold` (`>=`/`<=`/`>`/`<`) | the recorded score meets the gate; score in `results` as `{metric: {score: N}}` or `{metric: N}` | `results` |
 | `command` | anything your hook understands | your hook prints `{"state": "delivered"}` | `command`, `timeout` |
-| `need` | `other-need-id` or `other-need-id@yes\|no\|inconclusive` | the referenced need is settled (DELIVERED); the `@answer` form also requires its authored `answer` to match | — (built in; not configured) |
+| `need` | `other-need-id` or `other-need-id@yes\|no\|inconclusive` | the referenced need is settled (DELIVERED); the `@answer` form also requires its authored `answer` to match | (built in; not configured) |
 
 Any adapter takes `repo = "../sibling"` to resolve against a sibling checkout; absent sibling → UNRESOLVED, not BROKEN. `results` (cucumber-json or junit XML) turns declared states into real ones.
 
-`need` is a need→need edge for the question→question DAG ("B can't be posed until A settles"): a proof whose payload is another need id. It is resolved by prodc itself, not a configured adapter, so it needs no `[proofs.need]` block (one would be shadowed). Cycles (A→B→A) resolve to BROKEN, not an infinite loop. B does not inherit A's answer — the dependency only requires A settled, optionally in a given direction.
+`need` is a need→need edge for the question→question DAG ("B can't be posed until A settles"): a proof whose payload is another need id. It is resolved by prodc itself, not a configured adapter, so it needs no `[proofs.need]` block (one would be shadowed). Cycles (A→B→A) resolve to BROKEN, not an infinite loop. B does not inherit A's answer. The dependency only requires A settled, optionally in a given direction.
 
-### `command` — the generic hook
+### `command`: the generic hook
 
 Resolve a proof against any system with a script, with no per-provider code in prodc. `command` is an argv list (no shell); the need's locator is substituted for every `{locator}` in it, or appended as the final argument when there is none. The hook prints a JSON object to stdout:
 
@@ -79,15 +81,15 @@ timeout = 10                           # seconds, optional (default 10)
 {"state": "delivered", "detail": "PROJ-7 closed"}
 ```
 
-`state` is `delivered` / `pending` / `broken` / `unresolved`; `detail` is optional. The command comes only from this config (trusted); the locator is passed as data, never executed. A non-zero exit, a timeout, unparseable output, or an unknown `state` resolves to UNRESOLVED ("could not read") — never a false DELIVERED. The hook inherits the environment and owns any network/secrets itself.
+`state` is `delivered` / `pending` / `broken` / `unresolved`; `detail` is optional. The command comes only from this config (trusted); the locator is passed as data, never executed. A non-zero exit, a timeout, unparseable output, or an unknown `state` resolves to UNRESOLVED ("could not read"), never a false DELIVERED. The hook inherits the environment and owns any network/secrets itself.
 
 ## `[sources.<name>]`
 
 | `kind` | checks | keys |
 |---|---|---|
 | `frontmatter` | a source `locator` of `file.md#heading` exists | `paths` |
-| `gitlab` | a source `locator` of `#123` (or `group/project#123`) is a real GitLab issue — read-only, token from `token_env`; missing token/offline → unverified, 404 → broken | `base_url`, `project`, `token_env` |
-| `command` | a source `locator` your hook resolves — prints `{"exists": true, "who": ..., "date": ..., "quote": ...}` | `command`, `timeout` |
+| `gitlab` | a source `locator` of `#123` (or `group/project#123`) is a real GitLab issue (read-only, token from `token_env`; missing token/offline → unverified, 404 → broken) | `base_url`, `project`, `token_env` |
+| `command` | a source `locator` your hook resolves; prints `{"exists": true, "who": ..., "date": ..., "quote": ...}` | `command`, `timeout` |
 
 `command` works the same as the proof hook (argv, `{locator}` or appended, trusted config). `exists: true` resolves the source; `exists: false` flags it BROKEN; a non-zero exit, a timeout, unparseable output, or a missing `exists` → unverified (never a false BROKEN).
 
@@ -116,7 +118,7 @@ timeout = 10                           # seconds, optional (default 10)
 
 | Key | Means | Default |
 |---|---|---|
-| `scopes` | the allowed principle scopes — a principle's `scope` (and `add principle --scope`) must be one of these, or the load fails; lets product, design, visual and engineering principles share one board | `["product"]` |
+| `scopes` | the allowed principle scopes: a principle's `scope` (and `add principle --scope`) must be one of these, or the load fails; lets product, design, visual and engineering principles share one board | `["product"]` |
 
 ## `[flows]`
 
@@ -131,19 +133,19 @@ case = flow + role + per-edge step). Declaring `steps` turns that free text into
   refused at load, and because the writer re-loads and reverts, refused at write time too).
 - `lint` then grades each journey's shape (warnings, keyed by flow id; `--strict` makes them fail):
   a flow whose stepped edges never reach the terminal step, steps that run **out of order**, or a
-  flow that **mixes** stepped and bare edges. A flow with no stepped edges is exempt — it is a
+  flow that **mixes** stepped and bare edges. A flow with no stepped edges is exempt. It is a
   plain flow, not a use case.
 
 Order is the journey and must not repeat a step. Leaving `[flows].steps` unset keeps the old
 behaviour: any step (or none) passes, and the lint is silent.
 
-## `[callbacks]` — lifecycle callbacks (#71)
+## `[callbacks]`: lifecycle callbacks (#71)
 
 `prodc sync` runs a command when a need's state changes (e.g. a proof turns green). Same trust model as the command hook: the command is from this config, never from need data; the changed need + board context are piped to it as JSON on **stdin**, never executed.
 
 ```toml
 [callbacks]
-state_file = ".prodc/state.json"   # the state ledger (default); gitignore it — it is local state
+state_file = ".prodc/state.json"   # the state ledger (default); gitignore it (it is local state)
 
 [[callbacks.hooks]]
 on = "state_change"                # the only event today (capture/report/pre_gate are follow-ups)

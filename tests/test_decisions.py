@@ -326,7 +326,7 @@ def test_status_text_shows_decisions_section(
 
     main(["status", "--config", str(_project(tmp_path))])
     out = capsys.readouterr().out
-    assert "decisions (the solution chosen for a need — how it gets built):" in out
+    assert "decisions (the solution chosen for a need, how it gets built):" in out
     assert "D-1" in out and "serves: N-1" in out and "over: WAV, cloud blob" in out
 
 

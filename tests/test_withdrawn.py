@@ -343,7 +343,7 @@ def test_status_breaks_down_withdrawn_by_kind(
 
     main(["status", "--config", str(_project(tmp_path, needs=_KIND_NEEDS))])
     out = capsys.readouterr().out
-    assert "withdrawn: 1 (decided against) — 1 out_of_scope" in out
+    assert "withdrawn: 1 (decided against) (1 out_of_scope)" in out
 
 
 def test_show_tags_non_default_kind(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

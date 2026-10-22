@@ -108,28 +108,28 @@ def _callbacks(raw: dict[str, object]) -> tuple[tuple[Callback, ...], str]:
 class Config:
     root: Path
     # [prodc].files (+ the older alias [prodc].needs): the prodc files. Every matched file may
-    # carry any noun list (needs:, goals:, roles:, principles:, decisions:, …) — #95.
+    # carry any noun list (needs:, goals:, roles:, principles:, decisions:, …). (#95)
     need_globs: list[str]
     adapters: dict[str, Adapter] = field(default_factory=dict[str, Adapter])
     source_adapters: dict[str, SourceAdapter] = field(default_factory=dict[str, SourceAdapter])
-    duplicate_threshold: float = 0.8  # [lint].duplicate_threshold — dupe score to flag (#55)
-    stale_after_days: int | None = None  # [lint].stale_after_days — flag older evidence (#58)
+    duplicate_threshold: float = 0.8  # [lint].duplicate_threshold: dupe score to flag (#55)
+    stale_after_days: int | None = None  # [lint].stale_after_days: flag older evidence (#58)
     importance_levels: dict[int, tuple[str, str]] = field(
         default_factory=dict[int, tuple[str, str]]
-    )  # [importance].levels — ordinal → (label, meaning); empty = no rubric declared (#59)
+    )  # [importance].levels: ordinal → (label, meaning); empty = no rubric declared (#59)
     importance_revisit_days: int | None = None  # [lint].importance_revisit_days (#59)
-    draft_max_age_days: int | None = None  # [lint].draft_max_age_days — flag stale drafts (#60)
-    default_draft: bool = False  # [add].default_draft — `add` stages as draft by default (#60)
-    callbacks: tuple[Callback, ...] = ()  # [[callbacks.hooks]] — lifecycle callbacks (#71)
-    callback_state_file: str = ".prodc/state.json"  # [callbacks].state_file — the state ledger
-    principle_scopes: tuple[str, ...] = ("product",)  # [principles].scopes — allowed scopes (#88)
-    flow_steps: tuple[str, ...] = ()  # [flows].steps — ordered step vocab; () = undeclared (#90)
+    draft_max_age_days: int | None = None  # [lint].draft_max_age_days: flag stale drafts (#60)
+    default_draft: bool = False  # [add].default_draft: ``add`` stages as draft by default (#60)
+    callbacks: tuple[Callback, ...] = ()  # [[callbacks.hooks]]: lifecycle callbacks (#71)
+    callback_state_file: str = ".prodc/state.json"  # [callbacks].state_file: the state ledger
+    principle_scopes: tuple[str, ...] = ("product",)  # [principles].scopes: allowed scopes (#88)
+    flow_steps: tuple[str, ...] = ()  # [flows].steps: ordered step vocab; () = undeclared (#90)
 
     @property
     def terminal_step(self) -> str | None:
         """The step that ends a journey: the last declared step, or None when no vocab (#90).
 
-        The single definition of 'terminal' — status/lint read it here, never recompute
+        The single definition of 'terminal': status/lint read it here, never recompute
         ``flow_steps[-1]`` elsewhere. Order in ``[flows].steps`` *is* the journey.
         """
         return self.flow_steps[-1] if self.flow_steps else None

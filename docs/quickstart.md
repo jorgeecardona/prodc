@@ -1,6 +1,7 @@
 # Quickstart
 
-You only need three files to get going. One tells prodc where to look, one is where you jot down what people need, and the third is a test you've probably already written. Fill them in, run a single command, and you've got a board. Here's the smallest one that actually does something.
+Three files are enough. One tells prodc where to look, one holds the needs, and the third is a test.
+Fill them in and run `prodc status`. The following is the smallest setup that produces a real board.
 
 ## 1. `prodc.toml`
 
@@ -63,6 +64,7 @@ prodc status
 
 N-1 is DELIVERED (tagged scenario), N-2 is a HOLE, N-3 is an opinion. Exit 0; a BROKEN proof would exit 1.
 
-A slightly larger version is checked in at `examples/quickstart/` — it adds N-4, a hypothesis that settled NO, so its board reads `coverage 2/4`.
+A slightly larger version is checked in at `examples/quickstart/`. It adds N-4, a hypothesis that
+settled NO, so its board reads `coverage 2/4`.
 
 Other proof kinds (`pytest`, `files`, `accept`, …) and every `prodc.toml` section: [Config](config.md).

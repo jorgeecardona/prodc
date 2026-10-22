@@ -2,7 +2,7 @@
 
 Prints the gap between needs and what the test suite proves, sorted by what needs
 attention first. Exit 1 on a BROKEN proof; ``--strict`` also on an opinion. A HOLE
-never fails — it is the honest gap you want people to keep writing.
+never fails. It is the honest gap you want people to keep writing.
 
 This package splits the former single ``cli`` module into ``app`` (argparse + dispatch),
 ``commands`` (the handlers), ``render`` (text renderers), ``serialize`` (JSON), and

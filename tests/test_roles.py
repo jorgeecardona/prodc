@@ -137,7 +137,7 @@ def test_show_renders_role(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -
     _project(tmp_path, _WITH_ROLES)
     main(["show", "N-1", "--config", str(cfg)])
     out = capsys.readouterr().out
-    assert "who: john — owner" in out
+    assert "who: john (owner)" in out
 
 
 def test_set_role_via_writer(tmp_path: Path) -> None:

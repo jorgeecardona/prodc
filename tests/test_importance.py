@@ -130,7 +130,7 @@ needs:
 """
     toml = _TOML + "\n[lint]\nimportance_revisit_days = 180\n"
     main(["lint", "--config", str(_project(tmp_path, toml, needs))])
-    assert "revisit" in capsys.readouterr().out
+    assert "Revisit" in capsys.readouterr().out
 
 
 def test_lint_flags_off_scale_importance(

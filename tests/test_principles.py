@@ -397,10 +397,10 @@ def test_status_text_shows_principles_section(
 
     main(["status", "--config", str(_project(tmp_path))])
     out = capsys.readouterr().out
-    assert "principles (the vision — held as given):" in out
+    assert "principles (the vision, held as given):" in out
     assert "P-1" in out and "revised 2026-10-15" in out
     assert "declined: N-7, N-9" in out
-    assert "decided before the latest revision: N-7 — re-review" in out
+    assert "decided before the latest revision: N-7: re-review" in out
 
 
 def test_status_json_carries_principles(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

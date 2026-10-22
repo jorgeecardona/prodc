@@ -1,7 +1,7 @@
 """Shared CLI helpers with no dependency on the renderers or command handlers.
 
 The leaf of the ``prodc.cli`` package: loading the model, the git stamp, the exit-code gate,
-the edit diff printer, the meeting-agenda filter, and the portfolio row — all used by several
+the edit diff printer, the meeting-agenda filter, and the portfolio row, all used by several
 commands (and, for a couple, by both a text renderer and a JSON serialiser), kept here so
 nothing above has to import sideways.
 """
@@ -105,7 +105,7 @@ class RepoRow:
 
 @dataclass(frozen=True)
 class PortfolioTotals:
-    """The aggregate across every board in a portfolio — a footer, not a merged board.
+    """The aggregate across every board in a portfolio: a footer, not a merged board.
 
     Error rows are excluded (a board that would not load contributes no counts). ``coverage`` is
     the pooled ``delivered / total``, which is not the mean of the per-board percentages.
@@ -157,7 +157,7 @@ _PRUNE_DIRS = frozenset(
 
 
 def discover_configs(root: Path, *, max_depth: int = 4) -> list[Path]:
-    """Every ``prodc.toml`` under ``root``, for the portfolio roll-up — bounded so it can't run away.
+    """Every ``prodc.toml`` under ``root``, for the portfolio roll-up, bounded so it can't run away.
 
     A plain recursive scan is a footgun: it descends into ``.git``/``node_modules``/build trees and
     picks up vendored or example configs. So this prunes those (and every ``.``-prefixed dir) and

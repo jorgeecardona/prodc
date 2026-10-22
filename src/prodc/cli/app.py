@@ -1,4 +1,4 @@
-"""The argument parser and dispatch for ``prodc`` — one subparser per command.
+"""The argument parser and dispatch for ``prodc``: one subparser per command.
 
 Builds the argparse tree, wires each subcommand to its handler in :mod:`prodc.cli.commands`,
 and runs it. ``main`` is the console entry point (``prodc.cli:main``), re-exported from the
@@ -145,7 +145,7 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=None,
         metavar="DAYS",
-        help="only needs whose importance is undated or set more than DAYS ago — a refresh pass (#59)",
+        help="only needs whose importance is undated or set more than DAYS ago. A refresh pass (#59)",
     )
     pl.set_defaults(func=cmd_plan)
 
@@ -178,7 +178,7 @@ def main(argv: list[str] | None = None) -> int:
     ad.add_argument("noun", choices=["need", "role", "principle", "decision"], help="what to add")
     ad.add_argument(
         "need_id",
-        help="the new item's id — need (N-9), role, principle (P-1), or decision (D-1)",
+        help="the new item's id: need (N-9), role, principle (P-1), or decision (D-1)",
     )
     ad.add_argument(
         "--text",
@@ -190,14 +190,14 @@ def main(argv: list[str] | None = None) -> int:
         "--from-need",
         default=None,
         metavar="ID",
-        help="principle only: promote a need into a principle — copy its text (unless --text "
+        help="principle only: promote a need into a principle: copy its text (unless --text "
         "overrides) and its sources as the provenance that surfaced it; the need stays on the board",
     )
     ad.add_argument(
         "--scope",
         default="product",
         metavar="SCOPE",
-        help="principle only: its scope — product (default), design, visual, engineering; "
+        help="principle only: its scope: product (default), design, visual, engineering; "
         "must be declared in [principles].scopes",
     )
     ad.add_argument(
@@ -229,7 +229,7 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         dest="alternatives",
         metavar="TEXT",
-        help="decision only: an option that was rejected (repeatable) — what makes it a choice",
+        help="decision only: an option that was rejected (repeatable), what makes it a choice",
     )
     ad.add_argument(
         "--consequences",
@@ -247,7 +247,7 @@ def main(argv: list[str] | None = None) -> int:
         "--date",
         default=None,
         metavar="ISO",
-        help="decision only: when it was decided (default: today) — the comparand for the ripple",
+        help="decision only: when it was decided (default: today), the comparand for the ripple",
     )
     ad.add_argument(
         "--who",
@@ -258,7 +258,7 @@ def main(argv: list[str] | None = None) -> int:
         "--kind",
         choices=["assumption", "secondary", "internal", "proxy"],
         default="assumption",
-        help="need only: provenance source kind — assumption (default) or secondary; never "
+        help="need only: provenance source kind: assumption (default) or secondary; never "
         "primary for an agent (internal/proxy accepted as aliases for assumption)",
     )
     ad.add_argument(
@@ -315,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
         "--role",
         default=None,
         metavar="ID",
-        help="the declared role the person spoke as (validated against roles:) — whose signal it is (#52)",
+        help="the declared role the person spoke as (validated against roles:), whose signal it is (#52)",
     )
     cp.add_argument("--date", default=None, help="when (ISO, e.g. 2026-10-05)")
     cp.add_argument("--quote", default=None, help="a verbatim quote (for a primary source)")
@@ -341,7 +341,7 @@ def main(argv: list[str] | None = None) -> int:
 
     at = sub.add_parser("attest", help="record a human or AI review of a need's warrant (#13)")
     at.add_argument("need_id", help="the need id being attested")
-    at.add_argument("--by", required=True, help="who reviewed it — a person's name or a model id")
+    at.add_argument("--by", required=True, help="who reviewed it: a person's name or a model id")
     at.add_argument("--date", required=True, help="when (ISO, e.g. 2026-10-05)")
     at.add_argument("--ai", action="store_true", help="the reviewer is an AI model, not a human")
     at.add_argument(
@@ -383,7 +383,7 @@ def main(argv: list[str] | None = None) -> int:
     ac.set_defaults(func=cmd_accept)
 
     wd = sub.add_parser(
-        "withdraw", help="record a decision against a need — withdrawn / won't-do (#74)"
+        "withdraw", help="record a decision against a need: withdrawn / won't-do (#74)"
     )
     wd.add_argument("target", help="the need id to withdraw, or 'decision' to withdraw a decision")
     wd.add_argument(
@@ -410,7 +410,7 @@ def main(argv: list[str] | None = None) -> int:
         "--principle",
         default=None,
         metavar="ID",
-        help="the product principle this decision rests on (validated against principles:) — revising it "
+        help="the product principle this decision rests on (validated against principles:). Revising it "
         "later flags this decision for re-review",
     )
     wd.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
@@ -449,7 +449,7 @@ def main(argv: list[str] | None = None) -> int:
     ri.set_defaults(func=cmd_reinstate)
 
     rvz = sub.add_parser(
-        "revise", help="revise a product principle in place — new text and/or a fresh revised_at"
+        "revise", help="revise a product principle in place: new text and/or a fresh revised_at"
     )
     rvz.add_argument("noun", choices=["principle"], help="what to revise (principle)")
     rvz.add_argument("principle_id", help="the principle id to revise, e.g. P-1")
@@ -459,7 +459,7 @@ def main(argv: list[str] | None = None) -> int:
     rvz.add_argument(
         "--date",
         default=None,
-        help="the new revised_at (ISO, e.g. 2026-10-15; default: today) — fires the ripple",
+        help="the new revised_at (ISO, e.g. 2026-10-15; default: today), fires the ripple",
     )
     rvz.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     rvz.add_argument("--json", action="store_true", help="machine-readable output")
@@ -496,7 +496,7 @@ def main(argv: list[str] | None = None) -> int:
         nargs="+",
         default=None,
         metavar="ID",
-        help="delete these drafts outright (a draft, never a real need — withdraw that)",
+        help="delete these drafts outright (a draft, never a real need: withdraw that)",
     )
     rv.add_argument(
         "--dry-run", action="store_true", help="validate and show the diffs, don't write"
@@ -613,7 +613,7 @@ def main(argv: list[str] | None = None) -> int:
         "--format",
         choices=["md", "html"],
         default="md",
-        help="md (default) or html — a self-contained, interactive, read-only viewer (#79)",
+        help="md (default) or html : a self-contained, interactive, read-only viewer (#79)",
     )
     rp.add_argument(
         "--output",

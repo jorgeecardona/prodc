@@ -1,6 +1,6 @@
 """Text-similarity matching for duplicate detection (#55).
 
-A dependency-free trigram Jaccard over normalised need text — no external model, a
+A dependency-free trigram Jaccard over normalised need text. No external model, a
 cheap deterministic signal the board can act on. Needs with the same `client` and `goal`
 break ties, so a same-scope pair ranks above a cross-scope one at equal text score. The
 same matcher feeds recurrence-link suggestion (#56) and proof discovery (#54).
@@ -49,7 +49,7 @@ def _score_if_reachable(ta: frozenset[str], tb: frozenset[str], threshold: float
 
     Jaccard = intersection / union <= min(|ta|,|tb|) / max(|ta|,|tb|), since the intersection is at
     most the smaller set and the union at least the larger. So when that ratio is below ``threshold``
-    the score cannot reach it — an exact prune that returns 0.0 without the (costly) intersection,
+    the score cannot reach it: an exact prune that returns 0.0 without the (costly) intersection,
     never changing which pairs clear the threshold.
     """
     if not ta or not tb:
@@ -72,7 +72,7 @@ class DupPair:
     a: Need
     b: Need
     score: float
-    same_scope: bool  # same client and goal — a stronger duplicate signal
+    same_scope: bool  # same client and goal: a stronger duplicate signal
 
 
 def _acknowledged(a: Need, b: Need) -> bool:
@@ -109,7 +109,7 @@ class VariantGroup:
 def _variant_candidate(a: Need, b: Need) -> bool:
     """Two needs that could be variants of one baseline: distinct clients, neither linked yet."""
     if a.variant_of is not None or b.variant_of is not None:
-        return False  # already linked to a baseline — not an unlinked candidate
+        return False  # already linked to a baseline: not an unlinked candidate
     if a.client is None or b.client is None or a.client == b.client:
         return False  # recurrence is a cross-client signal; same/none client doesn't count
     # anything left is a candidate unless it was explicitly acknowledged as not the same want
@@ -194,13 +194,13 @@ class WhoVariant:
 
 
 def who_variants(needs: list[Need], threshold: float) -> list[WhoVariant]:
-    """Clusters of `who` strings that drift apart within one client — John vs john (#61).
+    """Clusters of ``who`` strings that drift apart within one client, e.g. John vs john (#61).
 
     `role` (#52) is validated at load; `who` is free text, so the same person splits the board
     when spelled inconsistently. Scoped per client (same name at two clients is not flagged):
     two whos cluster when they are equal after normalisation (case/whitespace) or their text
     similarity is >= `threshold`. Only clusters of two or more distinct whos are returned. A soft
-    lint signal — the fix is to normalise the data, so there is no suppression knob.
+    lint signal. The fix is to normalise the data, so there is no suppression knob.
     """
     by_client: dict[str | None, list[Need]] = {}
     for n in needs:
@@ -246,8 +246,8 @@ def tag_warnings(
 
     Tags are undeclared and many-to-many, so nothing stops a typo (`search` vs `searching`) or a
     one-off from accumulating. Three cheap hygiene signals, each a warning keyed by the tag:
-    a tag equal to a declared goal/role/release/client id ("structure hiding in a tag" — use the
-    first-class field instead), a singleton (one need only — a likely typo or a tag not worth it),
+    a tag equal to a declared goal/role/release/client id ("structure hiding in a tag": use the
+    first-class field instead), a singleton (one need only: a likely typo or a tag not worth it),
     and a near-duplicate spelling of another tag (same :func:`similarity` the dedup checks use).
     """
     counts: dict[str, int] = {}
@@ -259,10 +259,12 @@ def tag_warnings(
     for t in tags:
         if t in structural_ids:
             out.append(
-                (t, "tag equals a declared goal/role/release/client id — use that field, not a tag")
+                (t, "tag equals a declared goal/role/release/client id: use that field, not a tag")
             )
         elif counts[t] == 1:
-            out.append((t, "tag used on only one need — a singleton (likely a typo or not worth a tag)"))
+            out.append(
+                (t, "tag used on only one need: a singleton (likely a typo or not worth a tag)")
+            )
     for i in range(len(tags)):
         for j in range(i + 1, len(tags)):
             a, b = tags[i], tags[j]

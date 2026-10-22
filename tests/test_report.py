@@ -85,7 +85,7 @@ def test_report_client_scope_in_heading(tmp_path: Path, capsys: pytest.CaptureFi
     code = main(["report", "--config", str(_project(tmp_path)), "--client", "jordan"])
     out = capsys.readouterr().out
     assert code == 0
-    assert "— jordan — product status" in out
+    assert ": jordan: product status" in out
 
 
 _NEEDS_PD = """

@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 from .loader import LoaderError, load, yaml_error_message
 
 # Fields an agent may `set` on a need. Unknown keys are silently ignored by the loader, so the
-# write path allowlists instead — a typo'd key is an error here, not junk written to disk.
+# write path allowlists instead. A typo'd key is an error here, not junk written to disk.
 _SCALAR_FIELDS = frozenset(
     {
         "text",
@@ -113,7 +113,7 @@ def _scan_list(lines: list[str], key: str) -> tuple[list[tuple[int, str | None]]
     ``item_starts`` is ``(start_line, id)`` per list item, ``region_end`` is the line index just
     past the list (before trailing blanks/comments are trimmed), and ``item_indent`` is the ``- ``
     indent. Line-based and deliberately conservative: it understands the common prodc layout (a
-    top-level list key — ``needs:``, ``principles:`` — whose items are ``- `` at a fixed indent) and
+    top-level list key (``needs:``, ``principles:``) whose items are ``- `` at a fixed indent, and
     returns None for anything it is not sure about, so the caller can fall back to a full re-dump.
     The single scanner behind both the edit splice (:func:`_block_span`) and the append (#85).
     """
@@ -135,11 +135,11 @@ def _scan_list(lines: list[str], key: str) -> tuple[list[tuple[int, str | None]]
         m = re.match(r"^(\s*)-\s", line)
         if item_re is None:
             if m is None:
-                return None  # first non-blank line under the key isn't a list item — unknown shape
+                return None  # first non-blank line under the key isn't a list item: unknown shape
             item_indent = len(m.group(1))
             item_re = re.compile(rf"^\s{{{item_indent}}}-\s")
         if indent < item_indent and m is None:
-            break  # dedented past the list — end of the key's region
+            break  # dedented past the list: end of the key's region
         if item_re.match(line):
             starts.append((i, _item_id(lines, i, item_indent)))
         elif indent <= item_indent and m is None:
@@ -153,7 +153,7 @@ def _block_span(lines: list[str], key: str, item_id: str) -> tuple[int, int, int
 
     Trailing blank and comment lines are left out of the span, so a comment that introduces the
     *next* item is never swallowed. None when the key is absent, the shape is unrecognised, or no
-    item carries ``item_id`` — the caller then falls back to a full re-dump.
+    item carries ``item_id``. The caller then falls back to a full re-dump.
     """
     scanned = _scan_list(lines, key)
     if scanned is None:
@@ -195,7 +195,7 @@ def _normalize_answer(doc: dict[str, object]) -> None:
     """Rewrite a need's ``answer`` back to its yes/no string before re-dump.
 
     YAML 1.1 reads a bare ``answer: no`` as the boolean ``False``, so the raw dict carries a
-    bool; dumping it as-is would write ``answer: false`` — loads fine (the loader coerces it),
+    bool; dumping it as-is would write ``answer: false``. Loads fine (the loader coerces it),
     but a reader sees ``false``, not the authored ``no``. Canonicalise here so the on-disk text
     stays the research vocabulary, the same spirit as ``_canonical_kind`` for source kinds.
     """
@@ -214,7 +214,7 @@ def _render_edit(old_text: str, doc: dict[str, object], need_id: str) -> str:
 
     Dumps just the edited need's block and replaces its span in the original text, so the file
     header and every other need stay byte-for-byte. Falls back to a full re-dump (the old
-    behaviour) when the file's shape is anything the splice isn't sure of — the reload gate in
+    behaviour) when the file's shape is anything the splice isn't sure of. The reload gate in
     :func:`_validated` guards correctness either way.
     """
     _normalize_answer(doc)
@@ -225,7 +225,7 @@ def _render_item_edit(old_text: str, doc: dict[str, object], key: str, item_id: 
     """Splice the edited ``key:`` list item ``item_id`` back into ``old_text``, comments intact.
 
     The general form of :func:`_render_edit` (which adds the needs-only ``answer``
-    normalisation): any top-level list noun — ``needs:``, ``principles:`` — is spliced the same way,
+    normalisation): any top-level list noun (``needs:``, ``principles:``) is spliced the same way,
     with the same full re-dump fallback when the shape is not one the splice is sure of.
     """
     lines = old_text.splitlines(keepends=True)
@@ -265,7 +265,7 @@ def _render_item_append(old_text: str, doc: dict[str, object], key: str, item_id
     if scanned is None or not isinstance(items, list):
         return _dump(doc)
     starts, region_end, item_indent = scanned
-    if not starts:  # the key exists but holds no recognised item — re-dump rather than guess indent
+    if not starts:  # the key exists but holds no recognised item: re-dump rather than guess indent
         return _dump(doc)
     item = next(
         (
@@ -502,13 +502,13 @@ def capture_source(
     expect_sha: str | None,
     dry_run: bool,
 ) -> Edit:
-    """Append a Source to an existing need — the near-zero-friction capture of #24.
+    """Append a Source to an existing need: the near-zero-friction capture of #24.
 
     Records evidence as given; the loader's soft hygiene checks (a primary source wants a who and a
     quote-or-locator, a secondary source wants a locator) still apply on the next read.
     ``observed_at`` dates when the evidence was recorded, so the board can flag stale needs (#58).
     ``role`` records which declared role the ``who`` spoke as (validated against ``roles:`` on the
-    next load) — whose signal it is, orthogonal to the evidence tier (#52 follow-up).
+    next load): whose signal it is, orthogonal to the evidence tier (#52 follow-up).
     """
     kind = _canonical_kind(kind)
     source: dict[str, object] = {"kind": kind}
@@ -579,7 +579,7 @@ def withdraw(
     expect_sha: str | None,
     dry_run: bool,
 ) -> Edit:
-    """Record a decision against a need — withdrawn / won't-do (#74).
+    """Record a decision against a need: withdrawn / won't-do (#74).
 
     Writes a ``withdrawn: {reason, date, kind?, principle?}`` mapping onto the need, which takes it off
     the active board and out of coverage; the record stays as its durable trace. ``kind`` says
@@ -608,7 +608,7 @@ def withdraw(
 def reinstate(config: Config, need_id: str, *, expect_sha: str | None, dry_run: bool) -> Edit:
     """Remove a need's ``withdrawn`` mark, putting it back on the active board (#74).
 
-    Errors if the need is not currently withdrawn — reinstating a live need is a mistake worth
+    Errors if the need is not currently withdrawn. Reinstating a live need is a mistake worth
     surfacing, not a silent no-op.
     """
 
@@ -740,7 +740,7 @@ def set_decision_awaits(
 def delete_need(
     config: Config, need_id: str, *, expect_sha: str | None = None, dry_run: bool
 ) -> Edit:
-    """Remove a need from its file entirely — the hard-delete write path (#60).
+    """Remove a need from its file entirely: the hard-delete write path (#60).
 
     Unlike :func:`withdraw` (which keeps the need as a dated decision-against record), this erases
     it. The reload gate makes it referentially safe: a need still pointed at by another's
@@ -774,7 +774,7 @@ def accept(
 ) -> Edit:
     """Record (or revoke) a human acceptance pass as an ``accept:<who>@<date>`` proof (#46).
 
-    Some needs are proven by a person looking, not a test — this makes recording that a
+    Some needs are proven by a person looking, not a test. This makes recording that a
     one-liner instead of a hand edit. Idempotent: re-accepting the same who/date is a no-op.
     """
     locator = f"accept:{who}@{date}"
@@ -794,7 +794,7 @@ def accept(
 def add_proof(
     config: Config, need_id: str, locator: str, *, expect_sha: str | None = None, dry_run: bool
 ) -> Edit:
-    """Append a proof locator to an existing need, idempotently — the write path for `suggest --apply`.
+    """Append a proof locator to an existing need, idempotently: the write path for ``suggest --apply``.
 
     A thin single-field edit (same splice as :func:`set_field` `proofs+=`), factored out so the
     batch apply can call it per need and show each need's diff. Re-adding a locator already on the
@@ -819,7 +819,7 @@ def relink_proof(
     expect_sha: str | None = None,
     dry_run: bool,
 ) -> Edit:
-    """Replace one (broken) proof locator with a proposed one, in place — the relink of #54.
+    """Replace one (broken) proof locator with a proposed one, in place: the relink of #54.
 
     The write path for ``suggest --relink --apply``: a renamed test keeps its adapter kind but
     gets a new id, so this swaps ``old_locator`` for ``new_locator`` on the need and de-duplicates
@@ -856,7 +856,7 @@ def add_need(
 ) -> Edit:
     """Create a new need in ``file`` with an agent-provenance source (never a silent opinion).
 
-    An agent-authored need must carry a source — and never ``primary``, which only a real user
+    An agent-authored need must carry a source, and never ``primary``, which only a real user
     signal earns. ``kind`` is restricted to ``assumption`` (the agent's own guess) or ``secondary``
     (citing an existing document). A ``draft`` need is staged: it loads but is kept off the counted
     board until promoted (#60). The need is appended with the comment-preserving splice (#85), so
@@ -866,7 +866,7 @@ def add_need(
     if kind not in ("assumption", "secondary"):
         raise WriteError(
             f"agent-authored need source must be assumption or secondary, not {kind!r} "
-            "(never primary — that is earned by a real user signal)"
+            "(never primary: that is earned by a real user signal)"
         )
     target = config.root / file
     if target.exists():
@@ -966,7 +966,7 @@ def add_principle(
     the reload gate rejects anything that does not load (including an id already declared in another
     file), and a duplicate id in this file is refused. ``revised_at`` is stamped at creation so the first
     revision has something to ripple against. ``sources`` carry the provenance that surfaced the
-    principle — the signals (often a client) a ``--from-need`` promotion copies across, so the
+    principle. The signals (often a client) a ``--from-need`` promotion copies across, so the
     discovery history stays honest: the principle was discovered, not decreed.
     """
     target = config.root / file
@@ -1024,7 +1024,7 @@ def revise_principle(
 ) -> Edit:
     """Revise a principle in place: optionally new ``text``, always a new ``revised_at``.
 
-    Stamping ``revised_at`` is the point — it is what makes the ripple fire: every need withdrawn
+    Stamping ``revised_at`` is the point. It is what makes the ripple fire: every need withdrawn
     citing this principle with an earlier date comes back up for re-review. Comment-safe: only the
     principle's own block is spliced (:func:`_render_item_edit`), the rest of the file is untouched.
     """
@@ -1060,7 +1060,7 @@ def add_decision(
     """Declare a new Decision (the solution chosen for ``needs``) in ``file``'s ``decisions:`` list.
 
     Mirrors :func:`add_principle` (comment-preserving append #85, reload-gated, duplicate id refused). ``needs``
-    is required — the loader rejects a decision that serves none, and the reload gate rejects an id
+    is required. The loader rejects a decision that serves none, and the reload gate rejects an id
     that is not a known need. Empty optional lists are omitted so the written block stays clean.
     """
     target = config.root / file
@@ -1095,7 +1095,7 @@ def add_decision(
 
 
 def _snapshot(paths: list[Path]) -> dict[Path, str | None]:
-    """Current text of each path, or None when it does not exist — a point to roll back to."""
+    """Current text of each path, or None when it does not exist: a point to roll back to."""
     return {p: (p.read_text(encoding="utf-8") if p.exists() else None) for p in paths}
 
 
@@ -1111,7 +1111,7 @@ def _restore(snapshot: dict[Path, str | None]) -> None:
 def _write_baseline(config: Config, need_id: str, text: str, file: str) -> Edit:
     """Write a new client-less baseline need {id, text} into ``file`` (no reload/commit gate).
 
-    Unlike :func:`add_need`, it attaches no source — a recurrence baseline is a structural roll-up
+    Unlike :func:`add_need`, it attaches no source. A recurrence baseline is a structural roll-up
     the author evidences later, so it loads flagged as an opinion rather than carrying a fabricated
     one. Raw write (the caller's transaction validates the whole model once and rolls back on any
     failure); still refuses a target outside the globs or a duplicate id.
@@ -1146,7 +1146,7 @@ def link_variant_group(
     into ``baseline_file`` first so the members' ``variant_of`` resolves; otherwise ``baseline_id``
     is an existing client-less member reused in place. Every id in ``member_ids`` then gets
     ``variant_of=baseline_id`` (a comment-preserving per-need splice). All touched files are
-    snapshotted up front; any rejection — or ``dry_run`` — restores every one, so the group is
+    snapshotted up front; any rejection (or ``dry_run``) restores every one, so the group is
     linked all-or-nothing.
     """
     touched = config.prodc_files()

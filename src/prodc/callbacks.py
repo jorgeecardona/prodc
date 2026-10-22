@@ -1,12 +1,12 @@
 """Lifecycle callbacks: run a command when a need changes state (#71).
 
-The signal that a need is done already lives in prodc — its proof resolving to DELIVERED. This
+The signal that a need is done already lives in prodc: its proof resolving to DELIVERED. This
 lets a team act on that event: when a need's state changes, prodc runs a command from the project
 config with the affected need (and board context) as JSON on **stdin**. Same trust model as the
 command hook (#70): the command comes only from the config, never from need data; the need data is
 piped as data, never executed.
 
-A state change needs the *previous* state, which prodc (stateless per run — it re-reads every file)
+A state change needs the *previous* state, which prodc (stateless per run: it re-reads every file)
 does not otherwise keep. So a small ledger (``state_file``) records each need's last-seen state;
 `prodc sync` resolves the board, diffs it against the ledger, fires the matching callbacks, and
 writes the ledger forward. The first run records a baseline and fires nothing (everything would
@@ -92,7 +92,7 @@ def write_ledger(path: Path, states: dict[str, str]) -> None:
 def transitions(ledger: dict[str, str], current: dict[str, str]) -> list[Transition]:
     """Needs whose state differs from the ledger.
 
-    A need absent from the ledger is *new*, not a transition — it is baselined silently and never
+    A need absent from the ledger is *new*, not a transition. It is baselined silently and never
     fired on, so adding a need does not masquerade as a state change.
     """
     out = [
@@ -145,7 +145,7 @@ def advance_ledger(
     current: dict[str, str], ledger: dict[str, str], fired: list[Fired]
 ) -> dict[str, str]:
     """The ledger to persist: every need at its current state, except a need whose callback failed
-    — that one keeps its prior state so the next sync retries it."""
+    that one keeps its prior state so the next sync retries it."""
     failed = {f.transition.need_id for f in fired if not f.ok}
     new = dict(current)
     for nid in failed:

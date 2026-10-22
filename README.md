@@ -5,37 +5,35 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/prodc.svg)](https://pypi.org/project/prodc/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://gitlab.com/cardona-oss/prodc/-/blob/main/LICENSE)
 
-Product management as code: user *needs* in YAML, each traced to the evidence a real user gave
-and the test that proves it is delivered. For teams that keep product work in the repo, next to
-the code.
+Product management as code. You write user needs in YAML. Each need lists the evidence that a
+real user asked for it, and the test that shows it is delivered. The files live in the repo, next
+to the code.
 
-prodc reads plain YAML files and your test suite and shows you the gaps. It does not call a model,
-host a UI, or replace your tracker. Two rules carry it:
+prodc reads the YAML files and your test suite, and shows what is missing. It does not call a
+model, run a UI, or replace your issue tracker.
 
-1. **A need with no evidence is an opinion.** Write down who asked (an interview quote, a ticket,
-   an email) or prodc flags the need as an opinion.
-2. **"Done" is a claim your tests back.** You never mark a need delivered. You attach a *proof*
-   (a locator into your test suite) and `prodc status` resolves it: DELIVERED, PENDING, HOLE, or
-   BROKEN. The state is read from the repo, not remembered from a standup.
+It follows two rules:
 
-## Why prodc
+1. A need with no evidence is an opinion. Record who asked (an interview quote, a ticket, an
+   email). If you don't, prodc marks the need as an opinion.
+2. You never mark a need as done by hand. You attach a proof, which points to a test, and
+   `prodc status` computes the state: DELIVERED, PENDING, HOLE, or BROKEN.
 
-- **Versus Jira, Linear, other trackers.** A tracker records work items and a status someone set
-  by hand. prodc records *needs* and computes their status from the tests. No assignees, sprints,
-  comments, or notifications. Keep the tracker for the work; keep prodc for "did a real user ask
-  for this, and does a test prove it?" They connect at the edges: a source can be a ticket
-  locator (checked read-only against GitLab with `[sources.<name>] kind = "gitlab"`), a proof can
-  be any script (`kind = "command"`), and `prodc sync` fires a hook when a need changes state.
-- **Versus a PRD in Notion or a wiki.** A document says what should be true; nothing checks it
-  later. prodc's files are validated on every load, linted in CI, and reviewed in merge requests
-  like code. "Is this done?" is answered by `prodc show N-1`.
-- **Versus plain YAML in the repo.** You could keep this structure by hand. prodc adds the schema,
-  proof resolution against real test suites, the evidence ladder, the lint, and write-back
-  commands that keep the files consistent.
+## Compared to other tools
 
-**What it does not do.** It does not run your tests, call an LLM, or ping a tracker on its own.
-It does not model the full discovery loop (opportunity-solution trees, parallel solution
-testing); it records needs, the evidence under them, and the decisions taken on them.
+- Jira, Linear and other trackers store work items with a status that someone sets by hand.
+  prodc stores needs and computes their status from tests. It has no assignees, sprints, or
+  notifications. You can use both: a source can point to a GitLab ticket (`kind = "gitlab"`,
+  read-only), a proof can be any script (`kind = "command"`), and `prodc sync` runs a hook when a
+  need changes state.
+- A PRD in Notion or a wiki is not checked after it is written. prodc files are validated on
+  every load, linted in CI, and reviewed in merge requests.
+- You could keep the same YAML by hand. prodc adds the schema, proof checks against real test
+  suites, the source kinds, the lint, and write commands that keep the files consistent.
+
+prodc does not run your tests, call an LLM, or contact a tracker by itself. It does not model the
+full discovery process (opportunity-solution trees, testing several solutions in parallel). It
+records needs, their evidence, and the decisions made about them.
 
 ## Install
 
@@ -47,7 +45,7 @@ Python 3.12+. The only runtime dependency is PyYAML.
 
 ## Quickstart
 
-Three files: where prodc looks, what people need, and a test you have probably already written.
+You need three files: the config, the needs, and a test.
 
 `prodc.toml`
 
@@ -101,7 +99,7 @@ Feature: Orders board
     Then the order is highlighted as past due
 ```
 
-Run the board (output trimmed; the real one also carries a legend and phrasing hints):
+Run `prodc status` (output trimmed):
 
 ```text
 $ prodc status
@@ -114,16 +112,15 @@ jordan    1 DELIVERED   2 HOLE
       N-3  HOLE            implement a settings page                    opinion
        ⚠ text may be a solution in disguise (starts with 'implement')
   !!  N-1  DELIVERED* 1/1  see which orders are past due at a glance    primary:Jordan
-       ⚠ DELIVERED on an unattested proof link — warrant not reviewed
+       ⚠ DELIVERED on an unattested proof link (warrant not reviewed)
 ```
 
-- **N-1 is DELIVERED** because a tagged scenario proves it (`*` = declared by tag, no test results
-  loaded yet).
-- **N-2 is a HOLE**: evidence, but no proof.
-- **N-3 is an opinion**: neither.
+N-1 is DELIVERED because a tagged scenario proves it. The `*` means the state comes from the tag,
+because no test results were loaded. N-2 has evidence but no proof, so it is a HOLE. N-3 has
+neither, so it is an opinion.
 
-Close the loop from the command line. Each write command rewrites one YAML file, re-validates the
-whole model, and prints the diff.
+You fix these from the command line. Each write command changes one YAML file, validates the
+whole model again, and prints the diff.
 
 ```bash
 # trace the opinion to evidence
@@ -136,45 +133,41 @@ prodc capture N-3 --kind primary --who Jordan --date 2026-10-01 \
 # then point the need at it:
 prodc set N-2 proofs+="web:orders.feature#Export the run sheet"
 
-prodc status      # gaps: 1 PENDING · 1 HOLE   — the scenario exists, so N-2 is PENDING, not BROKEN
+prodc status      # gaps: 1 PENDING · 1 HOLE   (N-2 is PENDING: the scenario exists)
                   # (skip writing the scenario and the proof points at nothing: BROKEN, lint exits 1)
 prodc lint        # CI gate: exit 1 on a BROKEN proof or a must-have with no evidence
 ```
 
-Rename a scenario without updating the need and the proof turns BROKEN; `prodc lint` exits 1.
-That is the whole idea: the board cannot drift from the code.
+If you rename a scenario and do not update the need, the proof becomes BROKEN and `prodc lint`
+exits 1.
 
-## Key features
+## Features
 
-- **Evidence ladder.** A source is `primary` (the user's own words), `secondary` (a report, a
-  ticket, an internal doc), or `assumption` (a guess). With neither primary nor secondary, the need
-  is an opinion: `lint` fails a must-have opinion, `status --strict` fails on any.
-- **Proofs resolve against the repo.** Adapters for Gherkin scenarios and tags, pytest node ids,
-  file existence, human sign-off, prototypes, citations, eval metric gates, external results files,
-  and a generic `command` hook. Feed it cucumber-json or junit XML and declared states become real.
-- **Five states, honest semantics.** DELIVERED, PENDING, HOLE, BROKEN, UNRESOLVED. A HOLE is never
-  a failure; BROKEN always is; a proof in an absent sibling repo is UNRESOLVED, not BROKEN.
-- **Flows.** A need with `children` rolls them up, with `seam` proofs for the behaviour between
-  steps. Any BROKEN child breaks the flow; a flow is DELIVERED only when every child and seam is
-  green.
-- **Machine-checked roll-up.** `tests/test_models.py` builds a
-  [musil](https://pypi.org/project/musil/) model of the lifecycle and explores every reachable
-  state against the real resolver, so the documented invariants cannot drift from the code.
-- **Write-back that respects your files.** `set`, `capture`, `accept`, `attest`, `withdraw`, `add`
-  splice one need's block back into the original YAML, keeping other comments. All take `--dry-run`
-  and `--expect-sha`.
-- **Boards for humans.** `status`, `show`, `brief`, `plan`, `report --format html` (a self-contained
-  interactive viewer), `portfolio`, and `diff` against a snapshot. The read commands take `--json`;
-  exit codes are fixed (0 ok, 1 gate failed, 2 config or load error).
-- **Coding-agent playbook.** `prodc agent >> AGENTS.md` teaches an agent to act as the project's
-  product manager: read the board, capture evidence with honest provenance, find proofs, gate
-  before a handoff. An agent may record `assumption` or `secondary` sources; `primary` is reserved
-  for a real user's own words. `prodc guide` is the short human onboarding guide.
+- Source kinds: `primary` (the user's own words), `secondary` (a report, a ticket, an internal
+  doc), or `assumption` (a guess). A need with no primary or secondary source is an opinion.
+  `lint` fails on a must-have opinion; `status --strict` fails on any opinion.
+- Proof adapters: Gherkin scenarios and tags, pytest node ids, file existence, human sign-off,
+  prototypes, citations, eval metric gates, external result files, and a generic `command`. Give
+  it cucumber-json or JUnit XML to use real test results instead of tags.
+- Five states: DELIVERED, PENDING, HOLE, BROKEN, UNRESOLVED. A HOLE does not fail the gate; BROKEN
+  always does. A proof in a sibling repo that is not checked out is UNRESOLVED, not BROKEN.
+- Flows: a need with `children` rolls up its children, with `seam` proofs for the steps between
+  them. One BROKEN child breaks the flow. The flow is DELIVERED only when every child and seam is.
+- `tests/test_models.py` builds a [musil](https://pypi.org/project/musil/) model of the
+  lifecycle and checks every reachable state against the real resolver.
+- Write commands: `set`, `capture`, `accept`, `attest`, `withdraw`, `add`. They change only the
+  edited need's block and keep the comments in the rest of the file. All take `--dry-run` and
+  `--expect-sha`.
+- Read commands: `status`, `show`, `brief`, `plan`, `report --format html` (one self-contained
+  HTML file), `portfolio`, and `diff` against a snapshot. They take `--json`. Exit codes: 0 ok, 1
+  gate failed, 2 config or load error.
+- `prodc agent >> AGENTS.md` adds instructions for a coding agent to act as the project's product
+  manager. An agent may record `assumption` or `secondary` sources; `primary` is only for a real
+  user's own words. `prodc guide` is a short guide for people.
 
-Beyond need, source and proof, prodc has five more nouns — goals, releases, roles, principles
-and decisions ([why each exists](https://cardona-oss.gitlab.io/prodc/model/)); attestations,
-withdrawals and settled answers are fields on a need. It also ships hygiene commands (`dupes`,
-`recurrence`, `suggest`); the [docs](https://cardona-oss.gitlab.io/prodc/) have the full surface.
+prodc also has goals, releases, roles, principles, and decisions
+([model docs](https://cardona-oss.gitlab.io/prodc/model/)), and the commands `dupes`,
+`recurrence`, and `suggest`. See the [docs](https://cardona-oss.gitlab.io/prodc/) for all of it.
 
 ## Links
 

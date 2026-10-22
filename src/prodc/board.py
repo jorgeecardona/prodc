@@ -52,7 +52,7 @@ def warrant(need: Need) -> str:
 
     A `primary` source names its person (`primary:who`, and `primary:who (role)` when that person's
     role is recorded, #52); `secondary`/`assumption` show the kind. A need with any source is shown
-    by that kind even if it is an opinion (only an assumption) — the opinion roll-up lives in the
+    by that kind even if it is an opinion (only an assumption). The opinion roll-up lives in the
     gap counts, this column shows the literal evidence tier.
     """
     strongest = need.strongest_kind  # the one source-strength ranking lives on the model
@@ -74,11 +74,11 @@ def annotate_board_warnings(results: list[NeedResult], needs: list[Need]) -> Non
         if r.need.id in shared:
             r.warnings.append(shared[r.need.id])
         if r.need.id in flow_orphans:
-            r.warnings.append("belongs to no flow — seam not covered (#44)")
+            r.warnings.append("belongs to no flow: seam not covered (#44)")
 
 
 def need_payload(r: NeedResult, *, flavor: Literal["board", "html"] = "board") -> dict[str, object]:
-    """One need serialised to a plain dict — the single Need-to-JSON used by the board and viewer.
+    """One need serialised to a plain dict: the single Need-to-JSON used by the board and viewer.
 
     ``flavor="board"`` is the status/`show` payload (the full record); ``flavor="html"`` is the
     report viewer's flatter row. They carry different fields in a different order, so the two
@@ -211,7 +211,7 @@ class ResolvedBoard:
     handoffs: list[Handoff]
     recurrence: list[Recurrence]
     orphans: dict[str, list[str]]
-    principles: list[PrincipleReport]  # over the whole model — declined needs are off the board
+    principles: list[PrincipleReport]  # over the whole model: declined needs are off the board
 
 
 def gather(
@@ -225,7 +225,7 @@ def gather(
 
     ``needs`` overrides which needs are resolved (the caller filters drafts/client/goal/stale
     before calling and passes the result); it defaults to the whole model. ``annotate_warnings``
-    appends the cross-need board warnings (#44/#45) to the results, as ``prodc status`` does —
+    appends the cross-need board warnings (#44/#45) to the results, as ``prodc status`` does.
     the markdown/HTML reports leave it off, exactly as they did before this was factored out.
     The declared goals/releases/roles come from ``model``; the recurrence/handoffs/orphans views
     are computed over the resolved ``needs``. The principle report reads the whole ``model.needs``:

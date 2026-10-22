@@ -140,7 +140,7 @@ def test_lint_draft_waiting_is_fine() -> None:
 
 def test_lint_decided_against_its_research() -> None:
     w = _warns(_decision("Q-1@yes"), _research("Q-1", settled=True, answer=Answer.NO))
-    assert any("answered no — decided against its research" in x for x in w)
+    assert any("answered no: decided against its research" in x for x in w)
 
 
 def test_lint_awaits_withdrawn_need() -> None:

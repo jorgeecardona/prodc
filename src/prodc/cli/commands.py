@@ -123,8 +123,8 @@ def _annotate_duplicate_warnings(
     """Append a `possible duplicate of <id>` warning to each need in a candidate pair (#55)."""
     by_id = {r.need.id: r for r in results}
     for pair in duplicate_pairs(needs, threshold):
-        msg_a = f"possible duplicate of {pair.b.id} ({pair.score:.2f}) — #55"
-        msg_b = f"possible duplicate of {pair.a.id} ({pair.score:.2f}) — #55"
+        msg_a = f"possible duplicate of {pair.b.id} ({pair.score:.2f}) (#55)"
+        msg_b = f"possible duplicate of {pair.a.id} ({pair.score:.2f}) (#55)"
         if pair.a.id in by_id:
             by_id[pair.a.id].warnings.append(msg_a)
         if pair.b.id in by_id:
@@ -140,12 +140,12 @@ def _annotate_importance_warnings(results: list[NeedResult], cfg: Config) -> Non
             continue
         if cfg.importance_levels and imp not in cfg.importance_levels:
             allowed = ", ".join(str(n) for n in sorted(cfg.importance_levels))
-            r.warnings.append(f"importance {imp} is off the declared scale ({allowed}) — #59")
+            r.warnings.append(f"importance {imp} is off the declared scale ({allowed}) (#59)")
             continue
         when = r.need.importance_set_at
         if when is None:
             r.warnings.append(
-                "importance set but no revisit date (`set importance` stamps one) — #59"
+                "importance set but no revisit date (`set importance` stamps one) (#59)"
             )
         elif cfg.importance_revisit_days is not None:
             try:
@@ -154,7 +154,7 @@ def _annotate_importance_warnings(results: list[NeedResult], cfg: Config) -> Non
                 days = None
             if days is not None and days > cfg.importance_revisit_days:
                 r.warnings.append(
-                    f"importance set {days}d ago (> {cfg.importance_revisit_days}d) — revisit (#59)"
+                    f"importance set {days}d ago (> {cfg.importance_revisit_days}d). Revisit (#59)"
                 )
 
 
@@ -173,7 +173,7 @@ def _annotate_draft_age_warnings(results: list[NeedResult], cfg: Config) -> None
             continue
         when = r.need.draft_added
         if when is None:
-            r.warnings.append("draft with no staged date (`add --draft` stamps one) — #60")
+            r.warnings.append("draft with no staged date (`add --draft` stamps one) (#60)")
             continue
         try:
             days = (today - date.fromisoformat(when)).days
@@ -181,7 +181,7 @@ def _annotate_draft_age_warnings(results: list[NeedResult], cfg: Config) -> None
             continue
         if days > cfg.draft_max_age_days:
             r.warnings.append(
-                f"draft staged {days}d ago (> {cfg.draft_max_age_days}d) — promote or drop (#60)"
+                f"draft staged {days}d ago (> {cfg.draft_max_age_days}d). Promote or drop (#60)"
             )
 
 
@@ -190,7 +190,7 @@ def _lint_errors(results: list[NeedResult]) -> list[str]:
     errors: list[str] = []
     for r in sorted(results, key=lambda x: x.need.id):
         if r.state is NeedState.BROKEN:
-            errors.append(f"{r.need.id}: BROKEN proof — {'; '.join(r.detail)}")
+            errors.append(f"{r.need.id}: BROKEN proof: {'; '.join(r.detail)}")
         if r.need.must and r.need.is_opinion:
             errors.append(f"{r.need.id}: must-have is an opinion (no evidence)")
     return errors
@@ -199,7 +199,7 @@ def _lint_errors(results: list[NeedResult]) -> list[str]:
 def cmd_lint(args: argparse.Namespace) -> int:
     """Gate the board: fail on hard problems (BROKEN, must-opinion); list hygiene warnings.
 
-    The red-gate counterpart to `status` — so drift is a CI failure, not something you notice
+    The red-gate counterpart to `status`. Drift is a CI failure, not something you notice
     by eye. `--strict` also fails on any hygiene warning.
     """
     loaded = load_or_report(args)
@@ -216,29 +216,29 @@ def cmd_lint(args: argparse.Namespace) -> int:
         for m in g.members:
             if m.id in by_id:
                 by_id[m.id].warnings.append(
-                    f"unlinked cross-client recurrence with {others} — set variant_of or "
-                    f"not_variant_of ({g.score:.2f}) — #56"
+                    f"unlinked cross-client recurrence with {others}: set variant_of or "
+                    f"not_variant_of ({g.score:.2f}) (#56)"
                 )
     if cfg.stale_after_days is not None:
         today = date.today()
         for r in results:
             age = evidence_age_days(r.need, today)
             if age is not None and age > cfg.stale_after_days:
-                r.warnings.append(f"evidence is {age}d old (> {cfg.stale_after_days}d) — #58")
+                r.warnings.append(f"evidence is {age}d old (> {cfg.stale_after_days}d) (#58)")
     for v in who_variants(needs, cfg.duplicate_threshold):
         whos = " / ".join(repr(w) for w in v.whos)
         for nid in v.need_ids:
             if nid in by_id:
                 by_id[nid].warnings.append(
-                    f"who may name the same person: {whos} (needs {', '.join(v.need_ids)}) — #61"
+                    f"who may name the same person: {whos} (needs {', '.join(v.need_ids)}) (#61)"
                 )
     _annotate_importance_warnings(results, cfg)
     _annotate_draft_age_warnings(results, cfg)
     # The principle ripple: a need withdrawn citing a principle that was revised *after* the decision
-    # comes back up — the frame it was judged against has changed since. A warning, never a hard
+    # comes back up. The frame it was judged against has changed. A warning, never a hard
     # error; prodc flags, the PM re-decides. The same loop grades each principle's guards (#89): a
     # BROKEN guard/implemented_in is a hard error (a dangling locator), a VIOLATED guard warns (the
-    # code contradicts a stated principle — surfaced, but the PM owns the reconcile).
+    # code contradicts a stated principle (surfaced, but the PM owns the reconcile).
     principle_errors: list[str] = []
     principle_warnings: list[tuple[str, str]] = []
     for rep in principle_report(needs, list(model.principles), cfg.adapters):
@@ -246,22 +246,22 @@ def cmd_lint(args: argparse.Namespace) -> int:
             if n.id in by_id and n.withdrawn is not None:
                 by_id[n.id].warnings.append(
                     f"withdrawn per principle {rep.principle.id} on {n.withdrawn.date}, but "
-                    f"{rep.principle.id} was revised {rep.principle.revised_at} — re-review the decision"
+                    f"{rep.principle.id} was revised {rep.principle.revised_at}: re-review the decision"
                 )
         if rep.state is PrincipleState.BROKEN:
             principle_errors.append(
-                f"{rep.principle.id}: BROKEN principle guard — a proof or implemented_in locator "
+                f"{rep.principle.id}: BROKEN principle guard: a proof or implemented_in locator "
                 "resolves to nothing"
             )
         elif rep.state is PrincipleState.VIOLATED:
             principle_warnings.append(
                 (
                     rep.principle.id,
-                    "VIOLATED — a guard failed: the code contradicts this principle; reconcile the "
+                    "VIOLATED: a guard failed: the code contradicts this principle; reconcile the "
                     "code or revise the principle",
                 )
             )
-    # Unresolved contradiction: two needs oppose each other yet BOTH are still live — the product
+    # Unresolved contradiction: two needs oppose each other yet BOTH are still live. The product
     # vision has not decided between them. A warning on both sides (withdraw one out_of_scope citing
     # the principle that decides, or reconcile them).
     for c in contradictions(needs):
@@ -270,7 +270,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
         for near, far in ((c.a, c.b), (c.b, c.a)):
             if near.id in by_id:
                 by_id[near.id].warnings.append(
-                    f"unresolved contradiction with {far.id} — both live, the vision has not "
+                    f"unresolved contradiction with {far.id}: both live, the vision has not "
                     "decided yet (withdraw one out_of_scope citing the principle, or reconcile)"
                 )
     errors = _lint_errors(results) + principle_errors
@@ -285,14 +285,14 @@ def cmd_lint(args: argparse.Namespace) -> int:
         warnings.append(
             (
                 d.id,
-                "decision serves only withdrawn/non-product needs — re-tie it to a live need or withdraw it",
+                "decision serves only withdrawn/non-product needs: re-tie it to a live need or withdraw it",
             )
         )
     for d, pid in stale_decisions(decisions, list(model.principles)):
         warnings.append(
             (
                 d.id,
-                f"decided {d.decided_at} under principle {pid}, revised later — re-review this solution",
+                f"decided {d.decided_at} under principle {pid}, revised later. Re-review this solution",
             )
         )
     # Research a decision waits on (#93): committed too early, decided against its own result,
@@ -310,7 +310,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
     )
     warnings += tag_warnings(needs, structural_ids, cfg.duplicate_threshold)
     # Flow step hygiene (#90): once [flows].steps declares a vocabulary, grade each journey's
-    # shape — never-terminal, out-of-order, mixed bare/stepped. Silent when no vocab is declared.
+    # shape: never-terminal, out-of-order, mixed bare/stepped. Silent when no vocab is declared.
     warnings += flow_step_warnings(needs, cfg.flow_steps)
     if args.json:
         print(
@@ -402,13 +402,13 @@ def cmd_status(args: argparse.Namespace) -> int:
         )
     else:
         commit = git_rev(cfg.root)
-        print(f"prodc status — {cfg.root.name}{f' @ {commit}' if commit else ''}")
+        print(f"prodc status: {cfg.root.name}{f' @ {commit}' if commit else ''}")
         print(summary_line(summary))
         if draft_count and not args.include_drafts:
-            print(f"drafts: {draft_count} staged (hidden — --include-drafts to show) (#60)")
+            print(f"drafts: {draft_count} staged (hidden; --include-drafts to show) (#60)")
         if withdrawn_count:
             extra = ", ".join(f"{c} {k}" for k, c in sorted(withdrawn_kinds.items()))
-            suffix = f" — {extra}" if extra else ""
+            suffix = f" ({extra})" if extra else ""
             print(f"withdrawn: {withdrawn_count} (decided against){suffix} (#74)")
         visible = [r for r in results if r.need.product]
         if args.only_must:
@@ -460,9 +460,9 @@ def cmd_show(args: argparse.Namespace) -> int:
         # A decision is citable too (#95): the same warnings lint raises for it, shown inline.
         warnings: list[str] = []
         if decision in orphaned_decisions(list(model.decisions), needs):
-            warnings.append("serves only withdrawn/non-product needs — re-tie it or withdraw it")
+            warnings.append("serves only withdrawn/non-product needs: re-tie it or withdraw it")
         warnings += [
-            f"decided {decision.decided_at} under principle {pid}, revised later — re-review"
+            f"decided {decision.decided_at} under principle {pid}, revised later. Re-review"
             for d, pid in stale_decisions(list(model.decisions), list(model.principles))
             if d is decision
         ]
@@ -494,7 +494,7 @@ def cmd_brief(args: argparse.Namespace) -> int:
     needs = list(model.needs)
     if not any(n.client == args.client for n in needs):
         # shared baselines apply to everyone, so an unknown client would otherwise
-        # silently return a baselines-only brief — guard the likely typo instead.
+        # silently return a baselines-only brief: guard the likely typo instead.
         print(f"prodc: no needs for client '{args.client}'", file=sys.stderr)
         return 2
     scoped = applicable_needs(needs, args.client)
@@ -517,7 +517,7 @@ def cmd_brief(args: argparse.Namespace) -> int:
 
 
 def cmd_plan(args: argparse.Namespace) -> int:
-    """Emit a ranked backlog from recorded inputs — must+state+evidence, importance refines."""
+    """Emit a ranked backlog from recorded inputs: must+state+evidence, importance refines."""
     loaded = load_or_report(args)
     if loaded is None:
         return 2
@@ -612,7 +612,7 @@ def cmd_add(args: argparse.Namespace) -> int:
             if args.from_need:
                 # Promote a need into a principle (the discovery lifecycle): the signals that
                 # surfaced it travel with it as provenance, so the history stays honest. The origin
-                # need stays on the board unchanged — a need and the principle it inspired coexist.
+                # need stays on the board unchanged. A need and the principle it inspired coexist.
                 origin = next((n for n in load(cfg).needs if n.id == args.from_need), None)
                 if origin is None:
                     print(f"prodc: no need '{args.from_need}' to promote", file=sys.stderr)
@@ -693,7 +693,7 @@ def cmd_add(args: argparse.Namespace) -> int:
                 )
             if hits and args.strict_dupes:
                 print(
-                    "prodc: refusing to add — --strict-dupes and a possible duplicate exists",
+                    "prodc: refusing to add (--strict-dupes and a possible duplicate exists)",
                     file=sys.stderr,
                 )
                 return 2
@@ -763,7 +763,7 @@ def cmd_accept(args: argparse.Namespace) -> int:
 
 
 def cmd_withdraw(args: argparse.Namespace) -> int:
-    """Record a decision against a need — withdrawn / won't-do (#74)."""
+    """Record a decision against a need: withdrawn / won't-do (#74)."""
     cfg_path = Path(args.config)
     if not cfg_path.exists():
         print(f"prodc: no config at {cfg_path}", file=sys.stderr)
@@ -771,7 +771,7 @@ def cmd_withdraw(args: argparse.Namespace) -> int:
     try:
         cfg = Config.load(cfg_path)
         if args.target == "decision":
-            # noun-first: ids are unique per noun, so a need and a decision may share one — the
+            # noun-first: ids are unique per noun, so a need and a decision may share one. The
             # noun disambiguates (matches `add decision` / `revise principle`).
             if not args.decision_id:
                 print("prodc: withdraw decision needs a decision id", file=sys.stderr)
@@ -836,7 +836,7 @@ def cmd_reinstate(args: argparse.Namespace) -> int:
 def cmd_revise(args: argparse.Namespace) -> int:
     """Revise a product principle in place: optional new text, always a fresh revised_at (the ripple).
 
-    Re-stamping ``revised_at`` is the point — every need withdrawn citing this principle with an
+    Re-stamping ``revised_at`` is the point: every need withdrawn citing this principle with an
     earlier date comes back up for re-review (surfaced by `lint`). Comment-safe: only the principle's
     own block is spliced, the rest of the file is untouched.
     """
@@ -867,7 +867,7 @@ def cmd_review(args: argparse.Namespace) -> int:
     that clears them. With no action flag it lists each draft with its provenance and the nearest
     existing need (a dedup score, reusing #55), so a reviewer can see what is a duplicate before
     promoting. `--promote` flips `draft=false` (sugar over `set`); `--drop` deletes the draft
-    outright (the #60 delete-need path). Both act only on drafts — a real need is withdrawn, not
+    outright (the #60 delete-need path). Both act only on drafts. A real need is withdrawn, not
     dropped, so its record survives.
     """
     loaded = load_or_report(args)
@@ -888,7 +888,7 @@ def cmd_review(args: argparse.Namespace) -> int:
     if unknown:
         print(
             f"prodc: not a staged draft: {', '.join(unknown)} "
-            "(review acts only on drafts — withdraw a real need instead)",
+            "(review acts only on drafts: withdraw a real need instead)",
             file=sys.stderr,
         )
         return 2
@@ -924,7 +924,7 @@ def _review_list(cfg: Config, drafts: list[Need], needs: list[Need], as_json: bo
         print(json.dumps({"drafts": rows}, indent=2))
         return 0
     for r in rows:
-        who = f" — {r['who']}" if r["who"] else ""
+        who = f" ({r['who']})" if r["who"] else ""
         client = f" [{r['client']}]" if r["client"] else ""
         staged = f" (staged {r['staged']})" if r["staged"] else ""
         print(f"{r['id']}{who}{client}{staged}: {r['text']}")
@@ -933,7 +933,7 @@ def _review_list(cfg: Config, drafts: list[Need], needs: list[Need], as_json: bo
             print(f"        sources: {', '.join(kinds)}")
         dup = cast("dict[str, object] | None", r["duplicate"])
         if dup is not None:
-            print(f"        possible duplicate of {dup['id']} ({dup['score']:.2f}) — #55")
+            print(f"        possible duplicate of {dup['id']} ({dup['score']:.2f}) (#55)")
     print(f"review: {len(rows)} draft(s) staged")
     return 0
 
@@ -1037,7 +1037,7 @@ def _repo_row(config_path: str) -> RepoRow:
 
 
 def cmd_portfolio(args: argparse.Namespace) -> int:
-    """Roll up many boards into one scoreboard — coverage, must-HOLEs, provenance per board.
+    """Roll up many boards into one scoreboard: coverage, must-HOLEs, provenance per board.
 
     Each argument is a ``prodc.toml`` path or a directory to discover boards under (every
     ``prodc.toml`` beneath it, pruning VCS/vendor/build and hidden dirs, capped at ``--max-depth``).
@@ -1116,7 +1116,7 @@ def cmd_diff(args: argparse.Namespace) -> int:
 
 
 def cmd_report(args: argparse.Namespace) -> int:
-    """Render the board as a readable markdown document — a file a PM can read, share, or print."""
+    """Render the board as a readable markdown document. A file a PM can read, share, or print."""
     loaded = load_or_report(args)
     if loaded is None:
         return 2
@@ -1169,7 +1169,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
             write_ledger(ledger_path, current)
         n = len(current)
         print(
-            f"sync: baseline recorded ({n} need{'s' if n != 1 else ''}) — no callbacks fired on first run"
+            f"sync: baseline recorded ({n} need{'s' if n != 1 else ''}). No callbacks fired on first run"
         )
         return 0
 
@@ -1206,7 +1206,7 @@ def cmd_agent(args: argparse.Namespace) -> int:
     """Print prodc's agent playbook, or write it into the project.
 
     The playbook ships with prodc, so `prodc agent >> AGENTS.md` (or `--write`) drops the
-    current, versioned guidance into a user's repo where their coding agent reads it — the agent
+    current, versioned guidance into a user's repo where their coding agent reads it. The agent
     then runs prodc as the project's PM. It improves when prodc improves; nobody hand-copies it.
     """
     text = importlib.resources.files("prodc").joinpath("agent.md").read_text(encoding="utf-8")
@@ -1478,7 +1478,7 @@ def _apply_recurrence(cfg: Config, groups: list[VariantGroup], args: argparse.Na
     """Link the top recurrence group to a newly created shared baseline (#56), transactionally.
 
     A suggested group is always cross-client (the matcher excludes client-less needs), so there
-    is never a baseline to reuse — `--apply` creates one, which needs `--baseline-id` and `--file`.
+    is never a baseline to reuse. `--apply` creates one, which needs `--baseline-id` and `--file`.
     It links the single highest-scoring group per run (one id names one baseline); any remaining
     groups are reported as still unlinked, to rerun. `--dry-run` previews the diffs without writing.
     """
@@ -1525,7 +1525,7 @@ def _apply_recurrence(cfg: Config, groups: list[VariantGroup], args: argparse.Na
         for e in edits:
             print(e.diff, end="")
         if len(groups) > 1:
-            print(f"recurrence --apply: {len(groups) - 1} more group(s) unlinked — rerun to link")
+            print(f"recurrence --apply: {len(groups) - 1} more group(s) unlinked. Rerun to link")
     return 0
 
 

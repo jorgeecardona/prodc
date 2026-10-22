@@ -64,7 +64,7 @@ def _as_str(value: object, where: str) -> str:
 def _opt_str(value: object, where: str) -> str | None:
     if value is None:
         return None
-    # A bare ``date: 2026-09-20`` parses as a date, not a string — accept it.
+    # A bare ``date: 2026-09-20`` parses as a date, not a string. Accept it.
     if isinstance(value, datetime.date):
         return value.isoformat()
     return _as_str(value, where)
@@ -73,7 +73,7 @@ def _opt_str(value: object, where: str) -> str | None:
 def _opt_importance(value: object, where: str) -> int | None:
     if value is None:
         return None
-    # bool is a subclass of int — reject it so `importance: true` is not read as 1.
+    # bool is a subclass of int. Reject it so ``importance: true`` is not read as 1.
     if isinstance(value, bool) or not isinstance(value, int):
         raise LoaderError(f"{where}: expected a positive integer ordinal")
     if value < 1:
@@ -127,7 +127,7 @@ def _answer(raw: object, where: str) -> Answer | None:
     ``Enum(name) except ValueError`` pattern as ``SourceKind`` so an unknown value is
     a :class:`LoaderError` the author owns, not silent junk.
 
-    YAML 1.1 reads a bare ``yes``/``no`` as a boolean, so ``answer: no`` arrives as ``False`` —
+    YAML 1.1 reads a bare ``yes``/``no`` as a boolean, so ``answer: no`` arrives as ``False``.
     coerced back to the string here, the same way ``_opt_str`` accepts a bare ``date:`` that
     parsed as a date. ``inconclusive`` is a plain string and needs no coercion.
     """
@@ -146,7 +146,7 @@ def _answer(raw: object, where: str) -> Answer | None:
 def _withdrawal(raw: object, where: str) -> Withdrawal | None:
     """Parse ``withdrawn: {reason, date, kind?, principle?}`` into a :class:`Withdrawal` (#74).
 
-    ``reason`` and ``date`` are required when the key is present — a decision against a need must
+    ``reason`` and ``date`` are required when the key is present. A decision against a need must
     say why and when, the same way an attestation needs who and when. ``kind`` is optional and
     defaults to ``wont_do``; it is validated with the same ``Enum(name) except ValueError`` pattern
     as ``SourceKind``, so an unknown kind is a :class:`LoaderError` the author owns. ``principle`` is
@@ -228,7 +228,7 @@ def _need(
     tbl = _as_mapping(raw, where)
     if "label" in tbl:
         raise LoaderError(
-            f"{where}: 'label' was removed in 0.4 — express it with a declared role + client (#52)"
+            f"{where}: 'label' was removed in 0.4; express it with a declared role + client (#52)"
         )
     nid = _as_str(tbl.get("id"), f"{where}.id")
     text = _as_str(tbl.get("text"), f"{where}.text")
@@ -349,7 +349,7 @@ def _role(raw: object, where: str) -> Role:
 
 
 def _principle(raw: object, where: str) -> Principle:
-    """Parse one ``principles:`` entry — a product commitment with its provenance and guards."""
+    """Parse one ``principles:`` entry: a product commitment with its provenance and guards."""
     tbl = _as_mapping(raw, where)
     pid = _as_str(tbl.get("id"), f"{where}.id")
     proofs = tuple(
@@ -359,7 +359,7 @@ def _principle(raw: object, where: str) -> Principle:
     for p in proofs:
         if p.split(":", 1)[0] == "need":
             raise LoaderError(
-                f"principle {pid!r}: proof {p!r} is a need reference — a principle guards the "
+                f"principle {pid!r}: proof {p!r} is a need reference; a principle guards the "
                 "code, it does not wait on a need to settle (that inverts the OST)"
             )
     return Principle(
@@ -377,7 +377,7 @@ def _principle(raw: object, where: str) -> Principle:
 
 
 def _decision(raw: object, where: str) -> Decision:
-    """Parse one ``decisions:`` entry — the solution chosen for a need, and what was rejected.
+    """Parse one ``decisions:`` entry: the solution chosen for a need, and what was rejected.
 
     ``needs`` is required and must be non-empty: a decision with no need it serves is engineering
     with no product reason, refused here rather than nagged at by a soft lint. ``withdrawn`` reuses
@@ -430,7 +430,7 @@ def yaml_error_message(where: str, text: str, exc: yaml.YAMLError) -> str:
 
     PyYAML points at ``"<unicode string>", line N`` with no file or need id; on a 200-line board that
     leaves the author hunting by hand. We name the file and line, scan back to the nearest ``id:`` so
-    the offending need is identified, and — for the common ``": "``-in-prose case — spell out the fix.
+    the offending need is identified, and (for the common ``": "``-in-prose case) spells out the fix.
     """
     mark = getattr(exc, "problem_mark", None)
     problem = getattr(exc, "problem", None) or "invalid YAML"
@@ -449,8 +449,8 @@ def yaml_error_message(where: str, text: str, exc: yaml.YAMLError) -> str:
     msg = f"{loc}: {problem}"
     if "mapping values are not allowed here" in problem:
         msg += (
-            " — a ': ' in an unquoted claim/text reads as a nested mapping; "
-            "quote the value in single quotes or rephrase"
+            " (a ': ' in an unquoted claim/text reads as a nested mapping; "
+            "quote the value in single quotes or rephrase)"
         )
     return msg
 
@@ -469,7 +469,7 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
     tbl = _as_mapping(doc, where)
     if "label" in tbl:
         raise LoaderError(
-            f"{where}: 'label' was removed in 0.4 — express it with a declared role + client (#52)"
+            f"{where}: 'label' was removed in 0.4; express it with a declared role + client (#52)"
         )
     file_who = _opt_str(tbl.get("who"), f"{where}.who")
     file_client = _opt_str(tbl.get("client"), f"{where}.client")
@@ -505,10 +505,10 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
         _unique("decision", decision.id)
         out.decisions.append(decision)
     if "argument" in tbl:
-        # Tombstone (0.4): the GSN `argument` graph was removed — state the warrant as a need's
+        # Tombstone (0.4): the GSN ``argument`` graph was removed. State the warrant as a need's
         # `claim`, prove it with `proofs`, and review it with `prodc attest`. Removed for good in 0.5.
         raise LoaderError(
-            f"{where}: 'argument:' was removed in 0.4 — state the warrant as need.claim, "
+            f"{where}: 'argument:' was removed in 0.4; state the warrant as need.claim, "
             "prove it with proofs, and review it with `prodc attest`"
         )
     return out
@@ -519,7 +519,7 @@ def load(config: Config) -> Model:
 
     One loader for every noun: ids are unique within their kind, and each string reference
     (``variant_of``, ``children``, ``goal``, ``release``, ``role``, a withdrawal's ``principle``) is
-    checked here as a hard error — a dangling reference to something declared in these files is a
+    checked here as a hard error. A dangling reference to something declared in these files is a
     typo you own, not a runtime unknown. ``role`` is checked unconditionally like
     ``goal``/``release``: it is a new field, so (unlike free-text ``who``) there is no migration
     reason to make it lax.
@@ -588,7 +588,7 @@ def _check_source_roles(needs: list[Need], principles: list[Principle], known: s
     """Every ``source.role`` that is set must name a declared role id (like ``need.role``, #52).
 
     Validated unconditionally, on a need's sources and a principle's alike: ``role`` is a new, opt-in
-    field, so there is no migration reason to be lax — a dangling role on a source is a typo the
+    field, so there is no migration reason to be lax. A dangling role on a source is a typo the
     author owns, surfaced at load, not a silent unknown that only shows as missing provenance later.
     """
     owners = [("need", n.id, n.sources) for n in needs] + [
@@ -625,7 +625,7 @@ def _check_principle_scopes(principles: list[Principle], allowed: tuple[str, ...
 def _check_flow_steps(needs: list[Need], allowed: tuple[str, ...]) -> None:
     """Every flow edge's ``step`` must be one declared in ``[flows].steps`` (#90).
 
-    Membership is integrity, not judgment — a mis-spelled step (``conlcude``) is a typo, the
+    Membership is integrity, not judgment. A mis-spelled step (``conlcude``) is a typo, the
     same severity as an undeclared principle scope, so it is a hard load error. Because the
     writer re-loads and reverts on ``LoaderError``, this also refuses to *write* a bad step.
     Skipped entirely when no vocabulary is declared: a bare step stays free text, as it was
@@ -646,7 +646,7 @@ def _check_flow_steps(needs: list[Need], allowed: tuple[str, ...]) -> None:
 def _check_withdrawal_of(needs: list[Need]) -> None:
     """A withdrawal's ``of`` must name a known need (never itself); required when kind is duplicate.
 
-    ``of`` is the need this one duplicates — a ``duplicate`` withdrawal that names no target is a
+    ``of`` is the need this one duplicates. A ``duplicate`` withdrawal that names no target is a
     reason string, not data the board can roll up, so it is refused at load (0.4).
     """
     known = {n.id for n in needs}
@@ -719,8 +719,8 @@ def _check_contradicts(needs: list[Need]) -> None:
 def _symmetrize_contradicts(needs: list[Need]) -> list[Need]:
     """Close the ``contradicts`` relation symmetrically: if A declares B, B contradicts A too.
 
-    The file stays single-declaration — declare the edge once, so the comment-safe writer never has
-    to touch two needs — but the loaded model carries the full symmetric neighbour set on both
+    The file stays single-declaration: declare the edge once, so the comment-safe writer never has
+    to touch two needs. The loaded model carries the full symmetric neighbour set on both
     needs, so every reader (show, lint, the JSON payload) sees the one relation. Run after
     :func:`_check_contradicts`, so every target id is known.
     """

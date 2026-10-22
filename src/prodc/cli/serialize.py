@@ -26,7 +26,7 @@ from .common import brief_open
 
 
 def _decision_payload(d: Decision) -> dict[str, object]:
-    """One decision as a JSON record — the OST chosen-solution node and its edges."""
+    """One decision as a JSON record: the OST chosen-solution node and its edges."""
     return {
         "id": d.id,
         "text": d.text,
@@ -175,7 +175,7 @@ def decision_show_json(
 
 def show_json(r: NeedResult, decisions: list[Decision] | None = None) -> str:
     need = r.need
-    payload = need_payload(r)  # the shared core — never drifts from the board
+    payload = need_payload(r)  # the shared core, never drifts from the board
     payload.update(
         {
             "decisions": [_decision_payload(d) for d in (decisions or [])],

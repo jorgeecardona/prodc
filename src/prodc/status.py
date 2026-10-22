@@ -1,7 +1,7 @@
 """Resolve needs into states: the engine behind ``prodc status``.
 
 A leaf's state comes from its proofs; a flow (need with children) aggregates its
-sub-needs. ``HOLE`` (no proof) is deliberately not a failure — it is an honest gap.
+sub-needs. ``HOLE`` (no proof) is deliberately not a failure. It is an honest gap.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ def _text_warnings(need: Need) -> list[str]:
     out: list[str] = []
     # The outcome-shape lint (EARS + solution-verb) fires only until the author states the
     # warrant. A need with `claim` set has already articulated the proposition the lint was
-    # prodding toward — "what delivering this establishes" — so it is silenced. This is what
+    # prodding toward ("what delivering this establishes"), so it is silenced. This is what
     # unifies a product board and a research board without a mode: "When a roaster opens the
     # queue, she can see today's orders" and "π is irrational" are the same claim-under-uncertainty
     # at different altitudes; EARS is just one falsifiable-claim grammar, a stated `claim` another.
@@ -52,7 +52,7 @@ def _text_warnings(need: Need) -> list[str]:
             out.append(f"text may be a solution in disguise (starts with '{first}')")
         else:
             out.extend(ears_warnings(need.text))  # EARS shape check (redundant on solution verbs)
-    # Source hygiene is universal (it is about evidence, not phrasing) — always run it.
+    # Source hygiene is universal (it is about evidence, not phrasing): always run it.
     for src in need.sources:
         out.extend(src.warnings())
     return out
@@ -81,10 +81,10 @@ def evidence_age_days(need: Need, today: date) -> int | None:
 
 
 def importance_revisit_due(need: Need, today: date, max_age_days: int) -> bool:
-    """Whether a need's importance should be revisited — for ``plan --revisit`` (#59).
+    """Whether a need's importance should be revisited, for ``plan --revisit`` (#59).
 
     Due when the need has an importance set but it is either never dated (no ``importance_set_at``)
-    or last set more than ``max_age_days`` ago. A need with no importance is never due — there is
+    or last set more than ``max_age_days`` ago. A need with no importance is never due. There is
     nothing to revisit. A malformed date is treated as not-due (the lint warning owns that defect).
     """
     if need.importance is None:
@@ -109,7 +109,7 @@ def _resolve_proof(locator: str, adapters: dict[str, Adapter]) -> ProofResult:
 def _source_warnings(need: Need, source_adapters: dict[str, SourceAdapter]) -> list[str]:
     """Flag a Source.locator that names a configured source adapter but does not resolve.
 
-    This is a dangling (BROKEN) *source* — distinct from OPINION (no source at all). A
+    This is a dangling (BROKEN) *source*, distinct from OPINION (no source at all). A
     free-text locator with no matching adapter is left unchecked, not flagged.
     """
     out: list[str] = []
@@ -130,23 +130,23 @@ def _warrant_warnings(need: Need, result: NeedResult) -> list[str]:
     """Flag a leaf that is green on its proofs but whose link no human has attested (#13).
 
     prodc reads that the proof passes, not that it establishes *this* need. A DELIVERED
-    leaf with no :class:`~prodc.model.Attestation` is trusted blindly — surface that so a
+    leaf with no :class:`~prodc.model.Attestation` is trusted blindly. Surface that so a
     reviewer can confirm the link, without the tool pretending to prove semantic fit.
     """
     if need.children or not need.proofs or result.state is not NeedState.DELIVERED:
         return []
     att = need.attestation
     if att is None:
-        return ["DELIVERED on an unattested proof link — warrant not reviewed (#13)"]
+        return ["DELIVERED on an unattested proof link (warrant not reviewed) (#13)"]
     out: list[str] = []
     if att.kind is AttestationKind.AI:
         # an AI review is a middle rung: better than nothing, weaker than a human sign-off
-        out.append(f"DELIVERED, warrant reviewed by {att.who} (AI) — not a human (#13)")
+        out.append(f"DELIVERED, warrant reviewed by {att.who} (AI), not a human (#13)")
     if att.verdict is not Verdict.PASS:
-        # a recorded fail/concerns (or no verdict) must NOT read as a green warrant — the board
+        # a recorded fail/concerns (or no verdict) must NOT read as a green warrant. The board
         # cannot lie. Only `pass` clears the review (0.4 false-green fix).
         said = att.verdict.value if att.verdict else "no verdict"
-        out.append(f"DELIVERED but the warrant review did not pass ({said}) — re-review (#13)")
+        out.append(f"DELIVERED but the warrant review did not pass ({said}); re-review (#13)")
     return out
 
 
@@ -154,7 +154,7 @@ def _answer_warnings(need: Need, result: NeedResult) -> list[str]:
     """Flag an ``answer`` authored on a question that is not settled (research board).
 
     DELIVERED means settled; ``answer`` records which way it settled. An answer declared while
-    the state is anything but DELIVERED is a claim the proofs do not yet support — surface it.
+    the state is anything but DELIVERED is a claim the proofs do not yet support. Surface it.
     Conservative by design: the check never cross-examines the proof detail against the
     direction (a ``command:lean/¬P`` counterexample legitimately pairs DELIVERED with ``no``),
     so only settledness is checked here, not which way.
@@ -187,7 +187,7 @@ class Resolver:
         if need_id in self._cache:
             return self._cache[need_id]
         need = self._by_id[need_id]
-        if need_id in self._visiting:  # cycle — stop and report
+        if need_id in self._visiting:  # cycle: stop and report
             return NeedResult(need, NeedState.BROKEN, detail=["cycle in children"])
         self._visiting.add(need_id)
         result = self._compute(need)
@@ -211,7 +211,7 @@ class Resolver:
         """Resolve one leaf proof locator, routing ``need:`` to the needref edge.
 
         Every other adapter reads a repo; a needref reads another need's resolution, which only
-        the resolver can do — so it is dispatched here, not via :func:`_resolve_proof`.
+        the resolver can do. Dispatched here, not via :func:`_resolve_proof`.
         """
         name, sep, payload = locator.partition(":")
         if sep and name == _NEEDREF:
@@ -222,11 +222,11 @@ class Resolver:
         """Resolve ``need:<id>`` (or ``need:<id>@<answer>``) against another need (#research step 2).
 
         A research question can depend on a peer: "B cannot be posed until A is settled." That
-        edge is itself a proof — B delivers iff A is settled — so it rides the ``proofs`` tuple
+        edge is itself a proof: B delivers iff A is settled, so it rides the ``proofs`` tuple
         with no new field, and the resolver's own cycle detection and memoization cover A→B→A for
         free (a back-edge hits the ``_visiting`` guard and returns BROKEN). ``need:A`` resolves on
         A's *settledness* (DELIVERED); the optional ``need:A@yes`` form additionally requires A's
-        authored :attr:`~prodc.model.Need.answer` to match. B never inherits A's answer — the
+        authored :attr:`~prodc.model.Need.answer` to match. B never inherits A's answer. The
         dependency only requires A settled, optionally in a given direction. Public because a
         decision's ``awaits`` (#93) reads the same edge (see :func:`decision_readiness`).
         """
@@ -284,7 +284,7 @@ class Resolver:
         if any(r.state is ProofState.BROKEN for r in results):
             state = NeedState.BROKEN
         elif any(r.state is ProofState.UNRESOLVED for r in results):
-            state = NeedState.UNRESOLVED  # a source couldn't be read — can't judge yet
+            state = NeedState.UNRESOLVED  # a source couldn't be read: can't judge yet
         elif delivered == len(results):
             state = NeedState.DELIVERED
         else:
@@ -349,7 +349,7 @@ class Summary:
     delivered: int
     pending: int
     hole: int
-    must_hole: int  # a HOLE on a must-have — the top of the board
+    must_hole: int  # a HOLE on a must-have: the top of the board
     broken: int  # a dangling proof locator
     unresolved: int  # a proof whose source could not be read (e.g. sibling repo absent)
     opinion: int  # a need with no source of any kind
@@ -359,7 +359,7 @@ class Summary:
         """Fraction DELIVERED, of needs that could be read.
 
         UNRESOLVED needs (a source that couldn't be read) are excluded from the
-        denominator — they neither help nor hurt coverage, so a `--min-coverage` gate
+        denominator. They neither help nor hurt coverage, so a `--min-coverage` gate
         isn't failed by an absent sibling the way a BROKEN locator fails it.
         """
         judged = self.total - self.unresolved
@@ -388,7 +388,7 @@ def summarize(results: list[NeedResult]) -> Summary:
 
 
 def group_state(s: Summary) -> NeedState:
-    """The derived state of an FK group (goal, release, role) — the roll-up of its members (#80).
+    """The derived state of an FK group (goal, release, role): the roll-up of its members (#80).
 
     One function behind every group's state, so a goal/initiative, a release slice and a role all
     read the same way and none carries a hand-set status that can drift from its needs: BROKEN if
@@ -417,7 +417,7 @@ class Recurrence:
 
     @property
     def count(self) -> int:
-        """How many clients share this baseline — the recurrence signal."""
+        """How many clients share this baseline: the recurrence signal."""
         return self.variants
 
 
@@ -469,7 +469,7 @@ def proof_suggestions(
     """Rank candidate proofs for every HOLE need against the adapters' inventories (#54).
 
     For each leaf need with no proof, compare its text with every enumerable adapter's known
-    proof units and return the closest matches as ready-to-paste locators. Read-only — it never
+    proof units and return the closest matches as ready-to-paste locators. Read-only: it never
     writes; ``--apply`` and BROKEN-relink are left to the caller/follow-up.
     """
     inventories: list[tuple[str, list[str]]] = [
@@ -494,7 +494,7 @@ def proof_suggestions(
 
 @dataclass(frozen=True)
 class RelinkSuggestion:
-    """A candidate replacement for a BROKEN proof locator — a renamed test, relinkable (#54)."""
+    """A candidate replacement for a BROKEN proof locator: a renamed test, relinkable (#54)."""
 
     need: Need
     adapter: str  # the adapter the broken locator (and the replacement) resolve through
@@ -513,7 +513,7 @@ def relink_suggestions(
 ) -> list[RelinkSuggestion]:
     """Propose the nearest live inventory entry for each BROKEN proof locator (#54 relink).
 
-    A relink is for a locator whose adapter still exists but whose id no longer resolves — a test
+    A relink is for a locator whose adapter still exists but whose id no longer resolves. A test
     that was renamed. So it only proposes within the *same* adapter (the kind is stable, the id
     drifted), scoring each inventory entry by the similarity of its matchable part to the broken
     id's matchable part, falling back to the need text. A locator whose adapter is absent entirely
@@ -531,7 +531,7 @@ def relink_suggestions(
                 continue
             ad = adapters.get(name)
             if not isinstance(ad, Inventoried):
-                continue  # adapter gone, or can't enumerate — nothing to relink against
+                continue  # adapter gone, or can't enumerate: nothing to relink against
             scored: list[RelinkSuggestion] = []
             for inv in ad.inventory():
                 candidate = f"{name}:{inv}"
@@ -568,11 +568,11 @@ def state_priority(r: NeedResult) -> int:
 
 
 def _rank_key(r: NeedResult, recurrence_counts: dict[str, int]) -> tuple[int, int, int, int, str]:
-    """Pure ordering over recorded inputs only — never a conjured score (#34).
+    """Pure ordering over recorded inputs only. Never a conjured score (#34).
 
     1. must + state: a must-HOLE sits at the top, then BROKEN, PENDING, …, DELIVERED.
     2. evidence kind: a real `interview` outranks `proxy`/`internal`/opinion at the same
-       state, because a user actually asked — this is what reorders the author's guesses.
+       state, because a user actually asked. This is what reorders the author's guesses.
     3. recurrence: how many clients share this baseline (#51). Breadth of demand is a
        first-order, objective signal, so it outranks the author's importance guess.
     4. `importance`: the author's optional ordinal, higher first; absent falls to the back
@@ -604,7 +604,7 @@ def goal_report(
 ) -> tuple[list[tuple[Goal, Summary]], list[NeedResult]]:
     """Roll results up per goal, and list the needs that serve no goal.
 
-    Per-goal coverage is just :func:`summarize` over the needs that cite that goal — the
+    Per-goal coverage is just :func:`summarize` over the needs that cite that goal. The
     same summary the whole board uses. The ungoaled list is the flag symmetric to opinion:
     a need with no objective above it.
     """
@@ -622,7 +622,7 @@ def goal_report(
 def release_report(
     results: list[NeedResult], releases: list[Release]
 ) -> list[tuple[Release, Summary]]:
-    """Coverage per release slice, in declared (ship) order — the story-map release view (#30).
+    """Coverage per release slice, in declared (ship) order: the story-map release view (#30).
 
     Like :func:`goal_report`, each slice's coverage is just :func:`summarize` over the needs
     that name it, so "what does this release look like" reads the same as the whole board.
@@ -641,7 +641,7 @@ def role_report(
 
     The roster view: like :func:`goal_report`, each role's coverage is :func:`summarize` over the
     needs that name it, so a role reads the same as the whole board. A declared role with a 0/0
-    summary is an orphan role — on the roster though no need references it yet (a new packer),
+    summary is an orphan role: on the roster though no need references it yet (a new packer),
     the symmetric flag to a need that serves no role. Scope to one client by resolving a
     client-filtered need set first (``status --client``), exactly as goals/releases do.
     """
@@ -652,7 +652,7 @@ def role_report(
             if r.need.role in by_role:
                 by_role[r.need.role].append(r)
         elif r.need.who is not None:
-            # a person is named but plays no declared role — the flag symmetric to an
+            # a person is named but plays no declared role: the flag symmetric to an
             # ungoaled need. A need with neither who nor role (e.g. a bare flow) is not a
             # person with a missing role, so it is not listed here.
             unroled.append(r)
@@ -688,27 +688,27 @@ def principle_state(principle: Principle, adapters: dict[str, Adapter]) -> Princ
     if any(r.state is ProofState.UNRESOLVED for r in results):
         return PrincipleState.UNRESOLVED
     if any(r.state is ProofState.PENDING and not r.declared for r in results):
-        return PrincipleState.VIOLATED  # a guard ran and failed — the code contradicts the stance
+        return PrincipleState.VIOLATED  # a guard ran and failed: the code contradicts the stance
     if all(r.state is ProofState.DELIVERED for r in results):
         return PrincipleState.ENFORCED
-    # some declared-pending guards, none failing — honestly not yet active
+    # some declared-pending guards, none failing: honestly not yet active
     return PrincipleState.STATED
 
 
 @dataclass(frozen=True)
 class PrincipleReport:
-    """One principle, its enforcement state, and the decisions that rest on it — the ripple made visible."""
+    """One principle, its enforcement state, and the decisions that rest on it: the ripple made visible."""
 
     principle: Principle
     declined: tuple[Need, ...]  # needs withdrawn citing this principle
-    stale: tuple[Need, ...]  # of those, decided before the principle's latest revision — re-review
+    stale: tuple[Need, ...]  # of those, decided before the principle's latest revision: re-review
     state: PrincipleState = PrincipleState.STATED  # enforced/stated/violated/broken (#89)
 
 
 def _decided_before(decided: str, revised: str | None) -> bool:
     """True when a decision dated ``decided`` predates a principle revised on ``revised``.
 
-    Both are ISO dates. An undated principle, or a malformed date on either side, is never stale —
+    Both are ISO dates. An undated principle, or a malformed date on either side, is never stale.
     there is no revision to compare against, and the loader does not own date format here.
     """
     if revised is None:
@@ -726,10 +726,10 @@ def principle_report(
 ) -> list[PrincipleReport]:
     """Each declared principle with its enforcement state, the needs withdrawn under it, and the stale ones.
 
-    Reads the *whole* need list, withdrawn needs included — a declined need is off the board, so
+    Reads the *whole* need list, withdrawn needs included. A declined need is off the board, so
     the board-filtered list would hide exactly what this reports. A decision is stale when the
     withdrawal is dated before the principle's ``revised_at``: the frame it was judged against has
-    changed since, so it comes back up for re-review. Records-only — prodc flags, the PM re-decides.
+    changed since, so it comes back up for re-review. Records-only: prodc flags, the PM re-decides.
     When ``adapters`` are given, each principle also carries its :func:`principle_state` (#89); without
     them the state defaults to STATED (a caller that has no proof adapters, e.g. a plain ripple view).
     """
@@ -751,12 +751,12 @@ def principle_report(
 
 
 def active_decisions(decisions: list[Decision]) -> list[Decision]:
-    """The decisions still in force — neither superseded (``withdrawn``) nor a staged ``draft``."""
+    """The decisions still in force: neither superseded (``withdrawn``) nor a staged ``draft``."""
     return [d for d in decisions if d.withdrawn is None and not d.draft]
 
 
 def decisions_for(need_id: str, decisions: list[Decision]) -> list[Decision]:
-    """The in-force decisions whose chosen solution serves ``need_id`` — the 'how' behind a need."""
+    """The in-force decisions whose chosen solution serves ``need_id``: the 'how' behind a need."""
     return [d for d in active_decisions(decisions) if need_id in d.needs]
 
 
@@ -771,7 +771,7 @@ class DecisionWait:
 
 @dataclass(frozen=True)
 class DecisionReadiness:
-    """Whether a decision's research has settled (#93) — derived from the awaited needs' proofs.
+    """Whether a decision's research has settled (#93): derived from the awaited needs' proofs.
 
     BLOCKED is a property of the decision, not a :class:`NeedState`: the awaited needs keep their
     ordinary states, and nothing about coverage or delivery changes.
@@ -795,7 +795,7 @@ def decision_readiness(
     """Readiness for each decision that ``awaits`` research, keyed by decision id (#93).
 
     Each awaited ref resolves exactly like a ``need:`` proof (:meth:`Resolver.resolve_ref`), over
-    every need in the model — a research need is often ``product: false`` and off the board, but it
+    every need in the model. A research need is often ``product: false`` and off the board, but it
     is still what the decision waits on. Decisions with no ``awaits`` are absent.
     """
     resolver = Resolver(needs, adapters)
@@ -814,12 +814,12 @@ def decision_readiness(
 def awaits_warnings(
     decisions: list[Decision], needs: list[Need], readiness: dict[str, DecisionReadiness]
 ) -> list[tuple[str, str]]:
-    """Lint for a decision's ``awaits`` (#93), keyed by decision id — warnings, never errors.
+    """Lint for a decision's ``awaits`` (#93), keyed by decision id: warnings, never errors.
 
     - committed (not ``draft``) while its research is still open;
-    - an awaited direction the research answered the other way — decided against its own result;
-    - waiting on a withdrawn need — abandoned research;
-    - waiting on a product need — research belongs on a ``product: false`` need, or it leaks into
+    - an awaited direction the research answered the other way: decided against its own result;
+    - waiting on a withdrawn need: abandoned research;
+    - waiting on a product need: research belongs on a ``product: false`` need, or it leaks into
       coverage and blurs the line between research and a delivery proof.
     """
     by_id = {n.id: n for n in needs}
@@ -839,18 +839,18 @@ def awaits_warnings(
                 out.append(
                     (
                         d.id,
-                        f"awaits {ref} but {nid} answered {n.answer.value} — decided against its research",
+                        f"awaits {ref} but {nid} answered {n.answer.value}: decided against its research",
                     )
                 )
             if n.withdrawn is not None:
                 out.append(
-                    (d.id, f"awaits {nid}, which is withdrawn — drop it or withdraw the decision")
+                    (d.id, f"awaits {nid}, which is withdrawn; drop it or withdraw the decision")
                 )
             if n.product:
                 out.append(
                     (
                         d.id,
-                        f"awaits {nid}, a product need — research belongs on a product: false need",
+                        f"awaits {nid}, a product need; research belongs on a product: false need",
                     )
                 )
     return out
@@ -875,11 +875,11 @@ def stale_decisions(
 
 
 def orphaned_decisions(decisions: list[Decision], needs: list[Need]) -> list[Decision]:
-    """In-force decisions whose every served need is withdrawn or non-product — the real orphan.
+    """In-force decisions whose every served need is withdrawn or non-product: the real orphan.
 
     A decision must name a need at load, but that need can later be withdrawn (``out_of_scope``) or
     marked non-product. A decision left serving only such needs is engineering with no live product
-    reason — re-tie it to a live need, or withdraw it. (A need not in ``needs`` at all is a load
+    reason. Re-tie it to a live need, or withdraw it. (A need not in ``needs`` at all is a load
     error, never reached here.)
     """
     by_id = {n.id: n for n in needs}
@@ -897,18 +897,18 @@ def orphaned_decisions(decisions: list[Decision], needs: list[Need]) -> list[Dec
 
 @dataclass(frozen=True)
 class Contradiction:
-    """Two needs in tension — clients wanting opposite things. ``unresolved`` = both still live.
+    """Two needs in tension: clients wanting opposite things. ``unresolved`` = both still live.
 
     The ``contradicts`` relation is symmetric and the model carries it on both needs, so a pair is
     unordered (``a.id < b.id``). It is *unresolved* while neither need has left the board: the
     tension the product vision has not yet decided. Withdrawing one side (typically ``out_of_scope``
-    citing the principle that decides) resolves it — this is the structural home for "clients want
+    citing the principle that decides) resolves it. This is the structural home for "clients want
     opposite things; the vision decides" (#B).
     """
 
     a: Need
     b: Need
-    unresolved: bool  # both live (not withdrawn, not a staged draft) — the vision hasn't decided
+    unresolved: bool  # both live (not withdrawn, not a staged draft): the vision hasn't decided
 
 
 def _contradiction_live(need: Need) -> bool:
@@ -921,7 +921,7 @@ def contradictions(needs: list[Need]) -> list[Contradiction]:
 
     Reads the relation off the (already symmetric) model, so a pair surfaces from either need's
     ``contradicts``; pairs are deduped and unordered. A target not present in ``needs`` is skipped,
-    so a scoped subset never raises — pass the whole ``model.needs`` to judge resolution honestly
+    so a scoped subset never raises. Pass the whole ``model.needs`` to judge resolution honestly
     (a withdrawn side is what resolves a pair, and a board-filtered list would have dropped it).
     """
     by_id = {n.id: n for n in needs}
@@ -955,12 +955,12 @@ class Handoff:
 def handoffs(needs: list[Need]) -> list[Handoff]:
     """Derive the cross-role handoffs in every flow from its ordered ``children`` (#52).
 
-    A handoff is a consecutive pair of a flow's children whose ``role`` differs — the point in
+    A handoff is a consecutive pair of a flow's children whose ``role`` differs: the point in
     the journey where one person's work passes to the next (Patton's backbone, read as an
     ordered story map). It keys on ``role``, not ``who``: ``role`` is set deliberately on the
     need and is never inherited from a file-level default, so deriving on it does not fire on
     the file-level ``who`` that every need in a file silently shares (the noise #52's follow-up
-    flagged). No new edge type — the order already in ``children`` is the sequence.
+    flagged). No new edge type: the order already in ``children`` is the sequence.
     """
     by_id = {n.id: n for n in needs}
     out: list[Handoff] = []
@@ -979,7 +979,7 @@ def applicable_needs(needs: list[Need], client: str) -> list[Need]:
     it has not specialised.
 
     A baseline (``variant_of is None`` and ``client is None``) applies to all clients
-    unless this client carries a variant of it — in which case the variant overrides the
+    unless this client carries a variant of it. In that case the variant overrides the
     baseline and the baseline is dropped. Standalone needs tied to a different client are
     excluded.
     """
@@ -994,11 +994,11 @@ def applicable_needs(needs: list[Need], client: str) -> list[Need]:
 
 
 def flow_orphan_warnings(needs: list[Need]) -> set[str]:
-    """Leaf needs that belong to no flow — the seam-coverage analogue of orphan proofs (#44).
+    """Leaf needs that belong to no flow: the seam-coverage analogue of orphan proofs (#44).
 
     A product feels half-baked at the seams (the walk *between* stories), which only a flow
     (a need with children) scores. Once any flow exists, a leaf referenced by no flow is a
-    gap in that seam coverage. With no flows at all this is silent — there's no seam to miss.
+    gap in that seam coverage. With no flows at all this is silent: there's no seam to miss.
     """
     flows = [n for n in needs if n.children]
     if not flows:
@@ -1012,15 +1012,15 @@ def flow_orphan_warnings(needs: list[Need]) -> set[str]:
 def flow_step_warnings(needs: list[Need], steps: tuple[str, ...]) -> list[tuple[str, str]]:
     """Judgment-level hygiene on a flow's steps, once a ``[flows].steps`` vocabulary exists (#90).
 
-    Opt-in: silent when no vocabulary is declared — a board with no steps has no journey to
+    Opt-in: silent when no vocabulary is declared. A board with no steps has no journey to
     grade. Membership (a step word that isn't in the vocab) is the loader's hard error; this
     catches the *shape* of the journey, keyed by flow id, as warnings:
 
-    - **never terminal**: a flow with stepped edges but none carrying the terminal step — the
+    - **never terminal**: a flow with stepped edges but none carrying the terminal step. The
       journey never ends (Patton: the story must end). The message names the configured word.
-    - **out of order**: stepped edges whose rank decreases along ``children`` — the map runs
+    - **out of order**: stepped edges whose rank decreases along ``children``. The map runs
       backwards. Warned once per flow.
-    - **mixed bare/stepped**: a flow where some edges carry a step and some don't — a use case
+    - **mixed bare/stepped**: a flow where some edges carry a step and some don't. A use case
       with a hole, which would otherwise pass clean.
 
     A flow with zero stepped edges is exempt: it's a plain flow, not a use case (#90), and
@@ -1036,30 +1036,30 @@ def flow_step_warnings(needs: list[Need], steps: tuple[str, ...]) -> list[tuple[
             continue
         stepped = [c for c in flow.children if c.step is not None]
         if not stepped:
-            continue  # a plain flow, not a use case — exempt
+            continue  # a plain flow, not a use case: exempt
         if len(stepped) != len(flow.children):
             bare = next(c.id for c in flow.children if c.step is None)
             out.append(
-                (flow.id, f"edge {bare!r} has no step while siblings do — a use case with a hole")
+                (flow.id, f"edge {bare!r} has no step while siblings do (a use case with a hole)")
             )
         if not any(c.step == terminal for c in stepped):
             out.append(
                 (
                     flow.id,
-                    f"no edge carries the terminal step {terminal!r} — the journey never ends; "
+                    f"no edge carries the terminal step {terminal!r}: the journey never ends; "
                     "add it or drop the steps",
                 )
             )
         ranks = [rank[c.step] for c in stepped if c.step in rank]
         if any(b < a for a, b in pairwise(ranks)):
-            out.append((flow.id, "steps run out of order — reorder children or re-step the edges"))
+            out.append((flow.id, "steps run out of order; reorder children or re-step the edges"))
     return out
 
 
 def shared_proof_warnings(results: list[NeedResult]) -> dict[str, str]:
     """Flag a need whose *every* proof is also claimed by another need (#45).
 
-    `orphans` catches a proof claimed by no need; this catches the opposite inflation — one
+    `orphans` catches a proof claimed by no need; this catches the opposite inflation: one
     scenario standing in for many needs, so several green rows rest on a single assertion.
     Sharing is sometimes legitimate (one behaviour serves two needs), so it is a warning, not
     a failure. A need with no proof, or at least one proof it alone claims, is not flagged.
@@ -1072,12 +1072,12 @@ def shared_proof_warnings(results: list[NeedResult]) -> dict[str, str]:
     for r in results:
         proofs = r.need.proofs
         if proofs and all(len(by_proof[p]) > 1 for p in proofs):
-            out[r.need.id] = "every proof shared with another need — weak independent coverage"
+            out[r.need.id] = "every proof shared with another need (weak independent coverage)"
     return out
 
 
 def orphans(needs: list[Need], adapters: dict[str, Adapter]) -> dict[str, list[str]]:
-    """Proof units claimed by no need, per enumerable adapter — the reverse of the board.
+    """Proof units claimed by no need, per enumerable adapter: the reverse of the board.
 
     The board walks need → proof; this walks proof → need, surfacing scenarios that
     exist in the suite but no need references ("does every feature tie to a need?").

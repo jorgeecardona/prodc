@@ -1,4 +1,4 @@
-# An idea with no need yet — a draft decision with empty `needs[]`
+# An idea with no need yet: a draft decision with empty `needs[]`
 
 scope: S
 verify: test
@@ -22,7 +22,7 @@ In Torres terms this is a *brainstormed* solution that does not yet hang from an
 Reuse the decision noun, no new noun. "Idea" is the user word; the data is a decision.
 
 - **Load rule.** A decision with `draft: true` may have an empty `needs: []`. The loader still
-  refuses an empty `needs` on a non-draft decision — the refusal stays where it matters (a
+  refuses an empty `needs` on a non-draft decision. The refusal stays where it matters (a
   committed solution with no product reason).
 - **Create.** `add decision --draft` may omit `--needs` (only with `--draft`); `add_decision`
   then writes `needs: []`. Today `add decision` hard-refuses a missing `--needs`.
@@ -50,7 +50,7 @@ docstring, `src/prodc/agent.md` ("`--needs` is required"), and
 ## Rejected
 
 - A separate `idea` noun: cleaner to read, but one more noun to ripple through loader, status,
-  lint, writer, docs, and the playbook — for a thing that is a decision in a draft state.
+  lint, writer, docs, and the playbook, for a thing that is a decision in a draft state.
 - A draft need with an `assumption` source: it forces a fake problem statement. (The
   solution-verb lint would not catch it if `claim` is set, so the rejection rests on the fake
   problem, not on the lint.)

@@ -1,16 +1,15 @@
 # Contributing to prodc
 
-Developer and maintainer notes: toolchain, CI, and the release process. (Package *users* need none of
-this — see the [README](README.md) for what prodc does and how to use it.)
+Developer and maintainer notes: toolchain, CI, and the release process. Package users need none of
+this. See the [README](README.md) for what prodc does and how to use it.
 
 ## Contributing with an AI agent
 
-Most changes here will be written with a coding agent — that's expected and welcome. To get a good
-result from yours:
+Most changes here will be written with a coding agent. To get a good result from yours:
 
-- **Point it at [`AGENTS.md`](AGENTS.md) first** — the machine-facing contract for this repo: build
-  and test commands, the typed-API and style rules, and the repo-specific gotchas. Agents read it
-  automatically when started from the repo root.
+- **Point it at [`AGENTS.md`](AGENTS.md) first.** That file is the machine-facing contract for
+  this repo: build and test commands, the typed-API and style rules, and the repo-specific gotchas.
+  Agents read it automatically when started from the repo root.
 - **Ship a green `make check`** (lint + typecheck + test). Have the agent run it and fix what it
   finds *before* opening the MR, not leave it for review.
 - **Don't let it bypass the hooks.** The patch version auto-bumps on `src/` changes and CI's
@@ -30,7 +29,7 @@ moon run :test          # or run a single target
 ```
 
 CI is a single GitLab job: `proto install` brings up the toolchain, then one `moon run` resolves the
-whole graph — there are no per-language jobs or hand-wired stages. (`make` targets still work locally;
+whole graph. There are no per-language jobs or hand-wired stages. (`make` targets still work locally;
 they call `uv run` directly and don't need moon.)
 
 ## Releasing
@@ -44,12 +43,12 @@ The package version in `pyproject.toml` is the single source of truth, and relea
    non-bypassably in CI: a push or MR that changes `src/` without a version bump fails the pipeline,
    catching `--no-verify` and unhooked clones.
 3. **`:release`** runs on a green `main` pipeline: if the package version isn't on PyPI yet, it
-   publishes via OIDC Trusted Publishing. Merging a version bump to `main` releases itself — no
-   second pipeline, no tag required.
+   publishes via OIDC Trusted Publishing. Merging a version bump to `main` releases itself. No
+   second pipeline or tag required.
 
 ### One-time setup
 
-**PyPI — OIDC Trusted Publishing** (no API token is stored anywhere). Account → Publishing → add a
+**PyPI: OIDC Trusted Publishing** (no API token is stored anywhere). Account → Publishing → add a
 *pending* GitLab publisher (or add it to the project after the first manual upload):
 
 | Field | Value |
@@ -60,5 +59,5 @@ The package version in `pyproject.toml` is the single source of truth, and relea
 | Top-level pipeline file | `.gitlab-ci.yml` |
 | Environment name | `pypi` |
 
-Releases are automatic on `main` — there is no manual tag or publish step. Pushes and MRs run
+Releases are automatic on `main`. There is no manual tag or publish step. Pushes and MRs run
 lint + typecheck + test + build only.
