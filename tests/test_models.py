@@ -14,7 +14,21 @@ from dataclasses import dataclass, replace
 from musil import Action, Model, check, explore, reaches
 
 from prodc.adapters import Adapter, ProofResult
-from prodc.model import Child, Decision, Need, NeedState, ProofState, Withdrawal, board_needs
+from prodc.model import (
+    Attestation,
+    AttestationKind,
+    Child,
+    Confidence,
+    Decision,
+    Need,
+    NeedState,
+    ProofState,
+    Source,
+    SourceKind,
+    Verdict,
+    Withdrawal,
+    board_needs,
+)
 from prodc.status import Resolver, active_decisions
 
 
@@ -25,7 +39,14 @@ class _Stub:
         return ProofResult(ProofState(payload), declared=False, detail="stub")
 
 
-_ADAPTERS: dict[str, Adapter] = {"stub": _Stub()}
+class _DeclaredStub:
+    """Resolve 'decl:<state>' like ``_Stub``, but as a declared proof (tag/existence, #97)."""
+
+    def resolve(self, payload: str) -> ProofResult:
+        return ProofResult(ProofState(payload), declared=True, detail="declared stub")
+
+
+_ADAPTERS: dict[str, Adapter] = {"stub": _Stub(), "decl": _DeclaredStub()}
 
 
 # --- leaf-need lifecycle -------------------------------------------------------------
@@ -284,6 +305,161 @@ LIFE_MODEL = Model(
 )
 
 
+# --- delivery confidence (#97) -------------------------------------------------------
+# Every recorded fact that can feed confidence, as an axis an author can move. Each invariant
+# asks prodc's real resolver for the confidence and checks a property of it, never the rule
+# table itself.
+SOURCE_AXIS = ("none", "assumption", "secondary", "primary")
+PROOF_AXIS = ("none", "stub:pending", "stub:delivered", "decl:delivered", "stub:broken")
+ATTEST_AXIS = ("none", "human:pass", "human:concerns", "human:fail", "ai:pass", "ai:fail")
+
+
+@dataclass(frozen=True)
+class Conf:
+    source: str = "none"
+    proof: str = "none"
+    attest: str = "none"
+
+
+def _conf_need(s: Conf, nid: str = "n") -> Need:
+    sources = () if s.source == "none" else (Source(SourceKind(s.source), who="a", quote="q"),)
+    proofs = () if s.proof == "none" else (s.proof,)
+    att = None
+    if s.attest != "none":
+        kind, verdict = s.attest.split(":")
+        att = Attestation("a", "2026-10-24", AttestationKind(kind), Verdict(verdict))
+    return Need(id=nid, text="x", sources=sources, proofs=proofs, attestation=att)
+
+
+def conf_result(s: Conf) -> tuple[NeedState, Confidence | None]:
+    """State and confidence from prodc's real resolver: no reimplementation."""
+    r = Resolver([_conf_need(s)], _ADAPTERS).resolve("n")
+    return r.state, r.confidence
+
+
+def _conf_actions() -> list[Action[Conf]]:
+    out: list[Action[Conf]] = []
+    for field_name, axis in (
+        ("source", SOURCE_AXIS),
+        ("proof", PROOF_AXIS),
+        ("attest", ATTEST_AXIS),
+    ):
+        for v in axis:
+            out.append(
+                Action(
+                    f"{field_name}={v}",
+                    lambda s, f=field_name, v=v: getattr(s, f) != v,
+                    lambda s, f=field_name, v=v: replace(s, **{f: v}),
+                )
+            )
+    return out
+
+
+def _conf_iff_delivered(s: Conf) -> bool:
+    """A need has a confidence exactly when it is DELIVERED. A gap is never 'weak'."""
+    state, conf = conf_result(s)
+    return (conf is not None) == (state is NeedState.DELIVERED)
+
+
+def _conf_strong_needs_all_three(s: Conf) -> bool:
+    """Strong only with a human pass, a primary source, and a results-backed proof."""
+    if conf_result(s)[1] is not Confidence.STRONG:
+        return True
+    return s.attest == "human:pass" and s.source == "primary" and s.proof == "stub:delivered"
+
+
+def _conf_fact_against_is_weak(s: Conf) -> bool:
+    """A fail verdict, a declared proof, or an opinion caps a DELIVERED need at weak."""
+    state, conf = conf_result(s)
+    if state is not NeedState.DELIVERED:
+        return True
+    against = (
+        s.attest.endswith(":fail")
+        or s.proof.startswith("decl:")
+        or s.source
+        in (
+            "none",
+            "assumption",
+        )
+    )
+    return (conf is Confidence.WEAK) == against
+
+
+def _conf_unattested_is_not_weak(s: Conf) -> bool:
+    """A missing review is not a fact against the delivery: #13 warns on it, confidence does not."""
+    if s.attest != "none":
+        return True
+    state, conf = conf_result(s)
+    if state is not NeedState.DELIVERED or s.proof.startswith("decl:"):
+        return True
+    if s.source in ("none", "assumption"):
+        return True
+    return conf is Confidence.MEDIUM
+
+
+CONF_MODEL = Model(
+    init=Conf(),
+    actions=_conf_actions(),
+    invariants={
+        "confidence-iff-delivered": _conf_iff_delivered,
+        "strong-needs-all-three": _conf_strong_needs_all_three,
+        "fact-against-is-weak": _conf_fact_against_is_weak,
+        "unattested-is-not-weak": _conf_unattested_is_not_weak,
+    },
+)
+
+
+# A flow of two steps. Each step is one of a few leaf presets, one per confidence and one gap, so
+# the product stays small; the leaf model above already covers every leaf configuration.
+STEP_PRESETS = (
+    Conf(),  # HOLE: no confidence
+    Conf("assumption", "stub:delivered"),  # weak
+    Conf("secondary", "stub:delivered"),  # medium
+    Conf("primary", "stub:delivered", "human:pass"),  # strong
+)
+
+
+@dataclass(frozen=True)
+class ConfFlow:
+    steps: tuple[Conf, Conf] = (STEP_PRESETS[0], STEP_PRESETS[0])
+
+
+def _set_step(i: int, c: Conf) -> Action[ConfFlow]:
+    def enabled(s: ConfFlow) -> bool:
+        return s.steps[i] != c
+
+    def apply(s: ConfFlow) -> ConfFlow:
+        return replace(s, steps=(c, s.steps[1]) if i == 0 else (s.steps[0], c))
+
+    return Action(f"step{i}={c}", enabled, apply)
+
+
+def _conf_flow_actions() -> list[Action[ConfFlow]]:
+    return [_set_step(i, c) for i in range(2) for c in STEP_PRESETS]
+
+
+def _conf_flow_is_lowest_step(s: ConfFlow) -> bool:
+    """A DELIVERED flow is never more confident than its weakest step."""
+    kids = [_conf_need(c, f"c{i}") for i, c in enumerate(s.steps)]
+    flow = Need(id="f", text="f", children=tuple(Child(k.id) for k in kids))
+    res = Resolver([flow, *kids], _ADAPTERS)
+    fr = res.resolve("f")
+    if fr.state is not NeedState.DELIVERED:
+        return fr.confidence is None
+    order = list(Confidence)
+    kid_confs = [res.resolve(k.id).confidence for k in kids]
+    return fr.confidence is not None and all(
+        k is not None and order.index(fr.confidence) <= order.index(k) for k in kid_confs
+    )
+
+
+CONF_FLOW_MODEL = Model(
+    init=ConfFlow(),
+    actions=_conf_flow_actions(),
+    invariants={"flow-is-lowest-step": _conf_flow_is_lowest_step},
+)
+
+
 # --- the gate ------------------------------------------------------------------------
 def test_leaf_lifecycle_safety() -> None:
     r = check(LEAF_MODEL)
@@ -318,3 +494,19 @@ def test_checker_bites() -> None:
         invariants={"never-delivered": lambda s: leaf_state(s) is not NeedState.DELIVERED},
     )
     assert not check(bad).ok
+
+
+def test_confidence_safety() -> None:
+    r = check(CONF_MODEL)
+    assert r.ok, f"{r.invariant}: {r.trace}"
+
+
+def test_confidence_flow_safety() -> None:
+    r = check(CONF_FLOW_MODEL)
+    assert r.ok, f"{r.invariant}: {r.trace}"
+
+
+def test_confidence_strong_is_reachable() -> None:
+    """Strong is not dead code: some sequence of recorded facts reaches it."""
+    g = explore(CONF_MODEL)
+    assert any(conf_result(st)[1] is Confidence.STRONG for st in g.states)

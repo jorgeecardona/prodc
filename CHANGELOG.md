@@ -6,6 +6,10 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- A DELIVERED need now shows a confidence: weak, medium or strong (#97). It is derived from
+  recorded facts only: a `fail` verdict, a declared proof or an opinion make it weak; a human
+  `pass` on a primary source with a results-backed proof makes it strong. `show` says which
+  rule matched. A flow takes the lowest confidence of its steps.
 - A need can carry a `path:` (start, outcome, `max_clicks`, and the `proof` test that
   counts the clicks). `lint` warns on a click budget with no proof, `show` prints the path,
   and `report` lists them in a Paths section (#99).

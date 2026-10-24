@@ -50,6 +50,17 @@ class NeedState(StrEnum):
     UNRESOLVED = "unresolved"  # a proof's source could not be read (e.g. sibling repo absent)
 
 
+class Confidence(StrEnum):
+    """How far a DELIVERED need's recorded facts back the delivery (#97). Derived, never set.
+
+    Declaration order is weakest-first, so a flow takes the ``min`` of its children.
+    """
+
+    WEAK = "weak"  # a recorded fact undercuts the delivery
+    MEDIUM = "medium"  # green, with no fact against it
+    STRONG = "strong"  # human pass, primary source, results-backed proof
+
+
 class PrincipleState(StrEnum):
     """Whether a principle's proofs show the code still obeys it (#89).
 
@@ -556,4 +567,6 @@ class NeedResult:
     declared: bool = False  # true if DELIVERED rests on tags/existence, not a results artifact
     detail: list[str] = field(default_factory=list[str])
     warnings: list[str] = field(default_factory=list[str])
+    confidence: Confidence | None = None  # only for a DELIVERED need (#97)
+    confidence_detail: list[str] = field(default_factory=list[str])  # the rule that matched
     path_state: ProofState | None = None  # state of ``need.path.proof``; None when it has none

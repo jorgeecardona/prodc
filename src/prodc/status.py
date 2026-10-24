@@ -17,6 +17,7 @@ from .model import (
     SOLUTION_VERBS,
     Answer,
     AttestationKind,
+    Confidence,
     Decision,
     Goal,
     Need,
@@ -179,6 +180,35 @@ def _path_warnings(need: Need, result: NeedResult) -> list[str]:
     return []
 
 
+_CONFIDENCE_ORDER = list(Confidence)
+
+
+def leaf_confidence(need: Need, result: NeedResult) -> tuple[Confidence | None, list[str]]:
+    """The confidence of a DELIVERED leaf and the rule that set it; None when not DELIVERED (#97).
+
+    First match wins. Weak rules name a recorded fact that undercuts the delivery. A missing
+    attestation is not one: it is medium, and #13 warns on it separately. Evidence age is left
+    out on purpose, so the value changes only when a recorded fact changes.
+    """
+    if result.state is not NeedState.DELIVERED:
+        return None, []
+    att = need.attestation
+    if att is not None and att.verdict is Verdict.FAIL:
+        return Confidence.WEAK, ["attestation verdict is fail"]
+    if result.declared:
+        return Confidence.WEAK, ["proof is declared (tag or existence), not a results file"]
+    if need.is_opinion:
+        return Confidence.WEAK, ["opinion: no primary or secondary source"]
+    if (
+        att is not None
+        and att.kind is AttestationKind.HUMAN
+        and att.verdict is Verdict.PASS
+        and need.strongest_kind is SourceKind.PRIMARY
+    ):
+        return Confidence.STRONG, ["human pass on a primary source with a results-backed proof"]
+    return Confidence.MEDIUM, ["green proof, nothing recorded against it"]
+
+
 class Resolver:
     def __init__(
         self,
@@ -204,6 +234,15 @@ class Resolver:
         self._visiting.add(need_id)
         result = self._compute(need)
         self._visiting.discard(need_id)
+        if need.children:
+            if result.state is NeedState.DELIVERED:
+                kids = [self.resolve(c.id).confidence for c in need.children]
+                known = [k for k in kids if k is not None]
+                if known:
+                    result.confidence = min(known, key=_CONFIDENCE_ORDER.index)
+                    result.confidence_detail = ["lowest confidence of the flow's steps"]
+        else:
+            result.confidence, result.confidence_detail = leaf_confidence(need, result)
         if need.path is not None and need.path.proof is not None:
             result.path_state = self._resolve_one(need.path.proof).state
         result.warnings = (

@@ -99,7 +99,8 @@ def _grounds_cell(r: NeedResult) -> str:
     """The GROUNDS column as one aligned token: state, a `*` if declared, and n/n if proofs."""
     star = "*" if (r.declared and r.state is NeedState.DELIVERED) else ""
     nm = f" {r.delivered}/{r.total}" if r.total else ""
-    return f"{_LABEL[r.state]}{star}{nm}"
+    conf = f" ({r.confidence.value})" if r.confidence else ""
+    return f"{_LABEL[r.state]}{star}{conf}{nm}"
 
 
 def _marker(need: Need) -> str:
@@ -419,6 +420,11 @@ def render_show(
         f"{need.id}{'  !!' if need.must else ''}{'  (draft)' if need.draft else ''}  {need.text}",
         f"  who: {who}",
         f"  grounds: {_LABEL[r.state]}{nm}    warrant: {_warrant(need)}",
+        *(
+            [f"  confidence: {r.confidence.value} ({'; '.join(r.confidence_detail)})"]
+            if r.confidence
+            else []
+        ),
         f"  shape: {ears_shape(need.text).value}",
     ]
     if need.answer:

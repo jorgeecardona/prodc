@@ -93,7 +93,10 @@ def render_markdown(
             for r in rs:
                 must = "**(must)** " if r.need.must else ""
                 text = r.need.text.replace("|", "\\|")
-                out.append(f"| {r.need.id} | {_LABEL[r.state]} | {must}{text} | {_warrant(r)} |")
+                conf = f" ({r.confidence.value})" if r.confidence else ""
+                out.append(
+                    f"| {r.need.id} | {_LABEL[r.state]}{conf} | {must}{text} | {_warrant(r)} |"
+                )
             out.append("")
 
     # Paths (#99): where a role starts, what done means, the click budget, and the proof state.
