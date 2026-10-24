@@ -65,6 +65,7 @@ from ..writer import (
     capture_source,
     delete_need,
     link_variant_group,
+    record_outcome,
     reinstate,
     reinstate_decision,
     relink_proof,
@@ -731,6 +732,30 @@ def cmd_attest(args: argparse.Namespace) -> int:
             kind="ai" if args.ai else "human",
             verdict=args.verdict,
             comment=args.comment,
+            expect_sha=args.expect_sha,
+            dry_run=args.dry_run,
+        )
+    except (ConfigError, WriteError) as exc:
+        print(f"prodc: {exc}", file=sys.stderr)
+        return 2
+    return emit_edit(edit, args.dry_run, args.json)
+
+
+def cmd_outcome(args: argparse.Namespace) -> int:
+    """Record whether a delivered need moved its goal (#97)."""
+    cfg_path = Path(args.config)
+    if not cfg_path.exists():
+        print(f"prodc: no config at {cfg_path}", file=sys.stderr)
+        return 2
+    try:
+        cfg = Config.load(cfg_path)
+        edit = record_outcome(
+            cfg,
+            args.need_id,
+            landed=args.landed,
+            who=args.by,
+            date=args.date,
+            evidence=args.evidence,
             expect_sha=args.expect_sha,
             dry_run=args.dry_run,
         )

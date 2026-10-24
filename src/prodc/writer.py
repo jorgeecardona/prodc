@@ -655,6 +655,30 @@ def attest(
     )
 
 
+def record_outcome(
+    config: Config,
+    need_id: str,
+    *,
+    landed: bool,
+    who: str,
+    date: str,
+    evidence: str | None,
+    expect_sha: str | None,
+    dry_run: bool,
+) -> Edit:
+    """Record whether a delivered need moved its goal (#97). Replaces any earlier outcome."""
+    outcome: dict[str, object] = {"landed": landed, "date": date, "who": who}
+    if evidence is not None:
+        outcome["evidence"] = evidence
+    return _edit_one_need(
+        config,
+        need_id,
+        expect_sha=expect_sha,
+        dry_run=dry_run,
+        mutate=lambda need, _path: need.__setitem__("outcome", outcome),
+    )
+
+
 def withdraw(
     config: Config,
     need_id: str,

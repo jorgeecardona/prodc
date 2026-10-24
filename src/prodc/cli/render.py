@@ -443,6 +443,11 @@ def render_show(
         lines.append(f"  importance: {need.importance}{label}{seen}")
     if need.goal:
         lines.append(f"  goal: {need.goal}")
+    if need.outcome:
+        o = need.outcome
+        said = "landed" if o.landed else "did not land"
+        seen = f": {o.evidence}" if o.evidence else ""
+        lines.append(f"  outcome: {said} ({o.who}, {o.date}){seen}")
     path = path_summary(r)
     if path:
         lines.append(f"  path: {path}")

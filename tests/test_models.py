@@ -20,8 +20,10 @@ from prodc.model import (
     Child,
     Confidence,
     Decision,
+    Goal,
     Need,
     NeedState,
+    Outcome,
     ProofState,
     Source,
     SourceKind,
@@ -29,7 +31,7 @@ from prodc.model import (
     Withdrawal,
     board_needs,
 )
-from prodc.status import Resolver, active_decisions
+from prodc.status import Resolver, active_decisions, goal_report, summarize
 
 
 class _Stub:
@@ -312,6 +314,7 @@ LIFE_MODEL = Model(
 SOURCE_AXIS = ("none", "assumption", "secondary", "primary")
 PROOF_AXIS = ("none", "stub:pending", "stub:delivered", "decl:delivered", "stub:broken")
 ATTEST_AXIS = ("none", "human:pass", "human:concerns", "human:fail", "ai:pass", "ai:fail")
+OUTCOME_AXIS = ("none", "landed", "not-landed")
 
 
 @dataclass(frozen=True)
@@ -319,6 +322,7 @@ class Conf:
     source: str = "none"
     proof: str = "none"
     attest: str = "none"
+    outcome: str = "none"
 
 
 def _conf_need(s: Conf, nid: str = "n") -> Need:
@@ -328,7 +332,20 @@ def _conf_need(s: Conf, nid: str = "n") -> Need:
     if s.attest != "none":
         kind, verdict = s.attest.split(":")
         att = Attestation("a", "2026-10-24", AttestationKind(kind), Verdict(verdict))
-    return Need(id=nid, text="x", sources=sources, proofs=proofs, attestation=att)
+    outcome = (
+        None
+        if s.outcome == "none"
+        else Outcome(landed=s.outcome == "landed", date="2026-10-24", who="a")
+    )
+    return Need(
+        id=nid,
+        text="x",
+        goal="G",
+        sources=sources,
+        proofs=proofs,
+        attestation=att,
+        outcome=outcome,
+    )
 
 
 def conf_result(s: Conf) -> tuple[NeedState, Confidence | None]:
@@ -343,6 +360,7 @@ def _conf_actions() -> list[Action[Conf]]:
         ("source", SOURCE_AXIS),
         ("proof", PROOF_AXIS),
         ("attest", ATTEST_AXIS),
+        ("outcome", OUTCOME_AXIS),
     ):
         for v in axis:
             out.append(
@@ -374,7 +392,8 @@ def _conf_fact_against_is_weak(s: Conf) -> bool:
     if state is not NeedState.DELIVERED:
         return True
     against = (
-        s.attest.endswith(":fail")
+        s.outcome == "not-landed"
+        or s.attest.endswith(":fail")
         or s.proof.startswith("decl:")
         or s.source
         in (
@@ -387,7 +406,7 @@ def _conf_fact_against_is_weak(s: Conf) -> bool:
 
 def _conf_unattested_is_not_weak(s: Conf) -> bool:
     """A missing review is not a fact against the delivery: #13 warns on it, confidence does not."""
-    if s.attest != "none":
+    if s.attest != "none" or s.outcome == "not-landed":
         return True
     state, conf = conf_result(s)
     if state is not NeedState.DELIVERED or s.proof.startswith("decl:"):
@@ -395,6 +414,20 @@ def _conf_unattested_is_not_weak(s: Conf) -> bool:
     if s.source in ("none", "assumption"):
         return True
     return conf is Confidence.MEDIUM
+
+
+def _conf_outcome_never_hides_proofs(s: Conf) -> bool:
+    """Recording an outcome never changes the proof state: the board cannot lie either way."""
+    return conf_result(s)[0] is conf_result(replace(s, outcome="none"))[0]
+
+
+def _conf_goal_never_above_coverage(s: Conf) -> bool:
+    """The goal counts a need as delivered iff coverage does and its outcome did not miss."""
+    r = Resolver([_conf_need(s)], _ADAPTERS).resolve("n")
+    board = summarize([r])
+    [(_, goal)] = goal_report([r], [Goal(id="G", text="g")])[0]
+    expected = 0 if s.outcome == "not-landed" else board.delivered
+    return goal.delivered == expected and goal.total == board.total
 
 
 CONF_MODEL = Model(
@@ -405,6 +438,8 @@ CONF_MODEL = Model(
         "strong-needs-all-three": _conf_strong_needs_all_three,
         "fact-against-is-weak": _conf_fact_against_is_weak,
         "unattested-is-not-weak": _conf_unattested_is_not_weak,
+        "outcome-never-hides-proofs": _conf_outcome_never_hides_proofs,
+        "goal-never-above-coverage": _conf_goal_never_above_coverage,
     },
 )
 

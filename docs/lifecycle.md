@@ -73,8 +73,36 @@ rather than pretending `DELIVERED` means *true*:
 - **`attestation`** records a human warrant; prodc warns on a `DELIVERED` leaf whose warrant no
   human has reviewed.
 
+A `DELIVERED` need also shows a **confidence**: `weak`, `medium` or `strong` (#97). It is derived
+from recorded facts, first match wins:
+
+| Rule | Confidence |
+|---|---|
+| `outcome.landed: false` | weak |
+| attestation verdict `fail` | weak |
+| declared proof (tag or existence, no results file) | weak |
+| opinion (no primary or secondary source) | weak |
+| human `pass`, strongest source `primary` | strong |
+| anything else | medium |
+
+A missing attestation is medium, not weak: #13 already warns on it. Evidence age is not an input,
+so the confidence changes only when a recorded fact changes. A declared proof cannot regress (there
+is nothing to re-run), so it holds the confidence at weak. A flow takes the lowest confidence of
+its steps. `tests/test_models.py` model-checks these properties against the real resolver.
+
+When the proofs pass but the feature did not move the goal, record it:
+
+```bash
+prodc outcome R-1 --not-landed --by jorge --date 2026-10-24 --evidence "starts flat for 4 weeks"
+```
+
+The need stays `DELIVERED` (its proofs are green) and still counts toward board coverage. Its
+confidence becomes weak, it gets a warning, and its goal no longer counts it as delivered. Coverage
+answers "is it built"; the goal answers "did it move". `--landed` records the result and changes
+nothing else.
+
 What prodc deliberately does **not** model (Torres's discovery loop, out of prodc's scope): the
 opportunity solution tree and its weekly restructuring, parallel testing of competing solutions,
 and the two-way-door reversal of a target opportunity. prodc records needs and the evidence under
-them; it is not an OST editor. The one reversal worth considering later is re-opening a
-`DELIVERED` need when its outcome does not land.
+them; it is not an OST editor. A `DELIVERED` need whose outcome did not land is not re-opened: it
+stays delivered, and its goal stops counting it (see above).

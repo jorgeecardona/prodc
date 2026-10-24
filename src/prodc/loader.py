@@ -27,6 +27,7 @@ from .model import (
     Model,
     Need,
     NeedPath,
+    Outcome,
     Principle,
     Release,
     Role,
@@ -86,6 +87,24 @@ def _as_bool(value: object, where: str) -> bool:
     if not isinstance(value, bool):
         raise LoaderError(f"{where}: expected a boolean")
     return value
+
+
+def _outcome(raw: object, where: str) -> Outcome | None:
+    if raw is None:
+        return None
+    tbl = _as_mapping(raw, where)
+    if "landed" not in tbl:
+        raise LoaderError(f"{where}: an outcome needs 'landed: true' or 'landed: false'")
+    date = _opt_str(tbl.get("date"), f"{where}.date")
+    who = _opt_str(tbl.get("who"), f"{where}.who")
+    if not date or not who:
+        raise LoaderError(f"{where}: an outcome needs both 'who' and 'date'")
+    return Outcome(
+        landed=_as_bool(tbl["landed"], f"{where}.landed"),
+        date=date,
+        who=who,
+        evidence=_opt_str(tbl.get("evidence"), f"{where}.evidence"),
+    )
 
 
 def _need_path(raw: object, where: str) -> NeedPath | None:
@@ -268,6 +287,12 @@ def _need(
     withdrawn = _withdrawal(tbl.get("withdrawn"), f"{where}.withdrawn")
     answer = _answer(tbl.get("answer"), f"{where}.answer")
     path = _need_path(tbl.get("path"), f"{where}.path")
+    outcome = _outcome(tbl.get("outcome"), f"{where}.outcome")
+    if outcome is not None and answer is not None:
+        raise LoaderError(
+            f"{where} ({nid}): 'outcome' is for a delivered product need; a research question "
+            "settles with 'answer', it has no delivery outcome"
+        )
 
     sources = tuple(
         _source(s, f"{where}.sources[{i}]")
@@ -333,6 +358,7 @@ def _need(
         contradicts=contradicts,
         tags=tags,
         path=path,
+        outcome=outcome,
         importance_set_at=importance_set_at,
         draft=draft,
         draft_added=draft_added,

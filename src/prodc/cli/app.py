@@ -23,6 +23,7 @@ from .commands import (
     cmd_dupes,
     cmd_guide,
     cmd_lint,
+    cmd_outcome,
     cmd_plan,
     cmd_portfolio,
     cmd_recurrence,
@@ -363,6 +364,29 @@ def main(argv: list[str] | None = None) -> int:
         help="refuse if the file's content hash differs (optimistic lock)",
     )
     at.set_defaults(func=cmd_attest)
+
+    oc = sub.add_parser("outcome", help="record whether a delivered need moved its goal (#97)")
+    oc.add_argument("need_id", help="the need id")
+    landed = oc.add_mutually_exclusive_group(required=True)
+    landed.add_argument("--landed", dest="landed", action="store_true", help="it moved the goal")
+    landed.add_argument(
+        "--not-landed", dest="landed", action="store_false", help="it did not move the goal"
+    )
+    oc.add_argument("--by", required=True, help="who observed it")
+    oc.add_argument("--date", required=True, help="when (ISO, e.g. 2026-10-24)")
+    oc.add_argument("--evidence", default=None, help="what was observed, or where (a locator)")
+    oc.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    oc.add_argument("--json", action="store_true", help="machine-readable output")
+    oc.add_argument(
+        "--dry-run", action="store_true", help="validate and show the diff, don't write"
+    )
+    oc.add_argument(
+        "--expect-sha",
+        default=None,
+        metavar="SHA256",
+        help="refuse if the file's content hash differs (optimistic lock)",
+    )
+    oc.set_defaults(func=cmd_outcome)
 
     ac = sub.add_parser("accept", help="record a human acceptance pass (accept proof) on a need")
     ac.add_argument("need_id", help="the need id that was accepted")

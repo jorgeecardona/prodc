@@ -191,6 +191,16 @@ def need_payload(r: NeedResult, *, flavor: Literal["board", "html"] = "board") -
         "contradicts": list(need.contradicts),
         "tags": list(need.tags),
         "path": path_payload(r),
+        "outcome": (
+            {
+                "landed": need.outcome.landed,
+                "date": need.outcome.date,
+                "who": need.outcome.who,
+                "evidence": need.outcome.evidence,
+            }
+            if need.outcome
+            else None
+        ),
         "confidence": r.confidence.value if r.confidence else None,
         "confidence_detail": list(r.confidence_detail),
         "answer": need.answer.value if need.answer else None,

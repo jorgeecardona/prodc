@@ -6,6 +6,9 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- `prodc outcome <id> --not-landed` records that a green need did not move its goal (#97).
+  The need stays DELIVERED and in coverage, but its confidence becomes weak and its goal no
+  longer counts it.
 - A DELIVERED need now shows a confidence: weak, medium or strong (#97). It is derived from
   recorded facts only: a `fail` verdict, a declared proof or an opinion make it weak; a human
   `pass` on a primary source with a results-backed proof makes it strong. `show` says which

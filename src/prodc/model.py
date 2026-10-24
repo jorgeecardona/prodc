@@ -341,6 +341,21 @@ class Child:
 
 
 @dataclass(frozen=True)
+class Outcome:
+    """Whether a delivered need moved its goal: an observation, recorded by a person (#97).
+
+    The proofs can pass while the feature changes nothing. ``landed: false`` keeps the need
+    DELIVERED (its proofs are green) but makes its confidence weak and stops it counting toward
+    its goal. prodc never reads the goal metric; ``evidence`` says where the observation came from.
+    """
+
+    landed: bool
+    date: str
+    who: str
+    evidence: str | None = None  # free text or a locator: what was observed
+
+
+@dataclass(frozen=True)
 class NeedPath:
     """Where a role starts, what "done" looks like, and how many clicks it may take (#99).
 
@@ -391,6 +406,7 @@ class Need:
     contradicts: tuple[
         str, ...
     ] = ()  # ids of needs this one opposes; symmetric, a principle decides
+    outcome: Outcome | None = None  # did the delivery move the goal? (#97)
     path: NeedPath | None = None  # start, outcome, and click budget for this need (#99)
     tags: tuple[
         str, ...

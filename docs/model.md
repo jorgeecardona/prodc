@@ -103,6 +103,7 @@ withdrawn or product need. No need state changes: BLOCKED belongs to the decisio
 | `children` | flow edges: a bare need id, or `{id, step}` naming the step it plays (`[flows].steps`); makes this a flow that rolls them up |
 | `seam` | end-to-end locators for a flow's between-steps behaviour; flow is DELIVERED only when every child *and* the seam are green |
 | `path` | `{start, outcome, max_clicks, proof}`: where the role begins, what means done, the click budget, and the locator of the test that counts the clicks. `lint` warns on a budget with no proof or a proof that does not pass; `show` and `report` print it (#99) |
+| `outcome` | `{landed, date, who, evidence}`: whether the delivery moved the goal. `landed: false` makes confidence weak and drops the need from its goal's count, not from coverage. Refused on a research need with `answer` (#97) |
 | `client` | this instance is for one client; absent = shared baseline |
 | `variant_of` | baseline id this specialises; variants cannot chain |
 | `not_variant_of` | ids confirmed *not* a shared baseline; silences `recurrence --suggest` / lint for that pair |

@@ -7,7 +7,7 @@ sub-needs. ``HOLE`` (no proof) is deliberately not a failure. It is an honest ga
 from __future__ import annotations
 
 import contextlib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from itertools import pairwise
 
@@ -168,6 +168,18 @@ def _answer_warnings(need: Need, result: NeedResult) -> list[str]:
     return []
 
 
+def _outcome_warnings(need: Need, result: NeedResult) -> list[str]:
+    """Flag a green need whose outcome did not land, and an outcome with no goal to land on."""
+    out: list[str] = []
+    if need.outcome is None:
+        return out
+    if not need.outcome.landed and result.state is NeedState.DELIVERED:
+        out.append("DELIVERED but the outcome did not land; not counted toward its goal (#97)")
+    if need.goal is None:
+        out.append("outcome recorded, but the need serves no goal: what did it not move? (#97)")
+    return out
+
+
 def _path_warnings(need: Need, result: NeedResult) -> list[str]:
     """Flag a click budget with no test to enforce it, or a path proof that does not pass (#99)."""
     path = need.path
@@ -192,6 +204,8 @@ def leaf_confidence(need: Need, result: NeedResult) -> tuple[Confidence | None, 
     """
     if result.state is not NeedState.DELIVERED:
         return None, []
+    if need.outcome is not None and not need.outcome.landed:
+        return Confidence.WEAK, ["outcome did not land"]
     att = need.attestation
     if att is not None and att.verdict is Verdict.FAIL:
         return Confidence.WEAK, ["attestation verdict is fail"]
@@ -251,6 +265,7 @@ class Resolver:
             + _warrant_warnings(need, result)
             + _answer_warnings(need, result)
             + _path_warnings(need, result)
+            + _outcome_warnings(need, result)
             + result.warnings
         )
         self._cache[need_id] = result
@@ -669,8 +684,25 @@ def goal_report(
             ungoaled.append(r)
         elif r.need.goal in by_goal:
             by_goal[r.need.goal].append(r)
-    coverage = [(g, summarize(by_goal[g.id])) for g in goals]
+    coverage = [(g, _goal_summary(by_goal[g.id])) for g in goals]
     return coverage, ungoaled
+
+
+def _goal_summary(results: list[NeedResult]) -> Summary:
+    """:func:`summarize`, but a need whose outcome did not land is not delivered for its goal (#97).
+
+    Board coverage still counts it: coverage asks "is it built", the goal asks "did it move".
+    """
+    s = summarize(results)
+    missed = sum(
+        1
+        for r in results
+        if r.need.counts_toward_coverage
+        and r.state is NeedState.DELIVERED
+        and r.need.outcome is not None
+        and not r.need.outcome.landed
+    )
+    return replace(s, delivered=s.delivered - missed, pending=s.pending + missed)
 
 
 def release_report(
