@@ -30,10 +30,15 @@ def load_or_report(args: argparse.Namespace) -> tuple[Config, Model] | None:
         return None
     try:
         cfg = Config.load(cfg_path)
-        return cfg, load(cfg)
+        model = load(cfg)
     except (ConfigError, LoaderError) as exc:
         print(f"prodc: {exc}", file=sys.stderr)
         return None
+    # A removed key is ignored, not fatal, so writes can still fix the board (#96); say so on
+    # every read. stderr keeps --json output clean. `lint` fails on these.
+    for notice in model.notices:
+        print(f"prodc: {notice}", file=sys.stderr)
+    return cfg, model
 
 
 def git_rev(root: Path) -> str | None:

@@ -957,10 +957,10 @@ def handoffs(needs: list[Need]) -> list[Handoff]:
 
     A handoff is a consecutive pair of a flow's children whose ``role`` differs: the point in
     the journey where one person's work passes to the next (Patton's backbone, read as an
-    ordered story map). It keys on ``role``, not ``who``: ``role`` is set deliberately on the
-    need and is never inherited from a file-level default, so deriving on it does not fire on
-    the file-level ``who`` that every need in a file silently shares (the noise #52's follow-up
-    flagged). No new edge type: the order already in ``children`` is the sequence.
+    ordered story map). It keys on ``role``, not ``who``, so it does not fire on the file-level
+    ``who`` (a person) that every need in a file shares (the noise #52's follow-up flagged). A
+    file-level ``role:`` is fine: it is still an archetype chosen once, on purpose (#96). No new
+    edge type: the order already in ``children`` is the sequence.
     """
     by_id = {n.id: n for n in needs}
     out: list[Handoff] = []

@@ -53,6 +53,26 @@ prodc add need N-2 --text "a buyer can save a cart" --who you --kind assumption 
 
 Warning: never record a `primary` source you invented. `primary` means a real user actually said it. Your own reasoning is `assumption`.
 
+## Roles
+
+A role is who a need is for, as a type of user: `cli-user`, `reviewer`. A `who` is one named
+person. Declare roles once, then bind needs to one:
+
+```yaml
+roles:
+  - id: cli-user
+    text: researcher running timbre from the terminal
+
+role: cli-user        # every need in this file, unless a need sets its own role:
+needs:
+  - id: CU-1
+    text: "..."
+    who: Dana         # the person this came from (optional)
+```
+
+`prodc status` lists each role with its coverage, and warns on a need with a `who` but no `role`.
+Upgrading from 0.3 `label:`: the label text becomes the role's `text`. Then delete `label:`.
+
 ## Prove a need
 
 A need moves HOLE, then PENDING, then DELIVERED as its proof comes true. For a HOLE, let prodc find the test:
@@ -82,6 +102,7 @@ A HOLE (no proof yet) or an opinion (no evidence yet) is honest output, not a fa
 | rank the backlog | `prodc plan` |
 | prep a client call | `prodc brief <client>` |
 | add a need | `prodc add need <id> --text "..." --who you --kind assumption --file <f>` |
+| declare a role | `prodc add role <id> --text "..." --file <f>` |
 | attach evidence | `prodc capture <id> --kind primary --who <person> --date <ISO> --quote "..."` |
 | attach a proof | `prodc suggest <id> --apply` |
 | decide against a need | `prodc withdraw <id> --reason "..."` |

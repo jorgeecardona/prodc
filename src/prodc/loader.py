@@ -224,18 +224,18 @@ def _need(
     where: str,
     file_who: str | None,
     file_client: str | None,
+    file_role: str | None = None,
+    notices: list[str] | None = None,
 ) -> Need:
     tbl = _as_mapping(raw, where)
-    if "label" in tbl:
-        raise LoaderError(
-            f"{where}: 'label' was removed in 0.4; express it with a declared role + client (#52)"
-        )
+    if "label" in tbl and notices is not None:
+        notices.append(_label_notice(where, tbl.get("who") or file_who, tbl["label"]))
     nid = _as_str(tbl.get("id"), f"{where}.id")
     text = _as_str(tbl.get("text"), f"{where}.text")
     description = _opt_str(tbl.get("description"), f"{where}.description")
     must = _as_bool(tbl["must"], f"{where}.must") if "must" in tbl else False
     who = _opt_str(tbl.get("who"), f"{where}.who") or file_who
-    role = _opt_str(tbl.get("role"), f"{where}.role")
+    role = _opt_str(tbl.get("role"), f"{where}.role") or file_role
     client = _opt_str(tbl.get("client"), f"{where}.client") or file_client
     variant_of = _opt_str(tbl.get("variant_of"), f"{where}.variant_of")
     importance = _opt_importance(tbl.get("importance"), f"{where}.importance")
@@ -423,6 +423,25 @@ class _Loaded:
     roles: list[Role] = field(default_factory=list[Role])
     principles: list[Principle] = field(default_factory=list[Principle])
     decisions: list[Decision] = field(default_factory=list[Decision])
+    notices: list[str] = field(default_factory=list[str])
+
+
+def _label_notice(where: str, who: object, label: object) -> str:
+    """The 0.3 ``label:`` tombstone as a notice that shows the exact 0.4 YAML to write (#96).
+
+    A notice, not a :class:`LoaderError`: a load failure would also block every write, so the
+    board could not be fixed with ``prodc add role``. ``lint`` still exits 1 on it. The value
+    stays in the file (the writer never touches it); only the model ignores it.
+    """
+    rid = who if isinstance(who, str) and who else "<role-id>"
+    text = str(label)[:80]
+    return (
+        f"{where}: 'label' was removed in 0.4 and is ignored. Write it as a role:\n"
+        f"    roles:\n      - id: {rid}\n        text: {text}\n"
+        f"  then bind the needs with `role: {rid}` (per need, or once at the top of the file)"
+        " and delete `label:`.\n"
+        f'  Or: prodc add role {rid} --text "{text}" --file <file>'
+    )
 
 
 def yaml_error_message(where: str, text: str, exc: yaml.YAMLError) -> str:
@@ -467,12 +486,12 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
     if doc is None:
         return out
     tbl = _as_mapping(doc, where)
-    if "label" in tbl:
-        raise LoaderError(
-            f"{where}: 'label' was removed in 0.4; express it with a declared role + client (#52)"
-        )
     file_who = _opt_str(tbl.get("who"), f"{where}.who")
     file_client = _opt_str(tbl.get("client"), f"{where}.client")
+    # A file may name one role for all its needs, like `who`/`client` (#96); validated at load.
+    file_role = _opt_str(tbl.get("role"), f"{where}.role")
+    if "label" in tbl:
+        out.notices.append(_label_notice(where, file_who, tbl["label"]))
 
     def _unique(kind: str, nid: str) -> None:
         prior = seen[kind].get(nid)
@@ -481,7 +500,7 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
         seen[kind][nid] = path
 
     for i, raw in enumerate(_as_list(tbl.get("needs"), f"{where}.needs")):
-        need = _need(raw, f"{where}.needs[{i}]", file_who, file_client)
+        need = _need(raw, f"{where}.needs[{i}]", file_who, file_client, file_role, out.notices)
         _unique("need", need.id)
         out.needs.append(need)
     for i, raw in enumerate(_as_list(tbl.get("goals"), f"{where}.goals")):
@@ -505,11 +524,11 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
         _unique("decision", decision.id)
         out.decisions.append(decision)
     if "argument" in tbl:
-        # Tombstone (0.4): the GSN ``argument`` graph was removed. State the warrant as a need's
-        # `claim`, prove it with `proofs`, and review it with `prodc attest`. Removed for good in 0.5.
-        raise LoaderError(
-            f"{where}: 'argument:' was removed in 0.4; state the warrant as need.claim, "
-            "prove it with proofs, and review it with `prodc attest`"
+        # Tombstone (0.4): the GSN ``argument`` graph was removed. A notice, not an error, so the
+        # writer can still edit the board while the author migrates (#96). Removed for good in 0.5.
+        out.notices.append(
+            f"{where}: 'argument:' was removed in 0.4 and is ignored. State the warrant as "
+            "need.claim, prove it with proofs, and review it with `prodc attest`"
         )
     return out
 
@@ -541,6 +560,7 @@ def load(config: Config) -> Model:
         acc.roles.extend(f.roles)
         acc.principles.extend(f.principles)
         acc.decisions.extend(f.decisions)
+        acc.notices.extend(f.notices)
     _check_variants(acc.needs)
     _check_children(acc.needs)
     _check_contradicts(acc.needs)
@@ -566,6 +586,7 @@ def load(config: Config) -> Model:
         roles=tuple(acc.roles),
         principles=tuple(acc.principles),
         decisions=tuple(acc.decisions),
+        notices=tuple(acc.notices),
     )
 
 

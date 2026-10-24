@@ -6,6 +6,9 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- A 0.3 `label:` (or `argument:`) no longer blocks every command. It is ignored with a
+  notice that shows the role YAML to write, `lint` exits 1 on it, and writes such as
+  `prodc add role` work again (#96). A file can set `role:` once for all its needs.
 - **Decisions wait on research** (#93) — `awaits: [Q-1@yes, Q-2]` on a decision names the
   research needs (`product: false`, a `claim`) it waits on. Readiness is derived from their
   proofs: `show`/`status` mark the decision BLOCKED or READY, and `lint` warns on a decision

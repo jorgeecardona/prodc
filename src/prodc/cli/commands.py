@@ -274,6 +274,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
                     "decided yet (withdraw one out_of_scope citing the principle, or reconcile)"
                 )
     errors = _lint_errors(results) + principle_errors
+    errors += [f"TOMBSTONE {n}" for n in model.notices]  # a removed key still in a file (#96)
     warnings = [
         (r.need.id, w) for r in sorted(results, key=lambda x: x.need.id) for w in r.warnings
     ] + principle_warnings

@@ -461,6 +461,8 @@ class Model:
     roles: tuple[Role, ...] = ()  # the roles needs' `who` play (#52)
     principles: tuple[Principle, ...] = ()  # the product vision, held as given
     decisions: tuple[Decision, ...] = ()  # the solutions chosen for needs (OST), with alternatives
+    # Removed keys (0.3 `label:`, `argument:`) found and ignored. `lint` fails on any (#96).
+    notices: tuple[str, ...] = ()
 
 
 # A leading verb that usually signals a solution-in-disguise, not a need (Torres, Ch. 6).

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from prodc.config import Config
-from prodc.loader import LoaderError, load_needs
+from prodc.loader import LoaderError, load, load_needs
 from prodc.model import SourceKind
 
 
@@ -45,8 +45,9 @@ def test_label_key_is_a_removed_tombstone(tmp_path: Path) -> None:
         tmp_path,
         ("a.yaml", 'needs:\n  - id: N-1\n    text: t\n    label: "design partner"\n'),
     )
-    with pytest.raises(LoaderError, match=r"'label' was removed in 0\.4"):
-        load_needs(cfg)
+    # A notice, not a LoaderError: a load failure would block the writes that fix it (#96).
+    (notice,) = load(cfg).notices
+    assert "'label' was removed in 0.4 and is ignored" in notice
 
 
 def test_source_kind_defaults_to_internal(tmp_path: Path) -> None:
@@ -349,14 +350,14 @@ def test_need_release_unknown_raises(tmp_path: Path) -> None:
 
 
 def test_argument_key_is_a_removed_tombstone(tmp_path: Path) -> None:
-    # The GSN argument graph was cut in 0.4; the key is a hard error (tombstone), not silently
-    # ignored, so an old board carrying it is told what replaced it.
+    # The GSN argument graph was cut in 0.4. The key is ignored with a notice saying what
+    # replaced it (lint fails on it), not a load error that would block writes (#96).
     cfg = _config(
         tmp_path,
         ("a.yaml", "argument:\n  - id: C-1\n    kind: claim\n    text: t\n"),
     )
-    with pytest.raises(LoaderError, match=r"'argument:' was removed in 0\.4"):
-        load_needs(cfg)
+    (notice,) = load(cfg).notices
+    assert "'argument:' was removed in 0.4 and is ignored" in notice
 
 
 def test_product_flag_defaults_true_and_parses(tmp_path: Path) -> None:

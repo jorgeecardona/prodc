@@ -116,11 +116,61 @@ def test_capture_dangling_role_rejected_by_gate(tmp_path: Path) -> None:
         )
 
 
-def test_label_board_fails_to_load(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_label_is_a_lint_failure_not_a_load_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     from prodc.cli import main
 
-    # label was removed in 0.4; a board still carrying it is a hard load error (tombstone).
+    # 0.3 `label:` is ignored with a notice that shows the role YAML; lint fails on it (#96).
     needs = 'who: jordan\nlabel: "design partner"\nneeds:\n  - id: N-1\n    text: t\n'
     _project(tmp_path, needs=needs)
-    assert main(["lint", "--config", str(tmp_path / "prodc.toml")]) == 2
-    assert "'label' was removed in 0.4" in capsys.readouterr().err
+    cfg = str(tmp_path / "prodc.toml")
+    assert main(["status", "--config", cfg]) == 0
+    err = capsys.readouterr().err
+    assert "'label' was removed in 0.4 and is ignored" in err
+    assert "- id: jordan" in err and "text: design partner" in err
+    assert main(["lint", "--config", cfg]) == 1
+    assert "TOMBSTONE" in capsys.readouterr().out
+
+
+def test_writes_work_on_a_board_with_label(tmp_path: Path) -> None:
+    # The #96 regression: the board could not be fixed through the CLI, because every write
+    # reloads the board and the label made that load fail.
+    from prodc.cli import main
+
+    needs = 'who: jordan\nlabel: "design partner"\nneeds:\n  - id: N-1\n    text: t\n'
+    cfg = _project(tmp_path, needs=needs)
+    code = main(
+        [
+            "add",
+            "role",
+            "jordan",
+            "--text",
+            "design partner",
+            "--file",
+            "needs/a.yaml",
+            "--config",
+            str(tmp_path / "prodc.toml"),
+        ]
+    )
+    assert code == 0
+    assert [r.id for r in load(cfg).roles] == ["jordan"]
+    assert "label:" in (tmp_path / "needs" / "a.yaml").read_text()  # the value is never deleted
+
+
+def test_file_level_role_binds_every_need(tmp_path: Path) -> None:
+    needs = (
+        "roles:\n  - id: cli-user\n    text: runs it from the terminal\n  - id: other\n"
+        "    text: x\nrole: cli-user\nwho: Dana\nneeds:\n  - id: N-1\n    text: a\n"
+        "  - id: N-2\n    text: b\n    role: other\n"
+    )
+    model = load(_project(tmp_path, needs=needs))
+    assert {n.id: n.role for n in model.needs} == {"N-1": "cli-user", "N-2": "other"}
+
+
+def test_file_level_unknown_role_is_a_load_error(tmp_path: Path) -> None:
+    from prodc.loader import LoaderError
+
+    needs = "role: ghost\nneeds:\n  - id: N-1\n    text: a\n"
+    with pytest.raises(LoaderError, match="ghost"):
+        load(_project(tmp_path, needs=needs))

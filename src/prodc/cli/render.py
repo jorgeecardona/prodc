@@ -257,7 +257,10 @@ def render_roles(role_cov: list[tuple[Role, Summary]], unroled: list[NeedResult]
             out.append(f"  {role.id:<12}   (orphan role: no need plays it yet)  {role.text}")
     if unroled:
         ids = ", ".join(r.need.id for r in unroled)
-        out.append(f"  ⚠ need(s) whose who plays no declared role: {ids}")
+        out.append(
+            f"  ⚠ need(s) with a who but no role: {ids} "
+            "(set role: <role-id> on the need, or role: at the top of the file)"
+        )
     return "\n".join(out)
 
 
