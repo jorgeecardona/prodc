@@ -26,6 +26,7 @@ from .model import (
     Goal,
     Model,
     Need,
+    NeedPath,
     Principle,
     Release,
     Role,
@@ -85,6 +86,23 @@ def _as_bool(value: object, where: str) -> bool:
     if not isinstance(value, bool):
         raise LoaderError(f"{where}: expected a boolean")
     return value
+
+
+def _need_path(raw: object, where: str) -> NeedPath | None:
+    if raw is None:
+        return None
+    tbl = _as_mapping(raw, where)
+    max_clicks = tbl.get("max_clicks")
+    if max_clicks is not None and (
+        isinstance(max_clicks, bool) or not isinstance(max_clicks, int) or max_clicks < 0
+    ):
+        raise LoaderError(f"{where}.max_clicks: expected a whole number >= 0, got {max_clicks!r}")
+    return NeedPath(
+        start=_as_str(tbl.get("start"), f"{where}.start"),
+        outcome=_as_str(tbl.get("outcome"), f"{where}.outcome"),
+        max_clicks=max_clicks,
+        proof=_opt_str(tbl.get("proof"), f"{where}.proof"),
+    )
 
 
 def _attestation(raw: object, where: str) -> Attestation | None:
@@ -249,6 +267,7 @@ def _need(
     draft_added = _opt_str(tbl.get("draft_added"), f"{where}.draft_added")
     withdrawn = _withdrawal(tbl.get("withdrawn"), f"{where}.withdrawn")
     answer = _answer(tbl.get("answer"), f"{where}.answer")
+    path = _need_path(tbl.get("path"), f"{where}.path")
 
     sources = tuple(
         _source(s, f"{where}.sources[{i}]")
@@ -313,6 +332,7 @@ def _need(
         not_variant_of=not_variant_of,
         contradicts=contradicts,
         tags=tags,
+        path=path,
         importance_set_at=importance_set_at,
         draft=draft,
         draft_added=draft_added,

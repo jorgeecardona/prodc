@@ -167,6 +167,18 @@ def _answer_warnings(need: Need, result: NeedResult) -> list[str]:
     return []
 
 
+def _path_warnings(need: Need, result: NeedResult) -> list[str]:
+    """Flag a click budget with no test to enforce it, or a path proof that does not pass (#99)."""
+    path = need.path
+    if path is None or path.max_clicks is None:
+        return []
+    if path.proof is None:
+        return [f"path budget of {path.max_clicks} click(s) has no proof (#99)"]
+    if result.path_state is not ProofState.DELIVERED and result.path_state is not None:
+        return [f"path proof '{path.proof}' is {result.path_state.value.upper()} (#99)"]
+    return []
+
+
 class Resolver:
     def __init__(
         self,
@@ -192,11 +204,14 @@ class Resolver:
         self._visiting.add(need_id)
         result = self._compute(need)
         self._visiting.discard(need_id)
+        if need.path is not None and need.path.proof is not None:
+            result.path_state = self._resolve_one(need.path.proof).state
         result.warnings = (
             _text_warnings(need)
             + _source_warnings(need, self._source_adapters)
             + _warrant_warnings(need, result)
             + _answer_warnings(need, result)
+            + _path_warnings(need, result)
             + result.warnings
         )
         self._cache[need_id] = result

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from .board import gather
+from .board import gather, path_summary
 from .config import Config
 from .model import Model, NeedResult, NeedState
 from .status import active_decisions, group_state, state_priority
@@ -95,6 +95,14 @@ def render_markdown(
                 text = r.need.text.replace("|", "\\|")
                 out.append(f"| {r.need.id} | {_LABEL[r.state]} | {must}{text} | {_warrant(r)} |")
             out.append("")
+
+    # Paths (#99): where a role starts, what done means, the click budget, and the proof state.
+    paths = [r for r in results if r.need.path is not None and not r.need.is_withdrawn]
+    if paths:
+        out += ["## Paths", "", "| need | path |", "|---|---|"]
+        for r in sorted(paths, key=lambda r: r.need.id):
+            out.append(f"| {r.need.id} | {(path_summary(r) or '').replace('|', chr(92) + '|')} |")
+        out.append("")
 
     if model.goals:
         out += [

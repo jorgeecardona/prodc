@@ -11,6 +11,7 @@ import datetime
 import shutil
 from collections.abc import Callable
 
+from ..board import path_summary
 from ..board import warrant as _warrant
 from ..model import (
     Decision,
@@ -436,6 +437,9 @@ def render_show(
         lines.append(f"  importance: {need.importance}{label}{seen}")
     if need.goal:
         lines.append(f"  goal: {need.goal}")
+    path = path_summary(r)
+    if path:
+        lines.append(f"  path: {path}")
     if need.release:
         lines.append(f"  release: {need.release}")
     if need.claim:

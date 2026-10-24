@@ -6,6 +6,9 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- A need can carry a `path:` (start, outcome, `max_clicks`, and the `proof` test that
+  counts the clicks). `lint` warns on a click budget with no proof, `show` prints the path,
+  and `report` lists them in a Paths section (#99).
 - `attest`, `capture`, `set` and the other in-place writes now change only the keys they
   edit. Quoting, folded `>` quotes, list indentation and comments inside the edited need
   stay as written (#98).

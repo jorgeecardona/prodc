@@ -102,6 +102,7 @@ withdrawn or product need. No need state changes: BLOCKED belongs to the decisio
 | `proofs` | locators (leaf needs only; a flow uses `seam`) |
 | `children` | flow edges: a bare need id, or `{id, step}` naming the step it plays (`[flows].steps`); makes this a flow that rolls them up |
 | `seam` | end-to-end locators for a flow's between-steps behaviour; flow is DELIVERED only when every child *and* the seam are green |
+| `path` | `{start, outcome, max_clicks, proof}`: where the role begins, what means done, the click budget, and the locator of the test that counts the clicks. `lint` warns on a budget with no proof or a proof that does not pass; `show` and `report` print it (#99) |
 | `client` | this instance is for one client; absent = shared baseline |
 | `variant_of` | baseline id this specialises; variants cannot chain |
 | `not_variant_of` | ids confirmed *not* a shared baseline; silences `recurrence --suggest` / lint for that pair |

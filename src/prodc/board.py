@@ -66,6 +66,36 @@ def warrant(need: Need) -> str:
     return strongest.value
 
 
+def path_summary(r: NeedResult) -> str | None:
+    """The need's path as one line: ``start → outcome``, its click budget, and its proof state (#99)."""
+    path = r.need.path
+    if path is None:
+        return None
+    out = f"{path.start} → {path.outcome}"
+    if path.max_clicks is not None:
+        out += f", max {path.max_clicks} click{'' if path.max_clicks == 1 else 's'}"
+    if path.proof is not None:
+        state = r.path_state.value.upper() if r.path_state else "?"
+        out += f", proof {path.proof} [{state}]"
+    elif path.max_clicks is not None:
+        out += ", no proof"
+    return out
+
+
+def path_payload(r: NeedResult) -> dict[str, object] | None:
+    """The need's path as a plain dict for JSON output, or None when it has none (#99)."""
+    path = r.need.path
+    if path is None:
+        return None
+    return {
+        "start": path.start,
+        "outcome": path.outcome,
+        "max_clicks": path.max_clicks,
+        "proof": path.proof,
+        "proof_state": r.path_state.value if r.path_state else None,
+    }
+
+
 def annotate_board_warnings(results: list[NeedResult], needs: list[Need]) -> None:
     """Append the cross-need hygiene warnings (shared proofs #45, seam coverage #44)."""
     shared = shared_proof_warnings(results)
@@ -159,6 +189,7 @@ def need_payload(r: NeedResult, *, flavor: Literal["board", "html"] = "board") -
         "draft": need.draft,
         "contradicts": list(need.contradicts),
         "tags": list(need.tags),
+        "path": path_payload(r),
         "answer": need.answer.value if need.answer else None,
         "withdrawn": (
             {

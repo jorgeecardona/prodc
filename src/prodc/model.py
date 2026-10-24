@@ -330,6 +330,21 @@ class Child:
 
 
 @dataclass(frozen=True)
+class NeedPath:
+    """Where a role starts, what "done" looks like, and how many clicks it may take (#99).
+
+    prodc does not model routes or count clicks. The project's own test counts them; ``proof``
+    is the locator of that test, resolved like any other proof. The router stays the truth for
+    routes.
+    """
+
+    start: str  # where the role begins, e.g. a route
+    outcome: str  # a test id or route that means "done"
+    max_clicks: int | None = None  # the click budget from start to outcome
+    proof: str | None = None  # locator of the test that enforces the budget
+
+
+@dataclass(frozen=True)
 class Need:
     """What a named person wants, with its provenance and its proofs."""
 
@@ -365,6 +380,7 @@ class Need:
     contradicts: tuple[
         str, ...
     ] = ()  # ids of needs this one opposes; symmetric, a principle decides
+    path: NeedPath | None = None  # start, outcome, and click budget for this need (#99)
     tags: tuple[
         str, ...
     ] = ()  # flat, many-to-many, stateless labels: a filter axis, not a group (#80)
@@ -540,3 +556,4 @@ class NeedResult:
     declared: bool = False  # true if DELIVERED rests on tags/existence, not a results artifact
     detail: list[str] = field(default_factory=list[str])
     warnings: list[str] = field(default_factory=list[str])
+    path_state: ProofState | None = None  # state of ``need.path.proof``; None when it has none
