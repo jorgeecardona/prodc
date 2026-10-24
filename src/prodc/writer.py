@@ -4,8 +4,8 @@ The one dangerous thing prodc does is edit files, so every edit goes through one
 mutate a copy of the target file, write it, re-run :func:`~prodc.loader.load` as the schema,
 and revert if the model no longer loads. An in-place edit splices only the changed need's block
 back into the original text (#53), so the file header and every other need keep their comments
-and formatting; only the edited need's own block is reflowed, and an unrecognised file shape
-falls back to a full PyYAML re-dump. One file per edit, always shown as a diff.
+and formatting. Inside the edited need, only the keys whose value changed are re-dumped (#98);
+an unrecognised shape falls back to a full PyYAML re-dump. One file per edit, always shown as a diff.
 """
 
 from __future__ import annotations
@@ -244,10 +244,98 @@ def _render_item_edit(old_text: str, doc: dict[str, object], key: str, item_id: 
     )
     if item is None:
         return _dump(doc)
-    dumped = yaml.safe_dump([item], sort_keys=False, allow_unicode=True, default_flow_style=False)
-    pad = " " * indent
-    block = "".join(pad + ln if ln.strip() else ln for ln in dumped.splitlines(keepends=True))
+    block = _splice_item_keys(lines[start:end], item, indent)
+    if block is None:
+        dumped = yaml.safe_dump(
+            [item], sort_keys=False, allow_unicode=True, default_flow_style=False
+        )
+        pad = " " * indent
+        block = "".join(pad + ln if ln.strip() else ln for ln in dumped.splitlines(keepends=True))
     return "".join(lines[:start]) + block + "".join(lines[end:])
+
+
+def _indented_dump(value: object, indent: int) -> list[str]:
+    """``value`` dumped as block YAML, every non-blank line shifted right by ``indent``."""
+    dumped = yaml.safe_dump(value, sort_keys=False, allow_unicode=True, default_flow_style=False)
+    pad = " " * indent
+    return [pad + ln if ln.strip() else ln for ln in dumped.splitlines(keepends=True)]
+
+
+def _splice_item_keys(block: list[str], new_item: dict[str, object], indent: int) -> str | None:
+    """Re-render one list item key by key, keeping every unchanged key's original text (#98).
+
+    A key whose value did not change keeps its lines byte-for-byte: quoting, folded ``>``
+    blocks, list indentation and comments. A changed key is re-dumped alone; a list that only
+    grew at the end (a captured source, an added proof) keeps its old items and gets the new
+    ones appended at the old item indent. Keys removed from the item are dropped, new keys go
+    at the end. Returns None when the block is not the plain ``- key: ...`` shape, so the
+    caller falls back to dumping the whole item.
+    """
+    try:
+        parsed = yaml.safe_load("".join(block))
+    except yaml.YAMLError:
+        return None
+    if not isinstance(parsed, list) or len(cast("list[object]", parsed)) != 1:
+        return None
+    first = cast("list[object]", parsed)[0]
+    if not isinstance(first, dict):
+        return None
+    old_item = cast("dict[str, object]", first)
+    _normalize_answer({"needs": [old_item]})
+    key_indent = indent + 2
+    head = re.match(rf"^ {{{indent}}}- ([A-Za-z_][\w-]*):(\s|$)", block[0])
+    key_re = re.compile(rf"^ {{{key_indent}}}([A-Za-z_][\w-]*):(\s|$)")
+    if head is None:
+        return None
+    # (key, lines) per top-level key of the item; the first key sits on the `- ` line
+    segments: list[tuple[str, list[str]]] = [(head.group(1), [block[0]])]
+    for line in block[1:]:
+        m = key_re.match(line)
+        if m:
+            segments.append((m.group(1), [line]))
+        else:
+            segments[-1][1].append(line)
+    if [k for k, _ in segments] != list(old_item):
+        return None
+    out: list[str] = []
+    for key, seg in segments:
+        if key not in new_item:
+            continue
+        old, new = old_item[key], new_item[key]
+        if old == new:
+            out.extend(seg)
+            continue
+        body, tail = seg, cast("list[str]", [])
+        while len(body) > 1 and (body[-1].strip() == "" or body[-1].strip().startswith("#")):
+            body, tail = body[:-1], [body[-1], *tail]
+        out.extend(_render_changed_key(key, old, new, body, key_indent))
+        out.extend(tail)
+    for key, value in new_item.items():
+        if key not in old_item:
+            out.extend(_indented_dump({key: value}, key_indent))
+    if not out:
+        return None
+    if out[0].startswith(" " * key_indent) and not out[0].startswith(" " * indent + "- "):
+        out[0] = " " * indent + "- " + out[0][key_indent:]
+    for i, line in enumerate(out[:-1]):
+        if not line.endswith("\n"):
+            out[i] = line + "\n"
+    return "".join(out)
+
+
+def _render_changed_key(
+    key: str, old: object, new: object, body: list[str], key_indent: int
+) -> list[str]:
+    """The lines for one changed key: old items kept when a list only grew at the end."""
+    if isinstance(old, list) and isinstance(new, list):
+        old_l, new_l = cast("list[object]", old), cast("list[object]", new)
+        grown: object = new_l[len(old_l) :]
+        dash = next((re.match(r"^(\s*)- ", ln) for ln in body[1:] if re.match(r"^\s*- ", ln)), None)
+        if old_l and len(new_l) > len(old_l) and new_l[: len(old_l)] == old_l and dash:
+            kept = [ln if ln.endswith("\n") else ln + "\n" for ln in body]
+            return kept + _indented_dump(grown, len(dash.group(1)))
+    single: dict[str, object] = {key: new}
+    return _indented_dump(single, key_indent)
 
 
 def _render_item_append(old_text: str, doc: dict[str, object], key: str, item_id: str) -> str:

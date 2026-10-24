@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from prodc.config import Config
-from prodc.writer import accept, add_need, capture_source, set_field
+from prodc.writer import accept, add_need, attest, capture_source, set_field
 
 _TOML = """
 [prodc]
@@ -156,3 +156,76 @@ def test_add_into_new_file_dumps_fresh(tmp_path: Path) -> None:
     out = (tmp_path / "needs" / "b.yaml").read_text(encoding="utf-8")
     assert "id: N-9" in out
     assert "a need in a brand-new file" in out
+
+
+# The 2026-10-16 paas file (#98): quoted scalars, a folded quote, 6-space list items, and a
+# trailing comment inside the need. An edit must not reflow any of them.
+_STYLED = """\
+who: client
+needs:
+  - id: AGT-001
+    text: "Agent can deploy an app with one command."
+    sources:
+      - kind: secondary
+        locator: "docs/research.md"
+        quote: >
+          Users want to deploy
+          in one step.
+    proofs:
+      - "web:x#y"
+    # HOLE: no primary source yet
+  - id: AGT-002
+    text: "Agent sees logs."
+"""
+
+
+def test_attest_only_adds_its_lines(tmp_path: Path) -> None:
+    cfg = _project(tmp_path, needs=_STYLED)
+    attest(
+        cfg,
+        "AGT-001",
+        who="claude",
+        date="2026-10-16",
+        kind="ai",
+        verdict=None,
+        comment=None,
+        expect_sha=None,
+        dry_run=False,
+    )
+    out = _read(tmp_path)
+    added = [ln for ln in out.splitlines() if ln not in _STYLED.splitlines()]
+    assert added == [
+        "    attestation:",
+        "      who: claude",
+        "      date: '2026-10-16'",
+        "      kind: ai",
+    ]
+    assert out.replace("\n".join(added) + "\n", "") == _STYLED
+
+
+def test_capture_appends_without_reflowing_old_sources(tmp_path: Path) -> None:
+    cfg = _project(tmp_path, needs=_STYLED)
+    capture_source(
+        cfg,
+        "AGT-001",
+        kind="secondary",
+        who=None,
+        date=None,
+        quote=None,
+        locator="docs/y.md",
+        expect_sha=None,
+        dry_run=False,
+    )
+    out = _read(tmp_path)
+    assert '        locator: "docs/research.md"\n        quote: >\n' in out
+    assert "      - kind: secondary\n        locator: docs/y.md\n    proofs:" in out
+    assert "    # HOLE: no primary source yet\n" in out
+
+
+def test_set_changes_one_key_and_keeps_the_rest(tmp_path: Path) -> None:
+    cfg = _project(tmp_path, needs=_STYLED)
+    set_field(cfg, "AGT-001", "text=Deploy in one command.", expect_sha=None, dry_run=False)
+    out = _read(tmp_path)
+    assert out == _STYLED.replace(
+        'text: "Agent can deploy an app with one command."', "text: Deploy in one command."
+    )

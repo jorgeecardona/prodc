@@ -150,5 +150,5 @@ def test_answer_survives_a_splice_edit(tmp_path: Path, capsys: pytest.CaptureFix
     assert by_id["N-1"].importance == 3
     # on disk it stays the research word, never re-dumped as the YAML bool `false`
     text = (tmp_path / "needs" / "a.yaml").read_text(encoding="utf-8")
-    assert "answer: 'no'" in text
+    assert "answer: no\n" in text  # untouched key keeps its authored text (#98)
     assert "answer: false" not in text
