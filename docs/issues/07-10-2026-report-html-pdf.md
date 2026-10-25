@@ -11,7 +11,12 @@ area: cli
   the status engine (`report.render_markdown`), so it never drifts from `prodc status`. `-o/--output`
   writes a file; `--client` scopes it. Dependency-free.
 
-## What is deferred
+## Status
+
+Items 1 and 2 are done: the self-contained HTML viewer shipped in 0.3.x and is the
+print-to-PDF path (GitLab #66, closed). Item 3 is open as GitLab #67.
+
+## What was deferred
 
 1. **Self-contained HTML (`--format html`)** — one file, inline CSS, no new dependency (generate the
    HTML directly rather than pulling a markdown→HTML converter). This is the format a non-technical
