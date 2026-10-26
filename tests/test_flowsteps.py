@@ -32,7 +32,7 @@ def _project(tmp_path: Path, toml: str = _TOML, needs: str = "needs: []\n") -> P
 
 
 def test_flow_steps_default_is_empty_and_terminal_none(tmp_path: Path) -> None:
-    cfg = Config.load(_project(tmp_path, toml="[prodc]\nneeds = [\"needs/*.yaml\"]\n"))
+    cfg = Config.load(_project(tmp_path, toml='[prodc]\nneeds = ["needs/*.yaml"]\n'))
     assert cfg.flow_steps == ()
     assert cfg.terminal_step is None  # no vocab → nothing is terminal
 
@@ -44,13 +44,13 @@ def test_flow_steps_parsed_ordered_and_terminal_is_last(tmp_path: Path) -> None:
 
 
 def test_flow_steps_empty_list_rejected(tmp_path: Path) -> None:
-    toml = "[prodc]\nneeds = [\"needs/*.yaml\"]\n\n[flows]\nsteps = []\n"
+    toml = '[prodc]\nneeds = ["needs/*.yaml"]\n\n[flows]\nsteps = []\n'
     with pytest.raises(ConfigError, match=r"\[flows\].steps must list at least one step"):
         Config.load(_project(tmp_path, toml=toml))
 
 
 def test_flow_steps_duplicate_rejected(tmp_path: Path) -> None:
-    toml = "[prodc]\nneeds = [\"needs/*.yaml\"]\n\n[flows]\nsteps = [\"act\", \"act\"]\n"
+    toml = '[prodc]\nneeds = ["needs/*.yaml"]\n\n[flows]\nsteps = ["act", "act"]\n'
     with pytest.raises(ConfigError, match="must not repeat a step"):
         Config.load(_project(tmp_path, toml=toml))
 
@@ -88,7 +88,7 @@ needs:
 
 
 def test_no_vocab_lets_any_step_pass(tmp_path: Path) -> None:
-    toml = "[prodc]\nneeds = [\"needs/*.yaml\"]\n"
+    toml = '[prodc]\nneeds = ["needs/*.yaml"]\n'
     needs = """
 needs:
   - id: F-1
@@ -130,7 +130,11 @@ def test_lint_terminal_step_names_the_configured_word() -> None:
 
 def test_lint_warns_on_out_of_order_steps() -> None:
     needs = [
-        Need(id="F-1", text="f", children=(Child("A", "act"), Child("B", "trigger"), Child("C", "conclude")))
+        Need(
+            id="F-1",
+            text="f",
+            children=(Child("A", "act"), Child("B", "trigger"), Child("C", "conclude")),
+        )
     ]
     warns = flow_step_warnings(needs, _STEPS)
     assert any("out of order" in m for _, m in warns)
@@ -138,7 +142,9 @@ def test_lint_warns_on_out_of_order_steps() -> None:
 
 def test_lint_warns_on_mixed_bare_and_stepped() -> None:
     needs = [
-        Need(id="F-1", text="f", children=(Child("A", "trigger"), Child("B"), Child("C", "conclude")))
+        Need(
+            id="F-1", text="f", children=(Child("A", "trigger"), Child("B"), Child("C", "conclude"))
+        )
     ]
     warns = flow_step_warnings(needs, _STEPS)
     assert any("has no step while siblings do" in m for _, m in warns)
@@ -146,7 +152,11 @@ def test_lint_warns_on_mixed_bare_and_stepped() -> None:
 
 def test_lint_clean_journey_is_silent() -> None:
     needs = [
-        Need(id="F-1", text="f", children=(Child("A", "trigger"), Child("B", "act"), Child("C", "conclude")))
+        Need(
+            id="F-1",
+            text="f",
+            children=(Child("A", "trigger"), Child("B", "act"), Child("C", "conclude")),
+        )
     ]
     assert flow_step_warnings(needs, _STEPS) == []
 

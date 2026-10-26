@@ -34,6 +34,7 @@ class _Stub:
 def _adapter(state: ProofState, *, declared: bool) -> dict[str, Adapter]:
     return {"g": _Stub(ProofResult(state, declared=declared, detail="stub"))}
 
+
 _TOML = """
 [prodc]
 needs = ["needs/*.yaml"]
@@ -182,7 +183,9 @@ def test_undeclared_scope_rejected(tmp_path: Path) -> None:
 def test_add_principle_writes_scope(tmp_path: Path) -> None:
     from prodc.writer import add_principle
 
-    cfg = Config.load(_project(tmp_path, toml=_SCOPED_TOML, needs="principles:\n  - id: P-0\n    text: seed\n"))
+    cfg = Config.load(
+        _project(tmp_path, toml=_SCOPED_TOML, needs="principles:\n  - id: P-0\n    text: seed\n")
+    )
     add_principle(
         cfg,
         "P-9",
@@ -205,19 +208,26 @@ def _p(**kw: object) -> Principle:
 
 def test_no_proofs_is_stated() -> None:
     # a principle with no guards is honestly STATED — allowed, never a gate failure.
-    assert principle_state(_p(), _adapter(ProofState.DELIVERED, declared=True)) is PrincipleState.STATED
+    assert (
+        principle_state(_p(), _adapter(ProofState.DELIVERED, declared=True))
+        is PrincipleState.STATED
+    )
 
 
 def test_all_proofs_delivered_is_enforced() -> None:
     p = _p(proofs=("g:noPurple",))
-    assert principle_state(p, _adapter(ProofState.DELIVERED, declared=True)) is PrincipleState.ENFORCED
+    assert (
+        principle_state(p, _adapter(ProofState.DELIVERED, declared=True)) is PrincipleState.ENFORCED
+    )
 
 
 def test_failing_guard_with_results_is_violated() -> None:
     # the trap: a guard that ran and FAILED (results artifact present, not declared) means the code
     # contradicts the principle NOW — VIOLATED, never a mere STATED/PENDING. "The board cannot lie."
     p = _p(proofs=("g:noPurple",))
-    assert principle_state(p, _adapter(ProofState.PENDING, declared=False)) is PrincipleState.VIOLATED
+    assert (
+        principle_state(p, _adapter(ProofState.PENDING, declared=False)) is PrincipleState.VIOLATED
+    )
 
 
 def test_declared_pending_guard_is_stated_not_violated() -> None:

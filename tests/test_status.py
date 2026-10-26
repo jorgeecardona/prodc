@@ -11,7 +11,9 @@ from prodc.status import Summary, group_state, resolve
 
 
 def _summary(**kw: int) -> Summary:
-    base = dict(total=0, delivered=0, pending=0, hole=0, must_hole=0, broken=0, unresolved=0, opinion=0)
+    base = dict(
+        total=0, delivered=0, pending=0, hole=0, must_hole=0, broken=0, unresolved=0, opinion=0
+    )
     base.update(kw)
     return Summary(**base)
 
@@ -370,7 +372,9 @@ def test_flow_seam_proof_gates_delivered() -> None:
     # all children delivered but the seam proof pending → flow is PENDING, not DELIVERED (#44)
     from prodc.adapters import Adapter
 
-    flow = Need(id="F-1", text="roast day", children=(Child("L-1"), Child("L-2")), seam=("web:seam#E2E",))
+    flow = Need(
+        id="F-1", text="roast day", children=(Child("L-1"), Child("L-2")), seam=("web:seam#E2E",)
+    )
     children = [
         Need(id="L-1", text="a", proofs=("x:1",)),
         Need(id="L-2", text="b", proofs=("x:1",)),
