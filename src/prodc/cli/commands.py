@@ -186,6 +186,20 @@ def _annotate_draft_age_warnings(results: list[NeedResult], cfg: Config) -> None
             )
 
 
+def _annotate_declared_only_warnings(results: list[NeedResult]) -> None:
+    """Warn on a DELIVERED must-have whose every proof is declared, so ``--strict`` fails (#103).
+
+    A declared proof (``files``, ``accept``, ``prototype``, ``citation``) says something exists,
+    not that the need works. One results-backed proof clears the warning. A should-have is left
+    alone: its confidence already reads ``weak`` (#97).
+    """
+    for r in results:
+        if r.need.must and r.declared_only:
+            r.warnings.append(
+                "must-have DELIVERED on declared proofs only: add a results-backed proof (#103)"
+            )
+
+
 def _lint_errors(results: list[NeedResult]) -> list[str]:
     """Hard problems a lint gate fails on: a dangling proof, or a must-have with no evidence."""
     errors: list[str] = []
@@ -235,6 +249,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
                 )
     _annotate_importance_warnings(results, cfg)
     _annotate_draft_age_warnings(results, cfg)
+    _annotate_declared_only_warnings(results)
     # The principle ripple: a need withdrawn citing a principle that was revised *after* the decision
     # comes back up. The frame it was judged against has changed. A warning, never a hard
     # error; prodc flags, the PM re-decides. The same loop grades each principle's guards (#89): a

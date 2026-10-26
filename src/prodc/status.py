@@ -358,7 +358,10 @@ class Resolver:
             state = NeedState.DELIVERED
         else:
             state = NeedState.PENDING
-        return NeedResult(need, state, delivered, len(results), declared, detail)
+        declared_only = state is NeedState.DELIVERED and all(r.declared for r in results)
+        return NeedResult(
+            need, state, delivered, len(results), declared, detail, declared_only=declared_only
+        )
 
     def _aggregate_children(self, need: Need) -> NeedResult:
         warnings: list[str] = []

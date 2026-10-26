@@ -586,3 +586,4 @@ class NeedResult:
     confidence: Confidence | None = None  # only for a DELIVERED need (#97)
     confidence_detail: list[str] = field(default_factory=list[str])  # the rule that matched
     path_state: ProofState | None = None  # state of ``need.path.proof``; None when it has none
+    declared_only: bool = False  # true if every proof of a DELIVERED leaf is declared (#103)

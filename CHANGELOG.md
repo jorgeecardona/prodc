@@ -6,6 +6,8 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- `prodc lint` warns when a must-have is DELIVERED only by declared proofs (`files`, `accept`,
+  `prototype`, `citation`), so `lint --strict` fails until it has one results-backed proof (#103).
 - `prodc outcome <id> --not-landed` records that a green need did not move its goal (#97).
   The need stays DELIVERED and in coverage, but its confidence becomes weak and its goal no
   longer counts it.
