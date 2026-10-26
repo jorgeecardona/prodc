@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, cast, runtime_checkable
 
+from . import views as _views
 from .model import ProofState
 
 _TAG_RE = re.compile(r"@[\w\-.]+")
@@ -461,6 +462,53 @@ class AcceptAdapter:
         who, _, date = payload.partition("@")
         detail = "accepted" + (f" by {who}" if who else "") + (f" on {date}" if date else "")
         return ProofResult(ProofState.DELIVERED, True, detail)
+
+
+class ViewsAdapter:
+    """Resolves ``client:id`` against the generated view inventory files (#100).
+
+    A view in the inventory is a *declared* DELIVERED (``*``): the view exists, which says
+    nothing about whether a need works. A view not in the inventory is BROKEN. A concrete URL
+    (``web:/roast/sessions/42``) claims the ``$param`` view it fits. A child view and its parent
+    are separate units: claiming one does not claim the other.
+    """
+
+    def __init__(self, root: Path, files: list[str]) -> None:
+        self._paths = [root / f for f in files]
+        self._inv: _views.ViewInventory | None = None
+        self._error: str | None = None
+
+    def load(self) -> _views.ViewInventory:
+        """The merged inventory; empty when a file could not be read (``resolve`` says why)."""
+        if self._inv is None:
+            try:
+                self._inv = _views.load(self._paths)
+            except _views.ViewInventoryError as e:
+                self._error = str(e)
+                self._inv = _views.ViewInventory()
+        return self._inv
+
+    def inventory(self) -> list[str]:
+        """Every view, as ``client:id``."""
+        return sorted(v.key for v in self.load().views)
+
+    def covers(self, payload: str) -> list[str]:
+        """The views (as ``client:id``) a payload claims: the exact id, else every pattern fit."""
+        client, _, raw_id = payload.partition(":")
+        vid = _views.normalise_id(raw_id)
+        same = [v for v in self.load().views if v.client == client]
+        exact = [v.key for v in same if v.id == vid]
+        if exact:
+            return exact
+        return sorted(v.key for v in same if _views.matches(v.id, vid))
+
+    def resolve(self, payload: str) -> ProofResult:
+        hits = self.covers(payload)
+        if self._error is not None:
+            return ProofResult(ProofState.UNRESOLVED, False, self._error)
+        if not hits:
+            return ProofResult(ProofState.BROKEN, False, f"no view '{payload}' in the inventory")
+        return ProofResult(ProofState.DELIVERED, True, f"view {', '.join(hits)} exists")
 
 
 class CoverageAdapter:

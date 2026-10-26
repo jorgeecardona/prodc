@@ -6,6 +6,9 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- A `views` proof kind reads the view inventory files your clients generate (#100). A proof
+  `views:web:/roast/sessions/$planId` is DELIVERED (declared) when the view exists, and
+  views no need points at show up in `prodc orphans`.
 - `prodc lint` warns when a must-have is DELIVERED only by declared proofs (`files`, `accept`,
   `prototype`, `citation`), so `lint --strict` fails until it has one results-backed proof (#103).
 - `prodc outcome <id> --not-landed` records that a green need did not move its goal (#97).

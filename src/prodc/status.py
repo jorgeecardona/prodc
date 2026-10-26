@@ -11,7 +11,7 @@ from dataclasses import dataclass, replace
 from datetime import date
 from itertools import pairwise
 
-from .adapters import Adapter, Enumerable, Inventoried, ProofResult, SourceAdapter
+from .adapters import Adapter, Enumerable, Inventoried, ProofResult, SourceAdapter, ViewsAdapter
 from .dedup import similarity
 from .model import (
     SOLUTION_VERBS,
@@ -542,12 +542,14 @@ def proof_suggestions(
 
     For each leaf need with no proof, compare its text with every enumerable adapter's known
     proof units and return the closest matches as ready-to-paste locators. Read-only: it never
-    writes; ``--apply`` and BROKEN-relink are left to the caller/follow-up.
+    writes; ``--apply`` and BROKEN-relink are left to the caller/follow-up. A ``views``
+    adapter is left out unless named by ``kind``: a view exists, it does not prove a need (#100).
     """
     inventories: list[tuple[str, list[str]]] = [
         (name, ad.inventory())
         for name, ad in adapters.items()
-        if isinstance(ad, Inventoried) and (kind is None or name == kind)
+        if isinstance(ad, Inventoried)
+        and (name == kind if kind is not None else not isinstance(ad, ViewsAdapter))
     ]
     out: list[ProofSuggestion] = []
     for r in results:

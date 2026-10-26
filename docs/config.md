@@ -60,6 +60,7 @@ A proof is `<name>:<payload>`.
 | `external` | observable-outcome key | key recorded passing in `results` (a JSON `{key: bool}`); implementation-independent | `results` |
 | `evalgate` | `metric>=threshold` (`>=`/`<=`/`>`/`<`) | the recorded score meets the gate; score in `results` as `{metric: {score: N}}` or `{metric: N}` | `results` |
 | `command` | anything your hook understands | your hook prints `{"state": "delivered"}` | `command`, `timeout` |
+| `views` | `client:id`, for example `web:/roast/sessions/$planId#batches` or `ios:RoastSession` | the view is in an inventory file (declared); a concrete URL such as `web:/roast/sessions/42` claims the `$param` view it fits | `files` |
 | `need` | `other-need-id` or `other-need-id@yes\|no\|inconclusive` | the referenced need is settled (DELIVERED); the `@answer` form also requires its authored `answer` to match | (built in; not configured) |
 
 Any adapter takes `repo = "../sibling"` to resolve against a sibling checkout; absent sibling → UNRESOLVED, not BROKEN. `results` (cucumber-json or junit XML) turns declared states into real ones.
@@ -82,6 +83,42 @@ timeout = 10                           # seconds, optional (default 10)
 ```
 
 `state` is `delivered` / `pending` / `broken` / `unresolved`; `detail` is optional. The command comes only from this config (trusted); the locator is passed as data, never executed. A non-zero exit, a timeout, unparseable output, or an unknown `state` resolves to UNRESOLVED ("could not read"), never a false DELIVERED. The hook inherits the environment and owns any network/secrets itself.
+
+### `views`: the view inventory
+
+Each client generates one JSON file listing its views. prodc reads the files and never reads app
+code. The web app writes it from its router, a mobile app from its navigator.
+
+```toml
+[proofs.views]
+kind = "views"
+files = ["product/views/web.json", "product/views/ios.json"]
+```
+
+```json
+{
+  "schema": 1,
+  "client": "web",
+  "generated_from": "apps/website/src/router.tsx@<sha>",
+  "views": [
+    {"id": "/roast/sessions/$planId", "kind": "page", "parent": null, "section": "roast",
+     "orphan_ok": false, "needless_ok": false},
+    {"id": "/roast/sessions/$planId#batches", "kind": "section", "parent": "/roast/sessions/$planId"}
+  ],
+  "links": [{"from": "/roast/sessions", "to": "/roast/sessions/$planId"}]
+}
+```
+
+- `id`: the view. `:id` and `{id}` path params are read as `$id`.
+- `kind`: free text (page, screen, section, dialog, window). Null means untyped.
+- `parent`: the view that contains this one. `links` are navigation. They are separate relations.
+- `orphan_ok`: the view has no inbound link on purpose (top-level views only).
+- `needless_ok`: no need is expected for this view (redirect, auth, public page).
+
+A view that exists is a declared DELIVERED (`*`): it proves the view is there, not that the need
+works. A child view and its parent are graded separately. Views appear in `prodc orphans`, and
+`prodc suggest` leaves them out unless you pass `--kind views`. A missing or malformed file
+resolves to UNRESOLVED.
 
 ## `[sources.<name>]`
 

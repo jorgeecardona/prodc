@@ -25,6 +25,7 @@ from .adapters import (
     PrototypeAdapter,
     PytestAdapter,
     SourceAdapter,
+    ViewsAdapter,
     VitestAdapter,
 )
 from .callbacks import Callback
@@ -235,6 +236,11 @@ class Config:
                 inner = PrototypeAdapter()
             elif kind == "citation":
                 inner = CitationAdapter()
+            elif kind == "views":
+                inner = ViewsAdapter(
+                    root=proof_root,
+                    files=_as_str_list(tbl.get("files", []), f"[proofs.{name}].files"),
+                )
             elif kind == "coverage":
                 cat = tbl.get("catalog", "")
                 inner = CoverageAdapter(
@@ -257,7 +263,7 @@ class Config:
             else:
                 raise ConfigError(
                     f"[proofs.{name}]: unknown kind {kind!r} "
-                    "(gherkin|pytest|vitest|files|accept|prototype|citation|coverage|field|external|evalgate|command)"
+                    "(gherkin|pytest|vitest|files|accept|prototype|citation|coverage|field|external|evalgate|command|views)"
                 )
             adapters[name] = (
                 External(inner, root / repo_field) if isinstance(repo_field, str) else inner
