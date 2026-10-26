@@ -192,6 +192,35 @@ def _path_warnings(need: Need, result: NeedResult) -> list[str]:
     return []
 
 
+def _path_view_warnings(need: Need, adapters: dict[str, Adapter]) -> list[str]:
+    """Flag a path start or outcome that is not a view, when a ``views`` adapter exists (#101).
+
+    A value is ``client:id`` or a bare id; a bare id means the only client when there is one.
+    An outcome that is a proof locator of a configured adapter (a test id) is not a view and
+    is not checked. Silent when no ``views`` adapter is configured.
+    """
+    path = need.path
+    views = [a for a in adapters.values() if isinstance(a, ViewsAdapter)]
+    if path is None or not views:
+        return []
+    clients = list(dict.fromkeys(c for a in views for c in a.load().clients()))
+    out: list[str] = []
+    for label, value in (("start", path.start), ("outcome", path.outcome)):
+        prefix, sep, _ = value.partition(":")
+        if label == "outcome" and sep and prefix in adapters:
+            continue
+        if sep and prefix in clients:
+            payload = value
+        elif len(clients) == 1:
+            payload = f"{clients[0]}:{value}"
+        else:
+            out.append(f"path {label} '{value}' names no client: write it as client:id (#101)")
+            continue
+        if not any(a.covers(payload) for a in views):
+            out.append(f"path {label} '{payload}' is not a view (#101)")
+    return out
+
+
 _CONFIDENCE_ORDER = list(Confidence)
 
 
@@ -265,6 +294,7 @@ class Resolver:
             + _warrant_warnings(need, result)
             + _answer_warnings(need, result)
             + _path_warnings(need, result)
+            + _path_view_warnings(need, self._adapters)
             + _outcome_warnings(need, result)
             + result.warnings
         )

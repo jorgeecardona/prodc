@@ -6,6 +6,9 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- With a `views` adapter configured, a need's `path.start` and `path.outcome` must be views:
+  `status` and `lint` warn on one that is not (#101). Write `client:id`; a bare id means the
+  only client.
 - A `views` proof kind reads the view inventory files your clients generate (#100). A proof
   `views:web:/roast/sessions/$planId` is DELIVERED (declared) when the view exists, and
   views no need points at show up in `prodc orphans`.
