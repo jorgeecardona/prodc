@@ -36,6 +36,7 @@ from .commands import (
     cmd_status,
     cmd_suggest,
     cmd_sync,
+    cmd_views,
     cmd_withdraw,
 )
 
@@ -628,6 +629,12 @@ def main(argv: list[str] | None = None) -> int:
         help="similarity to flag (0..1); overrides [lint].duplicate_threshold",
     )
     du.set_defaults(func=cmd_dupes)
+
+    vw = sub.add_parser("views", help="list each client's views with the needs that point at them")
+    vw.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    vw.add_argument("--json", action="store_true", help="machine-readable output")
+    vw.add_argument("--client", default=None, help="only this client's views (for example web)")
+    vw.set_defaults(func=cmd_views)
 
     rp = sub.add_parser(
         "report", help="render the board as a shareable document (markdown, or an interactive HTML)"

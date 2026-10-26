@@ -32,6 +32,7 @@ from .model import (
     Verdict,
     ears_warnings,
 )
+from .views import View
 
 #: Reserved proof-adapter name for a need→need edge (#research-board step 2): a proof whose
 #: payload is another need id. Resolved by the :class:`Resolver` itself, not a config adapter,
@@ -203,22 +204,32 @@ def _path_view_warnings(need: Need, adapters: dict[str, Adapter]) -> list[str]:
     views = [a for a in adapters.values() if isinstance(a, ViewsAdapter)]
     if path is None or not views:
         return []
-    clients = list(dict.fromkeys(c for a in views for c in a.load().clients()))
+    clients = _view_clients(views)
     out: list[str] = []
     for label, value in (("start", path.start), ("outcome", path.outcome)):
         prefix, sep, _ = value.partition(":")
         if label == "outcome" and sep and prefix in adapters:
             continue
-        if sep and prefix in clients:
-            payload = value
-        elif len(clients) == 1:
-            payload = f"{clients[0]}:{value}"
-        else:
+        payload = _view_payload(value, clients)
+        if payload is None:
             out.append(f"path {label} '{value}' names no client: write it as client:id (#101)")
-            continue
-        if not any(a.covers(payload) for a in views):
+        elif not any(a.covers(payload) for a in views):
             out.append(f"path {label} '{payload}' is not a view (#101)")
     return out
+
+
+def _view_clients(views: list[ViewsAdapter]) -> list[str]:
+    return list(dict.fromkeys(c for a in views for c in a.load().clients()))
+
+
+def _view_payload(value: str, clients: list[str]) -> str | None:
+    """``value`` as ``client:id``: as written, or with the only client added; None if ambiguous."""
+    prefix, sep, _ = value.partition(":")
+    if sep and prefix in clients:
+        return value
+    if len(clients) == 1:
+        return f"{clients[0]}:{value}"
+    return None
 
 
 _CONFIDENCE_ORDER = list(Confidence)
@@ -1222,4 +1233,79 @@ def orphans(needs: list[Need], adapters: dict[str, Adapter]) -> dict[str, list[s
         unclaimed = sorted(set(adapter.inventory()) - claimed)
         if unclaimed:
             out[name] = unclaimed
+    return out
+
+
+@dataclass(frozen=True)
+class ViewRow:
+    """One view in the ``prodc views`` report: the needs that point at it and their state (#102)."""
+
+    view: View
+    depth: int  # containment depth: 0 for a top-level view
+    needs: tuple[str, ...]  # ids of needs whose proofs or path name this view
+    state: NeedState | None  # group state of those needs; None when no need points here
+    justified: bool  # a need points here or at a child, or ``needless_ok`` is set
+
+    @property
+    def untyped(self) -> bool:
+        return self.view.kind is None
+
+
+def view_report(
+    results: list[NeedResult], adapters: dict[str, Adapter], client: str | None = None
+) -> list[ViewRow]:
+    """Every view, in tree order per client, with the needs that point at it (#102).
+
+    A need points at a view through a ``views:`` proof or its ``path`` start or outcome. A
+    parent with no need of its own is justified when one of its children is.
+    """
+    views_by_name = {n: a for n, a in adapters.items() if isinstance(a, ViewsAdapter)}
+    all_views = [v for a in views_by_name.values() for v in a.load().views]
+    clients = _view_clients(list(views_by_name.values()))
+    pointing: dict[str, list[str]] = {}
+    for r in results:
+        payloads = [
+            payload
+            for name, _, payload in (p.partition(":") for p in r.need.proofs)
+            if name in views_by_name
+        ]
+        if r.need.path is not None:
+            for value in (r.need.path.start, r.need.path.outcome):
+                payload = _view_payload(value, clients)
+                if payload is not None:
+                    payloads.append(payload)
+        keys = {k for p in payloads for a in views_by_name.values() for k in a.covers(p)}
+        for k in sorted(keys):
+            pointing.setdefault(k, []).append(r.need.id)
+    by_id = {r.need.id: r for r in results}
+    children: dict[str, list[View]] = {}
+    roots: list[View] = []
+    known = {v.key for v in all_views}
+    for v in sorted(all_views, key=lambda x: x.id):
+        parent_key = f"{v.client}:{v.parent}" if v.parent is not None else None
+        if parent_key is not None and parent_key in known:
+            children.setdefault(parent_key, []).append(v)
+        else:
+            roots.append(v)
+
+    def justified(v: View) -> bool:
+        return (
+            v.needless_ok or v.key in pointing or any(justified(c) for c in children.get(v.key, []))
+        )
+
+    out: list[ViewRow] = []
+
+    def walk(v: View, depth: int) -> None:
+        ids = tuple(pointing.get(v.key, []))
+        state = group_state(summarize([by_id[i] for i in ids])) if ids else None
+        out.append(ViewRow(v, depth, ids, state, justified(v)))
+        for c in children.get(v.key, []):
+            walk(c, depth + 1)
+
+    for c in clients:
+        if client is not None and c != client:
+            continue
+        for v in roots:
+            if v.client == c:
+                walk(v, 0)
     return out

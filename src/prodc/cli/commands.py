@@ -51,6 +51,7 @@ from ..status import (
     resolve,
     stale_decisions,
     summarize,
+    view_report,
 )
 from ..writer import (
     Edit,
@@ -105,6 +106,7 @@ from .render import (
     render_releases,
     render_roles,
     render_show,
+    render_views,
     summary_line,
 )
 from .serialize import (
@@ -326,6 +328,12 @@ def cmd_lint(args: argparse.Namespace) -> int:
         | {n.client for n in needs if n.client is not None}
     )
     warnings += tag_warnings(needs, structural_ids, cfg.duplicate_threshold)
+    # An untyped view (``kind`` null) in the inventory: the report cannot say what it is (#102).
+    warnings += [
+        (row.view.key, "view has no kind: set it in the inventory file (#102)")
+        for row in view_report(results, cfg.adapters)
+        if row.untyped
+    ]
     # Flow step hygiene (#90): once [flows].steps declares a vocabulary, grade each journey's
     # shape: never-terminal, out-of-order, mixed bare/stepped. Silent when no vocab is declared.
     warnings += flow_step_warnings(needs, cfg.flow_steps)
@@ -1282,6 +1290,40 @@ def cmd_guide(args: argparse.Namespace) -> int:
         print(f"wrote prodc guide to {dest}")
         return 0
     print(text, end="")
+    return 0
+
+
+def cmd_views(args: argparse.Namespace) -> int:
+    """List every view per client with the needs that point at it and their state (#102)."""
+    loaded = load_or_report(args)
+    if loaded is None:
+        return 2
+    cfg, model = loaded
+    results = resolve(list(model.needs), cfg.adapters, cfg.source_adapters)
+    rows = view_report(results, cfg.adapters, args.client)
+    if args.json:
+        print(
+            json.dumps(
+                [
+                    {
+                        "client": r.view.client,
+                        "id": r.view.id,
+                        "kind": r.view.kind,
+                        "parent": r.view.parent,
+                        "section": r.view.section,
+                        "depth": r.depth,
+                        "needs": list(r.needs),
+                        "state": r.state.value if r.state is not None else None,
+                        "justified": r.justified,
+                        "untyped": r.untyped,
+                    }
+                    for r in rows
+                ],
+                indent=2,
+            )
+        )
+    else:
+        print(render_views(rows))
     return 0
 
 

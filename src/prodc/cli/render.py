@@ -31,6 +31,7 @@ from ..status import (
     PrincipleReport,
     Recurrence,
     Summary,
+    ViewRow,
     group_state,
     orphaned_decisions,
     rank,
@@ -203,6 +204,31 @@ def render_orphans(orphan_map: dict[str, list[str]]) -> str:
     for name in sorted(orphan_map):
         for sid in orphan_map[name]:
             out.append(f"     {name}:{sid}")
+    return "\n".join(out)
+
+
+def render_views(rows: list[ViewRow]) -> str:
+    """The view inventory, one tree per client, with each view's needs and their state (#102)."""
+    out: list[str] = []
+    client: str | None = None
+    for row in rows:
+        if row.view.client != client:
+            client = row.view.client
+            out.append(f"{'' if not out else chr(10)}{client}")
+            out.append(f"  {'view':<44} {'kind':<10} {'section':<10} {'state':<10} needs")
+        flags = [
+            f for f, on in (("unjustified", not row.justified), ("untyped", row.untyped)) if on
+        ]
+        name = "  " * row.depth + row.view.id
+        state = _LABEL[row.state] if row.state is not None else "-"
+        line = (
+            f"  {name:<44} {row.view.kind or '-':<10} {row.view.section or '-':<10} "
+            f"{state:<10} {', '.join(row.needs) or '-'}"
+        )
+        out.append(line + (f"  [{', '.join(flags)}]" if flags else ""))
+    unjustified = sum(1 for r in rows if not r.justified)
+    untyped = sum(1 for r in rows if r.untyped)
+    out.append(f"\nviews: {len(rows)}, unjustified: {unjustified}, untyped: {untyped}")
     return "\n".join(out)
 
 

@@ -6,6 +6,9 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- `prodc views` lists each client's views as a tree, with the needs that point at each view and
+  their state (#102). It flags views no need justifies and views with no `kind`; `lint --strict`
+  fails on an untyped view.
 - With a `views` adapter configured, a need's `path.start` and `path.outcome` must be views:
   `status` and `lint` warn on one that is not (#101). Write `client:id`; a bare id means the
   only client.
