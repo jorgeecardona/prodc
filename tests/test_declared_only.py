@@ -77,3 +77,26 @@ def test_should_with_only_declared_proofs_passes(
     code = _lint(tmp_path, '    proofs: ["accept:jorge@2026-10-26"]\n')
     assert "declared proofs only" not in capsys.readouterr().out
     assert code == 0
+
+
+def test_status_shows_the_same_per_need_warning_as_lint(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _lint(tmp_path, '    must: true\n    proofs: ["accept:jorge@2026-10-26"]\n')
+    capsys.readouterr()
+    main(["status", "--config", str(tmp_path / "prodc.toml")])
+    assert "must-have DELIVERED on declared proofs only" in capsys.readouterr().out  # (#81)
+
+
+def test_must_flow_of_declared_only_steps_warns(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    flow = (
+        "    must: true\n    children:\n      - id: R-2\n"
+        "  - id: R-2\n    text: When asked, the roaster can open the queue\n"
+        '    proofs: ["accept:jorge@2026-10-26"]\n'
+    )
+    code = _lint(tmp_path, flow)
+    out = capsys.readouterr().out
+    assert "R-1: must-have DELIVERED on declared proofs only" in out  # the flow, not only R-2
+    assert code == 1

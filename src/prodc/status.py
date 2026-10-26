@@ -407,6 +407,7 @@ class Resolver:
     def _aggregate_children(self, need: Need) -> NeedResult:
         warnings: list[str] = []
         child_states: list[NeedState] = []
+        child_results: list[NeedResult] = []
         declared = False
         for c in need.children:
             if c.id not in self._by_id:
@@ -414,6 +415,7 @@ class Resolver:
                 continue
             cr = self.resolve(c.id)
             child_states.append(cr.state)
+            child_results.append(cr)
             declared = declared or cr.declared
         delivered = sum(1 for s in child_states if s is NeedState.DELIVERED)
         total = len(child_states)
@@ -442,7 +444,15 @@ class Resolver:
             state = NeedState.HOLE
         else:
             state = NeedState.PENDING
-        return NeedResult(need, state, delivered, total, declared, detail, warnings)
+        # A flow rests on declared proofs only when every step and every seam proof does (#103).
+        declared_only = (
+            state is NeedState.DELIVERED
+            and all(cr.declared_only for cr in child_results)
+            and all(r.declared for r in seam_results)
+        )
+        return NeedResult(
+            need, state, delivered, total, declared, detail, warnings, declared_only=declared_only
+        )
 
 
 def resolve(

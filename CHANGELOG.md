@@ -6,6 +6,10 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- `status` now shows every per-need warning that `lint` shows (duplicates, unlinked recurrence,
+  stale evidence, `who` variants, importance, draft age, declared-only proofs). Both commands
+  call one function, so the two cannot drift (#81). `lint` still adds the warnings that are not
+  about one need: principles, decisions, tags and flow steps.
 - `prodc views` lists each client's views as a tree, with the needs that point at each view and
   their state (#102). It flags views no need justifies and views with no `kind`; `lint --strict`
   fails on an untyped view.

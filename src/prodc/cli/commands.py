@@ -16,8 +16,7 @@ from datetime import date
 from pathlib import Path
 from typing import cast
 
-from ..board import annotate_board_warnings as _annotate_board_warnings
-from ..board import gather
+from ..board import annotate_need_warnings, gather
 from ..callbacks import advance_ledger, fire, read_ledger, transitions, write_ledger
 from ..config import Config, ConfigError
 from ..dedup import (
@@ -26,7 +25,6 @@ from ..dedup import (
     matches_for,
     tag_warnings,
     variant_suggestions,
-    who_variants,
 )
 from ..loader import LoaderError, load
 from ..model import Need, NeedResult, NeedState, PrincipleState, board_needs
@@ -120,88 +118,6 @@ from .serialize import (
 )
 
 
-def _annotate_duplicate_warnings(
-    results: list[NeedResult], needs: list[Need], threshold: float
-) -> None:
-    """Append a `possible duplicate of <id>` warning to each need in a candidate pair (#55)."""
-    by_id = {r.need.id: r for r in results}
-    for pair in duplicate_pairs(needs, threshold):
-        msg_a = f"possible duplicate of {pair.b.id} ({pair.score:.2f}) (#55)"
-        msg_b = f"possible duplicate of {pair.a.id} ({pair.score:.2f}) (#55)"
-        if pair.a.id in by_id:
-            by_id[pair.a.id].warnings.append(msg_a)
-        if pair.b.id in by_id:
-            by_id[pair.b.id].warnings.append(msg_b)
-
-
-def _annotate_importance_warnings(results: list[NeedResult], cfg: Config) -> None:
-    """Flag importance values off the rubric, or set long ago / never dated (#59)."""
-    today = date.today()
-    for r in results:
-        imp = r.need.importance
-        if imp is None:
-            continue
-        if cfg.importance_levels and imp not in cfg.importance_levels:
-            allowed = ", ".join(str(n) for n in sorted(cfg.importance_levels))
-            r.warnings.append(f"importance {imp} is off the declared scale ({allowed}) (#59)")
-            continue
-        when = r.need.importance_set_at
-        if when is None:
-            r.warnings.append(
-                "importance set but no revisit date (`set importance` stamps one) (#59)"
-            )
-        elif cfg.importance_revisit_days is not None:
-            try:
-                days = (today - date.fromisoformat(when)).days
-            except ValueError:
-                days = None
-            if days is not None and days > cfg.importance_revisit_days:
-                r.warnings.append(
-                    f"importance set {days}d ago (> {cfg.importance_revisit_days}d). Revisit (#59)"
-                )
-
-
-def _annotate_draft_age_warnings(results: list[NeedResult], cfg: Config) -> None:
-    """Flag staged drafts older than `[lint].draft_max_age_days`, so a batch can't be forgotten (#60).
-
-    Mirrors the importance-revisit check: a draft with no `draft_added` stamp is flagged undated
-    (it cannot be aged, so it is not silently exempt); a dated draft past the limit is flagged with
-    its age. Only runs when the knob is set.
-    """
-    if cfg.draft_max_age_days is None:
-        return
-    today = date.today()
-    for r in results:
-        if not r.need.draft or r.need.is_withdrawn:
-            continue
-        when = r.need.draft_added
-        if when is None:
-            r.warnings.append("draft with no staged date (`add --draft` stamps one) (#60)")
-            continue
-        try:
-            days = (today - date.fromisoformat(when)).days
-        except ValueError:
-            continue
-        if days > cfg.draft_max_age_days:
-            r.warnings.append(
-                f"draft staged {days}d ago (> {cfg.draft_max_age_days}d). Promote or drop (#60)"
-            )
-
-
-def _annotate_declared_only_warnings(results: list[NeedResult]) -> None:
-    """Warn on a DELIVERED must-have whose every proof is declared, so ``--strict`` fails (#103).
-
-    A declared proof (``files``, ``accept``, ``prototype``, ``citation``) says something exists,
-    not that the need works. One results-backed proof clears the warning. A should-have is left
-    alone: its confidence already reads ``weak`` (#97).
-    """
-    for r in results:
-        if r.need.must and r.declared_only:
-            r.warnings.append(
-                "must-have DELIVERED on declared proofs only: add a results-backed proof (#103)"
-            )
-
-
 def _lint_errors(results: list[NeedResult]) -> list[str]:
     """Hard problems a lint gate fails on: a dangling proof, or a must-have with no evidence."""
     errors: list[str] = []
@@ -225,33 +141,8 @@ def cmd_lint(args: argparse.Namespace) -> int:
     cfg, model = loaded
     needs = list(model.needs)
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
-    _annotate_board_warnings(results, needs)
-    _annotate_duplicate_warnings(results, needs, cfg.duplicate_threshold)
+    annotate_need_warnings(results, needs, cfg)
     by_id = {r.need.id: r for r in results}
-    for g in variant_suggestions(needs, cfg.duplicate_threshold):
-        others = ", ".join(m.id for m in g.members)
-        for m in g.members:
-            if m.id in by_id:
-                by_id[m.id].warnings.append(
-                    f"unlinked cross-client recurrence with {others}: set variant_of or "
-                    f"not_variant_of ({g.score:.2f}) (#56)"
-                )
-    if cfg.stale_after_days is not None:
-        today = date.today()
-        for r in results:
-            age = evidence_age_days(r.need, today)
-            if age is not None and age > cfg.stale_after_days:
-                r.warnings.append(f"evidence is {age}d old (> {cfg.stale_after_days}d) (#58)")
-    for v in who_variants(needs, cfg.duplicate_threshold):
-        whos = " / ".join(repr(w) for w in v.whos)
-        for nid in v.need_ids:
-            if nid in by_id:
-                by_id[nid].warnings.append(
-                    f"who may name the same person: {whos} (needs {', '.join(v.need_ids)}) (#61)"
-                )
-    _annotate_importance_warnings(results, cfg)
-    _annotate_draft_age_warnings(results, cfg)
-    _annotate_declared_only_warnings(results)
     # The principle ripple: a need withdrawn citing a principle that was revised *after* the decision
     # comes back up. The frame it was judged against has changed. A warning, never a hard
     # error; prodc flags, the PM re-decides. The same loop grades each principle's guards (#89): a
