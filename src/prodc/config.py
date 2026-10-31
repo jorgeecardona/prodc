@@ -120,6 +120,8 @@ class Config:
     )  # [importance].levels: ordinal → (label, meaning); empty = no rubric declared (#59)
     importance_revisit_days: int | None = None  # [lint].importance_revisit_days (#59)
     draft_max_age_days: int | None = None  # [lint].draft_max_age_days: flag stale drafts (#60)
+    unjustified_views: str | None = None  # [lint].unjustified_views: "warn" | "error" (#108)
+    link_without_why: str | None = None  # [lint].link_without_why: "warn" | "error" (#104)
     default_draft: bool = False  # [add].default_draft: ``add`` stages as draft by default (#60)
     callbacks: tuple[Callback, ...] = ()  # [[callbacks.hooks]]: lifecycle callbacks (#71)
     callback_state_file: str = ".prodc/state.json"  # [callbacks].state_file: the state ledger
@@ -324,6 +326,13 @@ class Config:
         ):
             raise ConfigError("[lint].draft_max_age_days must be a positive integer")
 
+        lint_levels: dict[str, str | None] = {}
+        for key in ("unjustified_views", "link_without_why"):
+            level = lint_tbl.get(key)
+            if level is not None and level not in ("warn", "error"):
+                raise ConfigError(f'[lint].{key} must be "warn" or "error"')
+            lint_levels[key] = level
+
         importance_levels: dict[int, tuple[str, str]] = {}
         imp_tbl = _as_dict(raw.get("importance", {}), "[importance]")
         rows = imp_tbl.get("levels", [])
@@ -378,6 +387,8 @@ class Config:
             importance_levels=importance_levels,
             importance_revisit_days=revisit,
             draft_max_age_days=draft_max_age,
+            unjustified_views=lint_levels["unjustified_views"],
+            link_without_why=lint_levels["link_without_why"],
             default_draft=default_draft,
             callbacks=callbacks,
             callback_state_file=callback_state_file,

@@ -634,6 +634,14 @@ def main(argv: list[str] | None = None) -> int:
     vw.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     vw.add_argument("--json", action="store_true", help="machine-readable output")
     vw.add_argument("--client", default=None, help="only this client's views (for example web)")
+    vw.add_argument("--links", action="store_true", help="list each view's outgoing links and why")
+    vw.add_argument(
+        "--graph",
+        choices=["mermaid"],
+        default=None,
+        help="print the links as one Mermaid flowchart per client instead of the table",
+    )
+    vw.add_argument("-o", "--output", default=None, help="with --graph: write to this file")
     vw.set_defaults(func=cmd_views)
 
     rp = sub.add_parser(

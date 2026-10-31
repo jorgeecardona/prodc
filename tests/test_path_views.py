@@ -14,7 +14,11 @@ _WEB: dict[str, object] = {
     "client": "web",
     "views": [{"id": "/roast/sessions/$planId", "kind": "page"}, {"id": "/roast/preparation"}],
 }
-_IOS: dict[str, object] = {"schema": 1, "client": "ios", "views": [{"id": "RoastSession", "kind": "screen"}]}
+_IOS: dict[str, object] = {
+    "schema": 1,
+    "client": "ios",
+    "views": [{"id": "RoastSession", "kind": "screen"}],
+}
 
 
 def _views(tmp_path: Path, *clients: dict[str, object]) -> dict[str, Adapter]:

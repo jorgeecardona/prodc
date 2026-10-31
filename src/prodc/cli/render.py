@@ -207,29 +207,111 @@ def render_orphans(orphan_map: dict[str, list[str]]) -> str:
     return "\n".join(out)
 
 
-def render_views(rows: list[ViewRow]) -> str:
-    """The view inventory, one tree per client, with each view's needs and their state (#102)."""
+def render_views(
+    rows: list[ViewRow], unreachable: dict[str, int] | None = None, show_links: bool = False
+) -> str:
+    """The view inventory, one tree per client, with each view's needs and their state (#102).
+
+    ``in/out`` counts the links that end and start at the view (#107). ``show_links`` lists each
+    view's outgoing links under it with their reason (#104). ``unreachable`` maps a client to the
+    number of views no ``orphan_ok`` entry view leads to (#105).
+    """
     out: list[str] = []
     client: str | None = None
     for row in rows:
         if row.view.client != client:
             client = row.view.client
             out.append(f"{'' if not out else chr(10)}{client}")
-            out.append(f"  {'view':<44} {'kind':<10} {'section':<10} {'state':<10} needs")
+            out.append(
+                f"  {'view':<44} {'kind':<10} {'section':<10} {'state':<10} {'in/out':<7} needs"
+            )
         flags = [
-            f for f, on in (("unjustified", not row.justified), ("untyped", row.untyped)) if on
+            f
+            for f, on in (
+                ("unjustified", not row.justified),
+                ("untyped", row.untyped),
+                ("orphan", row.orphan),
+            )
+            if on
         ]
         name = "  " * row.depth + row.view.id
         state = _LABEL[row.state] if row.state is not None else "-"
+        links = f"{len(row.inbound)}/{len(row.outbound)}"
         line = (
             f"  {name:<44} {row.view.kind or '-':<10} {row.view.section or '-':<10} "
-            f"{state:<10} {', '.join(row.needs) or '-'}"
+            f"{state:<10} {links:<7} {', '.join(row.needs) or '-'}"
         )
         out.append(line + (f"  [{', '.join(flags)}]" if flags else ""))
+        if show_links:
+            pad = "  " * (row.depth + 2)
+            for lk in row.outbound:
+                out.append(f"{pad}-> {lk.target}" + (f": {lk.why}" if lk.why else ""))
     unjustified = sum(1 for r in rows if not r.justified)
     untyped = sum(1 for r in rows if r.untyped)
-    out.append(f"\nviews: {len(rows)}, unjustified: {unjustified}, untyped: {untyped}")
+    orphans = sum(1 for r in rows if r.orphan)
+    out.append(
+        f"\nviews: {len(rows)}, unjustified: {unjustified}, untyped: {untyped}, orphan: {orphans}"
+    )
+    for c, n in (unreachable or {}).items():
+        out.append(f"{c}: unreachable from an entry view: {n}")
     return "\n".join(out)
+
+
+def _mermaid_text(text: str) -> str:
+    return text.replace('"', "#quot;").replace("|", "#124;").replace("\n", " ")
+
+
+def _view_class(row: ViewRow) -> str:
+    if not row.justified:
+        return "unjustified"
+    if row.view.needless_ok:
+        return "noneed"
+    if row.state is None:
+        return "plain"
+    return "delivered" if row.state is NeedState.DELIVERED else "gap"
+
+
+def render_views_mermaid(rows: list[ViewRow]) -> str:
+    """The view links as one Mermaid flowchart per client, in a Markdown section each (#104).
+
+    A node is a view, classed by state (``delivered``, ``gap``, ``unjustified``, ``noneed``,
+    ``plain``). A link is an arrow labelled with its ``why``. Containment is a dotted line from
+    the parent. Views nobody links to sit in their own ``orphans`` subgraph.
+    """
+    out: list[str] = []
+    for client in dict.fromkeys(r.view.client for r in rows):
+        mine = [r for r in rows if r.view.client == client]
+        node = {r.view.id: f"v{i}" for i, r in enumerate(mine)}
+        lines = ["flowchart LR"]
+
+        decl = {
+            r.view.id: f'{node[r.view.id]}["{_mermaid_text(r.view.id)}"]:::{_view_class(r)}'
+            for r in mine
+        }
+        lines += [f"  {decl[r.view.id]}" for r in mine if not r.orphan]
+        orphans = [r for r in mine if r.orphan]
+        if orphans:
+            lines.append('  subgraph orphans ["no inbound link"]')
+            lines += [f"    {decl[r.view.id]}" for r in orphans]
+            lines.append("  end")
+        for r in mine:
+            if r.view.parent in node:
+                lines.append(f"  {node[r.view.parent]} -.- {node[r.view.id]}")
+        for r in mine:
+            for lk in r.outbound:
+                if lk.target not in node:
+                    continue
+                label = f'|"{_mermaid_text(lk.why)}"|' if lk.why else ""
+                lines.append(f"  {node[r.view.id]} -->{label} {node[lk.target]}")
+        lines += [
+            "  classDef delivered fill:#d3f9d8,stroke:#2f9e44",
+            "  classDef gap fill:#ffe3e3,stroke:#e03131",
+            "  classDef unjustified fill:#fff3bf,stroke:#f08c00",
+            "  classDef noneed fill:#e9ecef,stroke:#868e96",
+            "  classDef plain fill:#fff,stroke:#868e96",
+        ]
+        out.append(f"## {client}\n\n```mermaid\n" + "\n".join(lines) + "\n```")
+    return "\n\n".join(out)
 
 
 def render_out_of_scope(results: list[NeedResult]) -> str:

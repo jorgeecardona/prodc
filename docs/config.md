@@ -105,7 +105,10 @@ files = ["product/views/web.json", "product/views/ios.json"]
      "orphan_ok": false, "needless_ok": false},
     {"id": "/roast/sessions/$planId#batches", "kind": "section", "parent": "/roast/sessions/$planId"}
   ],
-  "links": [{"from": "/roast/sessions", "to": "/roast/sessions/$planId"}]
+  "links": [
+    {"from": "/roast/sessions", "to": "/roast/sessions/$planId",
+     "why": "A roaster opens the session to see its batches."}
+  ]
 }
 ```
 
@@ -114,6 +117,17 @@ files = ["product/views/web.json", "product/views/ios.json"]
 - `parent`: the view that contains this one. `links` are navigation. They are separate relations.
 - `orphan_ok`: the view has no inbound link on purpose (top-level views only).
 - `needless_ok`: no need is expected for this view (redirect, auth, public page).
+- link `why`: the reason a user takes the link. Optional. A link may also carry `need`, a need id.
+
+Link checks run only for a client whose file has at least one link:
+
+- Orphan view: a top-level view with no inbound link and no `orphan_ok`. `lint` warns, and
+  `prodc views` shows `[orphan]`. A child view is reached through its parent, so it is never an
+  orphan. Silence it with `orphan_ok`.
+- Dangling link: a `from` or `to` that is not a view of the same client. `lint` fails.
+- Walkable path: a need's `path.start` and `path.outcome` on the same client must be joined by
+  links. A link costs one click and containment costs none. `status` and `lint` warn when there
+  is no route, or when the route is longer than `max_clicks`.
 
 A view that exists is a declared DELIVERED (`*`): it proves the view is there, not that the need
 works. A child view and its parent are graded separately. Views appear in `prodc orphans`, and
@@ -144,6 +158,8 @@ resolves to UNRESOLVED.
 | `stale_after_days` | lint warns when a need's newest `observed_at` is older than this | off |
 | `importance_revisit_days` | lint warns when `importance_set_at` is older than this | off |
 | `draft_max_age_days` | lint warns when a staged draft's `draft_added` is older than this, so a batch is not forgotten (triage with `prodc review`) | off |
+| `unjustified_views` | `"warn"` or `"error"`: lint reports a view no need points at | off |
+| `link_without_why` | `"warn"` or `"error"`: lint reports a view link with no `why` | off |
 
 ## `[add]`
 

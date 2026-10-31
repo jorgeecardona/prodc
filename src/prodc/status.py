@@ -21,6 +21,7 @@ from .model import (
     Decision,
     Goal,
     Need,
+    NeedPath,
     NeedResult,
     NeedState,
     Principle,
@@ -32,7 +33,12 @@ from .model import (
     Verdict,
     ears_warnings,
 )
-from .views import View
+from .views import View, ViewInventory, ViewLink
+from .views import clicks as view_clicks
+from .views import dangling as dangling_links
+from .views import has_links as client_has_links
+from .views import orphans as orphan_views
+from .views import unreachable as unreachable_count
 
 #: Reserved proof-adapter name for a need→need edge (#research-board step 2): a proof whose
 #: payload is another need id. Resolved by the :class:`Resolver` itself, not a config adapter,
@@ -206,6 +212,7 @@ def _path_view_warnings(need: Need, adapters: dict[str, Adapter]) -> list[str]:
         return []
     clients = _view_clients(views)
     out: list[str] = []
+    found: dict[str, set[str]] = {}
     for label, value in (("start", path.start), ("outcome", path.outcome)):
         prefix, sep, _ = value.partition(":")
         if label == "outcome" and sep and prefix in adapters:
@@ -213,9 +220,63 @@ def _path_view_warnings(need: Need, adapters: dict[str, Adapter]) -> list[str]:
         payload = _view_payload(value, clients)
         if payload is None:
             out.append(f"path {label} '{value}' names no client: write it as client:id (#101)")
-        elif not any(a.covers(payload) for a in views):
+            continue
+        keys = {k for a in views for k in a.covers(payload)}
+        if not keys:
             out.append(f"path {label} '{payload}' is not a view (#101)")
+        else:
+            found[label] = keys
+    if len(found) == 2:
+        out += _path_link_warnings(path, found, _inventory(views))
     return out
+
+
+def _inventory(views: list[ViewsAdapter]) -> ViewInventory:
+    """The views and links of every ``views`` adapter, merged."""
+    invs = [a.load() for a in views]
+    return ViewInventory(
+        tuple(v for i in invs for v in i.views), tuple(lk for i in invs for lk in i.links)
+    )
+
+
+def _path_link_warnings(
+    path: NeedPath, found: dict[str, set[str]], inv: ViewInventory
+) -> list[str]:
+    """Check a path over the view links: a route must exist and fit ``max_clicks`` (#105, #108).
+
+    Skipped when the two ends are on different clients, or the client has no links at all.
+    """
+    start_clients = {k.partition(":")[0] for k in found["start"]}
+    out_clients = {k.partition(":")[0] for k in found["outcome"]}
+    if len(start_clients) != 1 or start_clients != out_clients:
+        return []
+    client = next(iter(start_clients))
+    if not client_has_links(inv, client):
+        return []
+    starts = {k.partition(":")[2] for k in found["start"]}
+    goals = {k.partition(":")[2] for k in found["outcome"]}
+    n = view_clicks(inv, client, starts, goals)
+    if n is None:
+        return [
+            f"path outcome '{path.outcome}' cannot be reached from start '{path.start}' "
+            "over the view links (#105)"
+        ]
+    if path.max_clicks is not None and n > path.max_clicks:
+        return [
+            f"path takes {n} click(s) over the view links, over the budget of "
+            f"{path.max_clicks} (#108)"
+        ]
+    return []
+
+
+def view_link_errors(adapters: dict[str, Adapter]) -> list[str]:
+    """A link to or from a view that is not in the inventory is a wrong inventory (#105)."""
+    views = [a for a in adapters.values() if isinstance(a, ViewsAdapter)]
+    return [
+        f"{lk.file}: link {lk.source} -> {lk.target} names a view that is not in the "
+        f"{lk.client} inventory (#105)"
+        for lk in dangling_links(_inventory(views))
+    ]
 
 
 def _view_clients(views: list[ViewsAdapter]) -> list[str]:
@@ -1255,6 +1316,9 @@ class ViewRow:
     needs: tuple[str, ...]  # ids of needs whose proofs or path name this view
     state: NeedState | None  # group state of those needs; None when no need points here
     justified: bool  # a need points here or at a child, or ``needless_ok`` is set
+    orphan: bool = False  # top-level, no inbound link, not ``orphan_ok`` (#106)
+    inbound: tuple[ViewLink, ...] = ()  # links that end at this view (#107)
+    outbound: tuple[ViewLink, ...] = ()  # links that start at this view (#107)
 
     @property
     def untyped(self) -> bool:
@@ -1270,7 +1334,9 @@ def view_report(
     parent with no need of its own is justified when one of its children is.
     """
     views_by_name = {n: a for n, a in adapters.items() if isinstance(a, ViewsAdapter)}
-    all_views = [v for a in views_by_name.values() for v in a.load().views]
+    inv = _inventory(list(views_by_name.values()))
+    all_views = list(inv.views)
+    orphaned = orphan_views(inv)
     clients = _view_clients(list(views_by_name.values()))
     pointing: dict[str, list[str]] = {}
     for r in results:
@@ -1308,7 +1374,22 @@ def view_report(
     def walk(v: View, depth: int) -> None:
         ids = tuple(pointing.get(v.key, []))
         state = group_state(summarize([by_id[i] for i in ids])) if ids else None
-        out.append(ViewRow(v, depth, ids, state, justified(v)))
+        out.append(
+            ViewRow(
+                v,
+                depth,
+                ids,
+                state,
+                justified(v),
+                orphan=v.key in orphaned,
+                inbound=tuple(
+                    lk for lk in inv.links if lk.client == v.client and lk.target == v.id
+                ),
+                outbound=tuple(
+                    lk for lk in inv.links if lk.client == v.client and lk.source == v.id
+                ),
+            )
+        )
         for c in children.get(v.key, []):
             walk(c, depth + 1)
 
@@ -1319,3 +1400,13 @@ def view_report(
             if v.client == c:
                 walk(v, 0)
     return out
+
+
+def view_unreachable(adapters: dict[str, Adapter]) -> dict[str, int]:
+    """Per client, how many views cannot be reached from an ``orphan_ok`` entry view (#105).
+
+    A client with no links or no entry view is left out.
+    """
+    inv = _inventory([a for a in adapters.values() if isinstance(a, ViewsAdapter)])
+    counts = {c: unreachable_count(inv, c) for c in inv.clients()}
+    return {c: n for c, n in counts.items() if n is not None}

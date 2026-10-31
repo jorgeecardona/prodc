@@ -6,6 +6,13 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- View links are checked. `lint` warns on an orphan view and fails on a link to a view that is
+  not in the inventory (#105, #106). `status` and `lint` warn when a need's `path` has no route
+  from start to outcome, or needs more clicks than `max_clicks` (#105, #108). `prodc views`
+  shows inbound and outbound links per view (#107), and `[lint].unjustified_views` makes an
+  unjustified view a warning or an error (#108).
+- A view link can carry a `why`, and `prodc views --graph mermaid` draws the links as a
+  flowchart per client (#104). `[lint].link_without_why` flags a link with no reason.
 - `status` now shows every per-need warning that `lint` shows (duplicates, unlinked recurrence,
   stale evidence, `who` variants, importance, draft age, declared-only proofs). Both commands
   call one function, so the two cannot drift (#81). `lint` still adds the warnings that are not

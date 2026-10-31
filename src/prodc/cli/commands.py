@@ -49,7 +49,9 @@ from ..status import (
     resolve,
     stale_decisions,
     summarize,
+    view_link_errors,
     view_report,
+    view_unreachable,
 )
 from ..writer import (
     Edit,
@@ -105,6 +107,7 @@ from .render import (
     render_roles,
     render_show,
     render_views,
+    render_views_mermaid,
     summary_line,
 )
 from .serialize import (
@@ -219,12 +222,37 @@ def cmd_lint(args: argparse.Namespace) -> int:
         | {n.client for n in needs if n.client is not None}
     )
     warnings += tag_warnings(needs, structural_ids, cfg.duplicate_threshold)
-    # An untyped view (``kind`` null) in the inventory: the report cannot say what it is (#102).
-    warnings += [
-        (row.view.key, "view has no kind: set it in the inventory file (#102)")
-        for row in view_report(results, cfg.adapters)
-        if row.untyped
-    ]
+    # View inventory hygiene (#102, #106, #104, #108): an untyped view, an orphan view, a link
+    # without its reason, and (opt in) a view no need points at. A dangling link is an error.
+    errors += view_link_errors(cfg.adapters)
+    need_ids = {n.id for n in needs}
+    for row in view_report(results, cfg.adapters):
+        if row.untyped:
+            warnings.append((row.view.key, "view has no kind: set it in the inventory file (#102)"))
+        if row.orphan:
+            warnings.append(
+                (
+                    row.view.key,
+                    "orphan view: no link leads here; link it or set orphan_ok (#106)",
+                )
+            )
+        if not row.justified and cfg.unjustified_views is not None:
+            msg = "unjustified view: no need points at it; add a need or set needless_ok (#108)"
+            if cfg.unjustified_views == "error":
+                errors.append(f"{row.view.key}: {msg}")
+            else:
+                warnings.append((row.view.key, msg))
+        for lk in row.outbound:
+            if lk.why is None and cfg.link_without_why is not None:
+                msg = f"link to {lk.target} has no why (#104)"
+                if cfg.link_without_why == "error":
+                    errors.append(f"{row.view.key}: {msg}")
+                else:
+                    warnings.append((row.view.key, msg))
+            if lk.need is not None and lk.need not in need_ids:
+                warnings.append(
+                    (row.view.key, f"link to {lk.target} cites unknown need {lk.need} (#104)")
+                )
     # Flow step hygiene (#90): once [flows].steps declares a vocabulary, grade each journey's
     # shape: never-terminal, out-of-order, mixed bare/stepped. Silent when no vocab is declared.
     warnings += flow_step_warnings(needs, cfg.flow_steps)
@@ -1192,6 +1220,14 @@ def cmd_views(args: argparse.Namespace) -> int:
     cfg, model = loaded
     results = resolve(list(model.needs), cfg.adapters, cfg.source_adapters)
     rows = view_report(results, cfg.adapters, args.client)
+    if args.graph:
+        text = render_views_mermaid(rows)
+        if args.output:
+            Path(args.output).write_text(text + "\n", encoding="utf-8")
+            print(f"wrote view graph to {args.output}")
+        else:
+            print(text)
+        return 0
     if args.json:
         print(
             json.dumps(
@@ -1207,6 +1243,13 @@ def cmd_views(args: argparse.Namespace) -> int:
                         "state": r.state.value if r.state is not None else None,
                         "justified": r.justified,
                         "untyped": r.untyped,
+                        "orphan": r.orphan,
+                        "inbound": [
+                            {"from": lk.source, "why": lk.why, "need": lk.need} for lk in r.inbound
+                        ],
+                        "outbound": [
+                            {"to": lk.target, "why": lk.why, "need": lk.need} for lk in r.outbound
+                        ],
                     }
                     for r in rows
                 ],
@@ -1214,7 +1257,10 @@ def cmd_views(args: argparse.Namespace) -> int:
             )
         )
     else:
-        print(render_views(rows))
+        unreachable = {
+            c: n for c, n in view_unreachable(cfg.adapters).items() if args.client in (None, c)
+        }
+        print(render_views(rows, unreachable, show_links=args.links))
     return 0
 
 

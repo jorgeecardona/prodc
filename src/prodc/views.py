@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -44,6 +45,9 @@ class ViewLink:
     client: str
     source: str
     target: str
+    why: str | None = None  # the reason a user takes this link (#104)
+    need: str | None = None  # the need id that reason points at (#104)
+    file: str = ""  # the inventory file the link came from, for error messages
 
 
 @dataclass(frozen=True)
@@ -159,7 +163,16 @@ def load_file(path: Path) -> ViewInventory:
         src, dst = raw.get("from"), raw.get("to")
         if not isinstance(src, str) or not isinstance(dst, str):
             raise ViewInventoryError(f"{at}: 'from' and 'to' must be strings")
-        links.append(ViewLink(client, normalise_id(src), normalise_id(dst)))
+        links.append(
+            ViewLink(
+                client,
+                normalise_id(src),
+                normalise_id(dst),
+                why=_opt_str(raw, "why", at),
+                need=_opt_str(raw, "need", at),
+                file=where,
+            )
+        )
     return ViewInventory(tuple(views), tuple(links))
 
 
@@ -172,3 +185,106 @@ def load(paths: list[Path]) -> ViewInventory:
         views.extend(inv.views)
         links.extend(inv.links)
     return ViewInventory(tuple(views), tuple(links))
+
+
+def has_links(inv: ViewInventory, client: str) -> bool:
+    """True if the client's inventory carries any link. Link checks are skipped without one."""
+    return any(lk.client == client for lk in inv.links)
+
+
+def dangling(inv: ViewInventory) -> list[ViewLink]:
+    """Links whose ``from`` or ``to`` is not a view of the same client (#105)."""
+    known = {v.key for v in inv.views}
+    return [
+        lk
+        for lk in inv.links
+        if f"{lk.client}:{lk.source}" not in known or f"{lk.client}:{lk.target}" not in known
+    ]
+
+
+def _children(inv: ViewInventory, client: str) -> dict[str, list[str]]:
+    ids = {v.id for v in inv.views if v.client == client}
+    out: dict[str, list[str]] = {}
+    for v in inv.views:
+        if v.client == client and v.parent in ids:
+            out.setdefault(v.parent, []).append(v.id)
+    return out
+
+
+def _subtree(children: dict[str, list[str]], root: str) -> set[str]:
+    seen = {root}
+    stack = [root]
+    while stack:
+        for c in children.get(stack.pop(), []):
+            if c not in seen:
+                seen.add(c)
+                stack.append(c)
+    return seen
+
+
+def orphans(inv: ViewInventory) -> set[str]:
+    """Keys (``client:id``) of top-level views nobody links to (#106).
+
+    A child view is reached through its parent, so only a view with no known parent can be an
+    orphan. A link to the view or to a view it contains counts, unless it starts inside the same
+    subtree. ``orphan_ok`` views are not orphans. A client with no links at all is skipped.
+    """
+    out: set[str] = set()
+    for client in inv.clients():
+        if not has_links(inv, client):
+            continue
+        children = _children(inv, client)
+        nested = {c for kids in children.values() for c in kids}
+        links = [lk for lk in inv.links if lk.client == client]
+        for v in inv.views:
+            if v.client != client or v.orphan_ok or v.id in nested:
+                continue
+            tree = _subtree(children, v.id)
+            if not any(lk.target in tree and lk.source not in tree for lk in links):
+                out.add(v.key)
+    return out
+
+
+def _distances(inv: ViewInventory, client: str, starts: set[str]) -> dict[str, int]:
+    """Clicks from the nearest start to every reachable view of the client (0-1 search)."""
+    ids = {v.id for v in inv.views if v.client == client}
+    adj: dict[str, list[tuple[str, int]]] = {}
+    for lk in inv.links:
+        if lk.client == client and lk.source in ids and lk.target in ids:
+            adj.setdefault(lk.source, []).append((lk.target, 1))
+    for v in inv.views:
+        if v.client == client and v.parent in ids:
+            adj.setdefault(v.id, []).append((v.parent, 0))
+            adj.setdefault(v.parent, []).append((v.id, 0))
+    dist = {s: 0 for s in starts if s in ids}
+    queue = deque(dist)
+    while queue:
+        cur = queue.popleft()
+        for nxt, cost in adj.get(cur, []):
+            if dist.get(nxt, 1 << 30) > dist[cur] + cost:
+                dist[nxt] = dist[cur] + cost
+                (queue.appendleft if cost == 0 else queue.append)(nxt)
+    return dist
+
+
+def clicks(inv: ViewInventory, client: str, starts: set[str], goals: set[str]) -> int | None:
+    """The fewest clicks from any start view to any goal view, or None when unreachable (#108).
+
+    A link costs one click. Containment costs none, in both directions: a section is on its
+    page, and a link from the page can be used from the section. Ids are same-client view ids.
+    """
+    dist = _distances(inv, client, starts)
+    best = [dist[g] for g in goals if g in dist]
+    return min(best) if best else None
+
+
+def unreachable(inv: ViewInventory, client: str) -> int | None:
+    """How many views cannot be reached from an ``orphan_ok`` entry view (#105).
+
+    None when the client has no links or no entry view, so there is nothing to measure from.
+    """
+    entries = {v.id for v in inv.views if v.client == client and v.orphan_ok}
+    if not entries or not has_links(inv, client):
+        return None
+    ids = {v.id for v in inv.views if v.client == client}
+    return len(ids - set(_distances(inv, client, entries)))
