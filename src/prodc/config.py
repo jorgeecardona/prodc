@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tomllib
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
@@ -105,6 +106,98 @@ def _callbacks(raw: dict[str, object]) -> tuple[tuple[Callback, ...], str]:
     return tuple(out), state_file
 
 
+@dataclass(frozen=True)
+class _Spec:
+    """One ``[proofs.<name>]`` or ``[sources.<name>]`` table, ready for a builder."""
+
+    name: str
+    tbl: dict[str, object]
+    root: Path  # the repo the adapter reads (the sibling repo for a proof with ``repo``)
+    results: str | None  # the table's ``results`` file, when it is a string
+
+
+def _sub_root(spec: _Spec) -> Path:
+    sub = spec.tbl.get("root", ".")
+    return spec.root / (sub if isinstance(sub, str) else ".")
+
+
+def _need_results(spec: _Spec, kind: str) -> str:
+    if not spec.results:
+        raise ConfigError(f"[proofs.{spec.name}]: {kind} needs results = <json file>")
+    return spec.results
+
+
+def _str_field(spec: _Spec, key: str, default: str) -> str:
+    val = spec.tbl.get(key, default)
+    return val if isinstance(val, str) else default
+
+
+def _gherkin(c: _Spec) -> Adapter:
+    where = f"[proofs.{c.name}]"
+    return GherkinAdapter(
+        root=c.root,
+        paths=_as_str_list(c.tbl.get("paths", []), f"{where}.paths"),
+        delivered_tags=_as_str_list(c.tbl.get("delivered", []), f"{where}.delivered"),
+        pending_tags=_as_str_list(c.tbl.get("pending", []), f"{where}.pending"),
+        results=c.results,
+    )
+
+
+def _command_proof(c: _Spec) -> Adapter:
+    command, timeout = _hook_command(c.tbl, f"[proofs.{c.name}]")
+    return CommandProof(root=c.root, command=command, timeout=timeout)
+
+
+# kind -> builder. The key order is the order the unknown-kind error lists, so the message
+# cannot drift from the supported set (#83). `External` wrapping is applied once, by the loader.
+_PROOF_BUILDERS: dict[str, Callable[[_Spec], Adapter]] = {
+    "gherkin": _gherkin,
+    "pytest": lambda c: PytestAdapter(root=_sub_root(c), results=c.results),
+    "vitest": lambda c: VitestAdapter(root=_sub_root(c), results=c.results),
+    "files": lambda c: FilesAdapter(root=_sub_root(c)),
+    "accept": lambda c: AcceptAdapter(),
+    "prototype": lambda c: PrototypeAdapter(),
+    "citation": lambda c: CitationAdapter(),
+    "coverage": lambda c: CoverageAdapter(root=c.root, catalog=_str_field(c, "catalog", "")),
+    "field": lambda c: FieldAdapter(root=c.root, schema=_str_field(c, "schema", "")),
+    "external": lambda c: OutcomeAdapter(root=c.root, results=_need_results(c, "external")),
+    "evalgate": lambda c: EvalGateAdapter(root=c.root, results=_need_results(c, "evalgate")),
+    "command": _command_proof,
+    "views": lambda c: ViewsAdapter(
+        root=c.root, files=_as_str_list(c.tbl.get("files", []), f"[proofs.{c.name}].files")
+    ),
+}
+
+
+def _gitlab_source(c: _Spec) -> SourceAdapter:
+    for key, default in (
+        ("base_url", "https://gitlab.com"),
+        ("project", ""),
+        ("token_env", "GITLAB_TOKEN"),
+    ):
+        if not isinstance(c.tbl.get(key, default), str):
+            raise ConfigError(f"[sources.{c.name}].{key} must be a string")
+    return GitLabSource(
+        base_url=_str_field(c, "base_url", "https://gitlab.com"),
+        project=_str_field(c, "project", ""),
+        token_env=_str_field(c, "token_env", "GITLAB_TOKEN"),
+    )
+
+
+def _command_source(c: _Spec) -> SourceAdapter:
+    command, timeout = _hook_command(c.tbl, f"[sources.{c.name}]")
+    return CommandSource(root=c.root, command=command, timeout=timeout)
+
+
+_SOURCE_BUILDERS: dict[str, Callable[[_Spec], SourceAdapter]] = {
+    "frontmatter": lambda c: FrontmatterAdapter(
+        root=c.root, paths=_as_str_list(c.tbl.get("paths", []), f"[sources.{c.name}].paths")
+    ),
+    "gitlab": _gitlab_source,
+    "command": _command_source,
+}
+
+
 @dataclass
 class Config:
     root: Path
@@ -201,72 +294,19 @@ class Config:
         for name, body in proofs.items():
             tbl = _as_dict(body, f"[proofs.{name}]")
             kind = tbl.get("kind")
-            results = tbl.get("results")
-            results_s = results if isinstance(results, str) else None
+            builder = _PROOF_BUILDERS.get(kind) if isinstance(kind, str) else None
+            if builder is None:
+                raise ConfigError(
+                    f"[proofs.{name}]: unknown kind {kind!r} ({'|'.join(_PROOF_BUILDERS)})"
+                )
             # `repo` points the adapter at a sibling repo checked out beside this one;
             # its paths then resolve under that repo and reads are wrapped by External.
             repo_field = tbl.get("repo")
             proof_root = root / repo_field if isinstance(repo_field, str) else root
-            if kind == "gherkin":
-                inner: Adapter = GherkinAdapter(
-                    root=proof_root,
-                    paths=_as_str_list(tbl.get("paths", []), f"[proofs.{name}].paths"),
-                    delivered_tags=_as_str_list(
-                        tbl.get("delivered", []), f"[proofs.{name}].delivered"
-                    ),
-                    pending_tags=_as_str_list(tbl.get("pending", []), f"[proofs.{name}].pending"),
-                    results=results_s,
-                )
-            elif kind == "pytest":
-                sub = tbl.get("root", ".")
-                inner = PytestAdapter(
-                    root=proof_root / (sub if isinstance(sub, str) else "."),
-                    results=results_s,
-                )
-            elif kind == "vitest":
-                sub = tbl.get("root", ".")
-                inner = VitestAdapter(
-                    root=proof_root / (sub if isinstance(sub, str) else "."),
-                    results=results_s,
-                )
-            elif kind == "files":
-                sub = tbl.get("root", ".")
-                inner = FilesAdapter(root=proof_root / (sub if isinstance(sub, str) else "."))
-            elif kind == "accept":
-                inner = AcceptAdapter()
-            elif kind == "prototype":
-                inner = PrototypeAdapter()
-            elif kind == "citation":
-                inner = CitationAdapter()
-            elif kind == "views":
-                inner = ViewsAdapter(
-                    root=proof_root,
-                    files=_as_str_list(tbl.get("files", []), f"[proofs.{name}].files"),
-                )
-            elif kind == "coverage":
-                cat = tbl.get("catalog", "")
-                inner = CoverageAdapter(
-                    root=proof_root, catalog=cat if isinstance(cat, str) else ""
-                )
-            elif kind == "field":
-                sch = tbl.get("schema", "")
-                inner = FieldAdapter(root=proof_root, schema=sch if isinstance(sch, str) else "")
-            elif kind == "external":
-                if not results_s:
-                    raise ConfigError(f"[proofs.{name}]: external needs results = <json file>")
-                inner = OutcomeAdapter(root=proof_root, results=results_s)
-            elif kind == "evalgate":
-                if not results_s:
-                    raise ConfigError(f"[proofs.{name}]: evalgate needs results = <json file>")
-                inner = EvalGateAdapter(root=proof_root, results=results_s)
-            elif kind == "command":
-                command, timeout = _hook_command(tbl, f"[proofs.{name}]")
-                inner = CommandProof(root=proof_root, command=command, timeout=timeout)
-            else:
-                raise ConfigError(
-                    f"[proofs.{name}]: unknown kind {kind!r} "
-                    "(gherkin|pytest|vitest|files|accept|prototype|citation|coverage|field|external|evalgate|command|views)"
-                )
+            results = tbl.get("results")
+            inner = builder(
+                _Spec(name, tbl, proof_root, results if isinstance(results, str) else None)
+            )
             adapters[name] = (
                 External(inner, root / repo_field) if isinstance(repo_field, str) else inner
             )
@@ -276,33 +316,12 @@ class Config:
         for name, body in sources.items():
             tbl = _as_dict(body, f"[sources.{name}]")
             kind = tbl.get("kind")
-            if kind == "frontmatter":
-                source_adapters[name] = FrontmatterAdapter(
-                    root=root,
-                    paths=_as_str_list(tbl.get("paths", []), f"[sources.{name}].paths"),
-                )
-            elif kind == "gitlab":
-                base_url = tbl.get("base_url", "https://gitlab.com")
-                project = tbl.get("project", "")
-                token_env = tbl.get("token_env", "GITLAB_TOKEN")
-                if not isinstance(base_url, str):
-                    raise ConfigError(f"[sources.{name}].base_url must be a string")
-                if not isinstance(project, str):
-                    raise ConfigError(f"[sources.{name}].project must be a string")
-                if not isinstance(token_env, str):
-                    raise ConfigError(f"[sources.{name}].token_env must be a string")
-                source_adapters[name] = GitLabSource(
-                    base_url=base_url,
-                    project=project,
-                    token_env=token_env,
-                )
-            elif kind == "command":
-                command, timeout = _hook_command(tbl, f"[sources.{name}]")
-                source_adapters[name] = CommandSource(root=root, command=command, timeout=timeout)
-            else:
+            source_builder = _SOURCE_BUILDERS.get(kind) if isinstance(kind, str) else None
+            if source_builder is None:
                 raise ConfigError(
-                    f"[sources.{name}]: unknown kind {kind!r} (frontmatter|gitlab|command)"
+                    f"[sources.{name}]: unknown kind {kind!r} ({'|'.join(_SOURCE_BUILDERS)})"
                 )
+            source_adapters[name] = source_builder(_Spec(name, tbl, root, None))
 
         lint_tbl = _as_dict(raw.get("lint", {}), "[lint]")
         dup = lint_tbl.get("duplicate_threshold", 0.8)
