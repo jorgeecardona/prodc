@@ -1,12 +1,13 @@
 """The prefix filter in ``candidate_pairs`` never drops a pair that reaches the threshold (#62)."""
 
+# pyright: reportPrivateUsage=false
 from __future__ import annotations
 
 import random
 
 import pytest
 
-from prodc.dedup import (  # pyright: ignore[reportPrivateUsage]
+from prodc.dedup import (
     _jaccard,
     _trigrams,
     candidate_pairs,
