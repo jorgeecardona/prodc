@@ -620,6 +620,10 @@ class OutcomeAdapter:
                 self._data = out
         return self._data
 
+    def inventory(self) -> list[str]:
+        """Every outcome key recorded in the results file, so ``suggest`` can offer it (#76)."""
+        return sorted(self._load() or {})
+
     def resolve(self, payload: str) -> ProofResult:
         data = self._load()
         if data is None:
@@ -677,6 +681,14 @@ class EvalGateAdapter:
                             out[key] = score
                 self._data = out
         return self._data
+
+    def inventory(self) -> list[str]:
+        """One ``metric>=score`` locator payload per recorded metric (#75, #76).
+
+        Each resolves DELIVERED against the current score, so a suggested gate is a starting point:
+        raise the threshold to the real bar before relying on it.
+        """
+        return sorted(f"{key}>={score:g}" for key, score in (self._load() or {}).items())
 
     def resolve(self, payload: str) -> ProofResult:
         m = _EVAL_RE.match(payload.strip())

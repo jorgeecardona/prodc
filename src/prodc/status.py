@@ -11,7 +11,16 @@ from dataclasses import dataclass, replace
 from datetime import date
 from itertools import pairwise
 
-from .adapters import Adapter, Enumerable, Inventoried, ProofResult, SourceAdapter, ViewsAdapter
+from .adapters import (
+    Adapter,
+    Enumerable,
+    EvalGateAdapter,
+    Inventoried,
+    OutcomeAdapter,
+    ProofResult,
+    SourceAdapter,
+    ViewsAdapter,
+)
 from .dedup import similarity
 from .model import (
     SOLUTION_VERBS,
@@ -656,9 +665,11 @@ def proof_suggestions(
     proof units and return the closest matches as ready-to-paste locators. Read-only: it never
     writes; ``--apply`` and BROKEN-relink are left to the caller/follow-up. A ``views``
     adapter is left out unless named by ``kind``: a view exists, it does not prove a need (#100).
+    An outcome or evalgate key rarely shares words with the need text, so when one of those is
+    named by ``kind`` every key is offered, ranked by text score but not cut by ``min_score`` (#76).
     """
-    inventories: list[tuple[str, list[str]]] = [
-        (name, ad.inventory())
+    inventories: list[tuple[str, list[str], bool]] = [
+        (name, ad.inventory(), name == kind and isinstance(ad, (OutcomeAdapter, EvalGateAdapter)))
         for name, ad in adapters.items()
         if isinstance(ad, Inventoried)
         and (name == kind if kind is not None else not isinstance(ad, ViewsAdapter))
@@ -668,10 +679,10 @@ def proof_suggestions(
         if r.state is not NeedState.HOLE or r.need.children:
             continue
         scored: list[ProofSuggestion] = []
-        for name, ids in inventories:
+        for name, ids, ungated in inventories:
             for inv in ids:
                 score = similarity(r.need.text, _matchable(inv))
-                if score >= min_score:
+                if ungated or score >= min_score:
                     scored.append(ProofSuggestion(r.need, name, f"{name}:{inv}", score))
         scored.sort(key=lambda s: (-s.score, s.locator))
         out.extend(scored[:top])

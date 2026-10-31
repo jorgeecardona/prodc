@@ -6,6 +6,9 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- `suggest` reads the keys of `external` (observable outcome) and `evalgate` proofs. Name one with
+  `--kind` and it offers every recorded key, ranked by text score and not cut by `--min-score`,
+  because an outcome or metric name rarely shares words with a need (#75, #76).
 - `report` takes `--goal ID` and `--only-must` to scope the needs, and `--out` as another name for
   `--output` (#64).
 - `report --format csv`, `--format jira` and `--format confluence` render the board for product
