@@ -78,6 +78,36 @@ def test_clicks_count_links_and_not_containment(tmp_path: Path) -> None:
     assert v.clicks(inv, "web", {"/"}, {"/lost"}) is None
 
 
+_NESTED: dict[str, object] = {
+    "schema": 1,
+    "client": "web",
+    "views": [
+        {"id": "/app", "kind": "page", "orphan_ok": True},
+        {"id": "/app/a", "kind": "page", "parent": "/app"},
+        {"id": "/app/b", "kind": "page", "parent": "/app"},
+        {"id": "/app#menu", "kind": "section", "parent": "/app"},
+    ],
+    "links": [{"from": "/app", "to": "/app/a"}],
+}
+
+
+def test_a_page_under_a_page_costs_its_links(tmp_path: Path) -> None:
+    inv = _inv(tmp_path, _NESTED)
+    assert v.clicks(inv, "web", {"/app"}, {"/app/a"}) == 1
+    assert v.clicks(inv, "web", {"/app/a"}, {"/app/b"}) is None  # siblings, no link between
+    assert v.clicks(inv, "web", {"/app"}, {"/app/b"}) is None
+
+
+def test_a_section_under_a_page_is_free_both_ways(tmp_path: Path) -> None:
+    inv = _inv(tmp_path, _NESTED)
+    assert v.clicks(inv, "web", {"/app"}, {"/app#menu"}) == 0
+    assert v.clicks(inv, "web", {"/app#menu"}, {"/app"}) == 0
+
+
+def test_unreachable_counts_a_nested_page_without_a_link(tmp_path: Path) -> None:
+    assert v.unreachable(_inv(tmp_path, _NESTED), "web") == 1  # /app/b
+
+
 def test_unreachable_from_entry_views(tmp_path: Path) -> None:
     assert v.unreachable(_inv(tmp_path), "web") == 1  # /lost
     no_entry: dict[str, object] = {

@@ -126,8 +126,9 @@ Link checks run only for a client whose file has at least one link:
   orphan. Silence it with `orphan_ok`.
 - Dangling link: a `from` or `to` that is not a view of the same client. `lint` fails.
 - Walkable path: a need's `path.start` and `path.outcome` on the same client must be joined by
-  links. A link costs one click and containment costs none. `status` and `lint` warn when there
-  is no route, or when the route is longer than `max_clicks`.
+  links. A link costs one click. Containment costs none for a child that is not a `page` (a
+  section, dialog or tab). A page under a page costs what its links cost. `status` and `lint`
+  warn when there is no route, or when the route is longer than `max_clicks`.
 
 A view that exists is a declared DELIVERED (`*`): it proves the view is there, not that the need
 works. A child view and its parent are graded separately. Views appear in `prodc orphans`, and

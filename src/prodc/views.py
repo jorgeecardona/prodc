@@ -253,7 +253,8 @@ def _distances(inv: ViewInventory, client: str, starts: set[str]) -> dict[str, i
         if lk.client == client and lk.source in ids and lk.target in ids:
             adj.setdefault(lk.source, []).append((lk.target, 1))
     for v in inv.views:
-        if v.client == client and v.parent in ids:
+        # a page under a page is a separate screen: only its links get a user there (#109)
+        if v.client == client and v.parent in ids and v.kind != "page":
             adj.setdefault(v.id, []).append((v.parent, 0))
             adj.setdefault(v.parent, []).append((v.id, 0))
     dist = {s: 0 for s in starts if s in ids}
@@ -270,8 +271,10 @@ def _distances(inv: ViewInventory, client: str, starts: set[str]) -> dict[str, i
 def clicks(inv: ViewInventory, client: str, starts: set[str], goals: set[str]) -> int | None:
     """The fewest clicks from any start view to any goal view, or None when unreachable (#108).
 
-    A link costs one click. Containment costs none, in both directions: a section is on its
-    page, and a link from the page can be used from the section. Ids are same-client view ids.
+    A link costs one click. Containment costs none, in both directions, for a child that is not
+    a ``page`` (a section, dialog or tab is on its parent's page, and a link from the page can be
+    used from it). A page under a page costs what its links cost (#109). Ids are same-client
+    view ids.
     """
     dist = _distances(inv, client, starts)
     best = [dist[g] for g in goals if g in dist]

@@ -6,6 +6,8 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- A page nested under another page no longer counts as 0 clicks away. Only a section, dialog or
+  tab is free inside its parent, so a path between sibling pages needs a link (#109).
 - View links are checked. `lint` warns on an orphan view and fails on a link to a view that is
   not in the inventory (#105, #106). `status` and `lint` warn when a need's `path` has no route
   from start to outcome, or needs more clicks than `max_clicks` (#105, #108). `prodc views`
