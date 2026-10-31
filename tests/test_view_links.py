@@ -179,11 +179,11 @@ needs:
 """
 
 
-def _project(tmp_path: Path, lint: str = "") -> str:
+def _project(tmp_path: Path, lint: str = "", needs: str = _NEEDS) -> str:
     (tmp_path / "views").mkdir()
     (tmp_path / "needs").mkdir()
     (tmp_path / "views" / "web.json").write_text(json.dumps(_WEB), encoding="utf-8")
-    (tmp_path / "needs" / "a.yaml").write_text(_NEEDS, encoding="utf-8")
+    (tmp_path / "needs" / "a.yaml").write_text(needs, encoding="utf-8")
     (tmp_path / "prodc.toml").write_text(_TOML.format(lint=lint), encoding="utf-8")
     return str(tmp_path / "prodc.toml")
 
@@ -257,6 +257,21 @@ def test_lint_errors_on_a_dangling_link_and_warns_on_an_orphan(
     assert code == 1
     assert "link /pricing -> /gone names a view that is not in the web inventory (#105)" in out
     assert "web:/lost: orphan view" in out
+
+
+def test_lint_warns_when_a_client_has_links_but_no_entry(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    only_proof = _NEEDS.split("  - id: R-2")[0]
+    _, out = _lint(_project(tmp_path, needs=only_proof), capsys)
+    assert "web: the view inventory has links but no entry view" in out
+
+
+def test_lint_is_quiet_about_entries_when_a_path_starts_at_a_view(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _, out = _lint(_project(tmp_path), capsys)
+    assert "no entry view" not in out
 
 
 def test_lint_unjustified_views_and_link_without_why_are_opt_in(

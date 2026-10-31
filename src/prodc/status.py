@@ -1421,6 +1421,21 @@ def view_entries(results: list[NeedResult], adapters: dict[str, Adapter]) -> set
     return out
 
 
+def view_entry_warnings(results: list[NeedResult], adapters: dict[str, Adapter]) -> list[str]:
+    """A client that has links but no entry view, so orphans and reachability cannot be judged (#110).
+
+    One message per client. Fix it with a need whose ``path.start`` names a view of that client.
+    """
+    inv = _inventory([a for a in adapters.values() if isinstance(a, ViewsAdapter)])
+    entries = view_entries(results, adapters)
+    return [
+        f"{c}: the view inventory has links but no entry view: add a need whose path starts at "
+        f"a {c} view (#110)"
+        for c in inv.clients()
+        if client_has_links(inv, c) and not any(k.partition(":")[0] == c for k in entries)
+    ]
+
+
 def view_unreachable(results: list[NeedResult], adapters: dict[str, Adapter]) -> dict[str, int]:
     """Per client, how many views cannot be reached from an entry view (#105).
 

@@ -49,6 +49,7 @@ from ..status import (
     resolve,
     stale_decisions,
     summarize,
+    view_entry_warnings,
     view_link_errors,
     view_report,
     view_unreachable,
@@ -128,7 +129,11 @@ def _lint_errors(results: list[NeedResult]) -> list[str]:
         if r.state is NeedState.BROKEN:
             errors.append(f"{r.need.id}: BROKEN proof: {'; '.join(r.detail)}")
         if r.need.must and r.need.is_opinion:
-            errors.append(f"{r.need.id}: must-have is an opinion (no evidence)")
+            has = "only an assumption" if r.need.only_assumption else "no source"
+            errors.append(
+                f"{r.need.id}: must-have is an opinion ({has}, no external evidence): add a "
+                "secondary or primary source that records why it is wanted, or lower must (#86)"
+            )
     return errors
 
 
@@ -225,6 +230,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
     # View inventory hygiene (#102, #106, #104, #108): an untyped view, an orphan view, a link
     # without its reason, and (opt in) a view no need points at. A dangling link is an error.
     errors += view_link_errors(cfg.adapters)
+    warnings += [("views", w) for w in view_entry_warnings(results, cfg.adapters)]
     need_ids = {n.id for n in needs}
     for row in view_report(results, cfg.adapters):
         if row.untyped:
@@ -1095,9 +1101,23 @@ def cmd_report(args: argparse.Namespace) -> int:
         scoped = applicable_needs(list(model.needs), args.client)
         model = replace(model, needs=tuple(scoped))
     if args.format == "html":
+        if args.title or args.hide_empty or args.only_open:
+            print(
+                "prodc: --title, --hide-empty and --only-open work with --format md only",
+                file=sys.stderr,
+            )
+            return 2
         text = render_html(cfg, model, client=args.client, rev=git_rev(cfg.root))
     else:
-        text = render_markdown(cfg, model, client=args.client, rev=git_rev(cfg.root))
+        text = render_markdown(
+            cfg,
+            model,
+            client=args.client,
+            rev=git_rev(cfg.root),
+            title=args.title,
+            hide_empty=args.hide_empty,
+            only_open=args.only_open,
+        )
     if args.output:
         dest = Path(args.output)
         dest.parent.mkdir(parents=True, exist_ok=True)

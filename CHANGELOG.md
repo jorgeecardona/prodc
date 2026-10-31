@@ -6,6 +6,11 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- `lint` warns when a client's view inventory has links but no entry view (#110). The `must-have
+  is an opinion` error now says whether the need has no source or only an assumption, and how to
+  fix it (#86).
+- `report --format md` takes `--title`, `--hide-empty` and `--only-open` (#67). `--only-open`
+  prints just the Open questions brief, for a pre-meeting agenda.
 - `orphan_ok` is removed from the view inventory, and a file that still has it fails to load.
   A view nobody links to is an orphan unless a need's `path.start` names it: an entry point is
   derived from a need, not flagged on the view. The `unreachable from an entry view` line uses the

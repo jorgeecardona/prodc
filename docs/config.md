@@ -126,6 +126,8 @@ Link checks run only for a client whose file has at least one link:
   `prodc views` shows `[orphan]`. A child view is reached through its parent, so it is never an
   orphan. Fix it with a link, or with a need whose `path` starts there.
 - Dangling link: a `from` or `to` that is not a view of the same client. `lint` fails.
+- No entry: `lint` warns when a client has links but no need's `path.start` names one of its
+  views, because orphans and reachability cannot be judged without one.
 - Walkable path: a need's `path.start` and `path.outcome` on the same client must be joined by
   links. A link costs one click. Containment costs none for a child that is not a `page` (a
   section, dialog or tab). A page under a page costs what its links cost. `status` and `lint`

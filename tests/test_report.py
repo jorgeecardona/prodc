@@ -118,3 +118,45 @@ def test_report_renders_principles_and_decisions(
     assert "## Principles" in out and "P-1: local-first always" in out
     assert "## Decisions" in out and "D-1: store as FLAC on disk" in out
     assert "WAV" in out  # the rejected alternative is shown
+
+
+def test_report_title_replaces_the_heading_and_keeps_the_stamp(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["report", "--config", str(_project(tmp_path)), "--title", "Weekly review"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0] == "# Weekly review"
+    assert lines[2].startswith("_20")  # the date stamp is still there
+
+
+def test_report_only_open_is_the_brief_alone(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["report", "--config", str(_project(tmp_path)), "--only-open"]) == 0
+    out = capsys.readouterr().out
+    assert "## Open questions" in out and "`N-3`" in out
+    assert "## Needs" not in out and "delivered**" not in out
+
+
+def test_report_hide_empty_drops_the_explainer_and_an_empty_open_section(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cfg = _project(tmp_path)
+    main(["report", "--config", str(cfg)])
+    assert "is an honest gap" in capsys.readouterr().out
+    # with every need delivered and sourced, nothing is open
+    (tmp_path / "needs" / "a.yaml").write_text(
+        "who: jordan\nneeds:\n  - id: N-1\n    text: see past-due orders\n    sources:\n"
+        '      - kind: interview\n        who: Jordan\n        date: 2026-09-20\n        quote: "x"\n'
+        '    proofs:\n      - "web:orders.feature#Past due orders are highlighted"\n',
+        encoding="utf-8",
+    )
+    assert main(["report", "--config", str(cfg), "--hide-empty"]) == 0
+    out = capsys.readouterr().out
+    assert "is an honest gap" not in out and "## Open questions" not in out
+
+
+def test_report_flags_are_md_only(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(["report", "--config", str(_project(tmp_path)), "--format", "html", "--title", "x"])
+    assert code == 2
+    assert "md only" in capsys.readouterr().err

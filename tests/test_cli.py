@@ -465,6 +465,22 @@ def test_lint_fails_on_must_opinion_and_broken(
     assert "2 error(s)" in out
 
 
+def test_lint_must_opinion_message_names_the_fix(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "needs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "prodc.toml").write_text('[prodc]\nneeds = ["needs/*.yaml"]\n', encoding="utf-8")
+    (tmp_path / "needs" / "a.yaml").write_text(
+        "needs:\n  - id: L-1\n    text: a committed frontier\n    must: true\n"
+        "    sources:\n      - kind: assumption\n        who: me\n        date: 2026-01-01\n",
+        encoding="utf-8",
+    )
+    assert main(["lint", "--config", str(tmp_path / "prodc.toml")]) == 1
+    out = capsys.readouterr().out
+    assert "must-have is an opinion (only an assumption, no external evidence)" in out
+    assert "add a secondary or primary source" in out and "or lower must (#86)" in out
+
+
 def test_lint_clean_board_passes(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     code = main(
         ["lint", "--config", str(_project(tmp_path))]

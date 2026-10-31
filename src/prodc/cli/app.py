@@ -664,6 +664,17 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument(
         "--client", default=None, metavar="ID", help="scope the report to one client (as `status`)"
     )
+    rp.add_argument("--title", default=None, help="replace the heading (md only; the stamp stays)")
+    rp.add_argument(
+        "--hide-empty",
+        action="store_true",
+        help="md only: drop the explainer paragraph and an empty Open questions section",
+    )
+    rp.add_argument(
+        "--only-open",
+        action="store_true",
+        help="md only: just the Open questions brief (opinions and HOLEs, must-haves first)",
+    )
     rp.set_defaults(func=cmd_report)
 
     sy = sub.add_parser(

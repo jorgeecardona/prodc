@@ -41,14 +41,64 @@ def _summary_line(total: int, delivered: int, coverage: float, must_hole: int, b
     return f"**{delivered} of {total} delivered** ({round(coverage * 100)}%): {gaps}."
 
 
+def _open_questions(results: list[NeedResult], *, hide_empty: bool) -> list[str]:
+    """The Open questions section: opinions (no evidence) or HOLEs (no proof), must-haves first.
+
+    Empty list when there is nothing open and ``hide_empty`` is set.
+    """
+    open_ = [
+        r
+        for r in results
+        if r.need.product
+        and not r.need.is_withdrawn
+        and (r.need.is_opinion or r.state is NeedState.HOLE)
+    ]
+    open_.sort(key=lambda r: (not r.need.must, r.need.id))
+    if not open_:
+        return (
+            []
+            if hide_empty
+            else [
+                "## Open questions",
+                "",
+                "_Nothing open: every need has evidence and a proof._",
+                "",
+            ]
+        )
+    out = ["## Open questions", ""]
+    for r in open_:
+        gaps = ", ".join(
+            g
+            for g in (
+                "no evidence" if r.need.is_opinion else "",
+                "no proof" if r.state is NeedState.HOLE else "",
+            )
+            if g
+        )
+        must = "**(must)** " if r.need.must else ""
+        out.append(f"- {must}`{r.need.id}`: {r.need.text} _({gaps})_")
+    out.append("")
+    return out
+
+
 def render_markdown(
-    cfg: Config, model: Model, *, client: str | None = None, rev: str | None = None
+    cfg: Config,
+    model: Model,
+    *,
+    client: str | None = None,
+    rev: str | None = None,
+    title: str | None = None,
+    hide_empty: bool = False,
+    only_open: bool = False,
 ) -> str:
     """Render the resolved board as a markdown report.
 
     ``client`` scopes nothing yet beyond the heading note. The caller passes the already-scoped
     model (so `--client` reuses the same filter the board uses). ``rev`` is an optional short git
-    revision to stamp the report, so a printed copy says which state it reflects.
+    revision to stamp the report, so a printed copy says which state it reflects. ``title``
+    replaces the heading (the date stamp stays). ``hide_empty`` drops the explainer paragraph and
+    an Open questions section with nothing in it. ``only_open`` renders the heading, the stamp and
+    the Open questions section alone: the pre-meeting agenda (#67).
     """
     board = gather(cfg, model)
     results = board.results
@@ -61,19 +111,25 @@ def render_markdown(
 
     scope = f": {client}" if client else ""
     stamp = date.today().isoformat() + (f" · {rev}" if rev else "")
-    out: list[str] = [
-        f"# {cfg.root.name}{scope}: product status",
-        "",
-        f"_{stamp}_",
-        "",
-        _summary_line(
-            summary.total, summary.delivered, summary.coverage, summary.must_hole, summary.broken
-        ),
-        "",
-        "A need is something a person wants; it is an **opinion** until evidence backs it, and "
-        "**delivered** only when a test proves it. A **HOLE** is an honest gap (a need no test "
-        "proves yet), not a failure.",
-    ]
+    heading = f"# {title or f'{cfg.root.name}{scope}: product status'}"
+    out: list[str] = [heading, "", f"_{stamp}_", ""]
+    if not only_open:
+        out += [
+            _summary_line(
+                summary.total,
+                summary.delivered,
+                summary.coverage,
+                summary.must_hole,
+                summary.broken,
+            )
+        ]
+        if not hide_empty:
+            out += [
+                "",
+                "A need is something a person wants; it is an **opinion** until evidence backs "
+                "it, and **delivered** only when a test proves it. A **HOLE** is an honest gap "
+                "(a need no test proves yet), not a failure.",
+            ]
 
     # Needs grouped by who, like the board. A withdrawn need (#74) is off the active board, so
     # it is dropped here (its trace is the YAML record and `prodc show`), never shown as a gap.
@@ -82,6 +138,8 @@ def render_markdown(
         if not r.need.product or r.need.is_withdrawn:
             continue
         groups.setdefault(r.need.who or "(unassigned)", []).append(r)
+    if only_open:
+        return "\n".join(out + _open_questions(results, hide_empty=False))
     if groups:
         out += ["", "## Needs", ""]
         for who in sorted(groups):
@@ -200,29 +258,5 @@ def render_markdown(
             out.append(f"| {d.id}: {text} | {', '.join(d.needs)} | {over} | {rests} |")
         out.append("")
 
-    # Open questions: opinions (no evidence) or HOLEs (no proof), must-haves first.
-    open_ = [
-        r
-        for r in results
-        if r.need.product
-        and not r.need.is_withdrawn
-        and (r.need.is_opinion or r.state is NeedState.HOLE)
-    ]
-    open_.sort(key=lambda r: (not r.need.must, r.need.id))
-    out += ["## Open questions", ""]
-    if not open_:
-        out.append("_Nothing open: every need has evidence and a proof._")
-    else:
-        for r in open_:
-            gaps = ", ".join(
-                g
-                for g in (
-                    "no evidence" if r.need.is_opinion else "",
-                    "no proof" if r.state is NeedState.HOLE else "",
-                )
-                if g
-            )
-            must = "**(must)** " if r.need.must else ""
-            out.append(f"- {must}`{r.need.id}`: {r.need.text} _({gaps})_")
-    out.append("")
+    out += _open_questions(results, hide_empty=hide_empty)
     return "\n".join(out)
