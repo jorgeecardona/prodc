@@ -1097,10 +1097,16 @@ def cmd_report(args: argparse.Namespace) -> int:
     if loaded is None:
         return 2
     cfg, model = loaded
-    if args.client:
+    if args.client or args.goal or args.only_must:
         # replace keeps every other noun (principles, decisions, …); a hand-rolled Model(...)
         # silently dropped them, which breaks the moment the report renders them (#0.4).
-        scoped = applicable_needs(list(model.needs), args.client)
+        scoped = list(model.needs)
+        if args.client:
+            scoped = applicable_needs(scoped, args.client)
+        if args.goal:
+            scoped = [n for n in scoped if n.goal == args.goal]
+        if args.only_must:
+            scoped = [n for n in scoped if n.must]
         model = replace(model, needs=tuple(scoped))
     if args.format != "md" and (args.title or args.hide_empty or args.only_open):
         print(

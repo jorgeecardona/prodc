@@ -203,3 +203,29 @@ def test_report_signal_names_the_source_type(
     out = capsys.readouterr().out
     assert "| secondary (ticket) |" in out
     assert "### Night shift" in out
+
+
+def test_report_goal_and_only_must_scope_the_needs(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cfg = _project(tmp_path)
+    (tmp_path / "needs" / "a.yaml").write_text(
+        "who: jordan\ngoals:\n  - id: G-1\n    text: fewer lost orders\nneeds:\n"
+        "  - id: N-1\n    text: first need\n    must: true\n    goal: G-1\n"
+        "  - id: N-2\n    text: second need\n    goal: G-1\n"
+        "  - id: N-3\n    text: third need\n    must: true\n",
+        encoding="utf-8",
+    )
+    assert main(["report", "--config", str(cfg), "--goal", "G-1", "--only-must"]) == 0
+    out = capsys.readouterr().out
+    assert "N-1" in out
+    assert "N-2" not in out and "N-3" not in out
+
+
+def test_report_out_is_an_alias_of_output(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    dest = tmp_path / "r.md"
+    assert main(["report", "--config", str(_project(tmp_path)), "--out", str(dest)]) == 0
+    assert dest.read_text(encoding="utf-8").startswith("# ")
+    assert "wrote report to" in capsys.readouterr().out

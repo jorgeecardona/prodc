@@ -662,6 +662,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     rp.add_argument(
         "--output",
+        "--out",
         "-o",
         default=None,
         metavar="PATH",
@@ -670,6 +671,8 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument(
         "--client", default=None, metavar="ID", help="scope the report to one client (as `status`)"
     )
+    rp.add_argument("--goal", default=None, metavar="ID", help="only needs serving this goal")
+    rp.add_argument("--only-must", action="store_true", help="only must-have needs")
     rp.add_argument("--title", default=None, help="replace the heading (md only; the stamp stays)")
     rp.add_argument(
         "--hide-empty",

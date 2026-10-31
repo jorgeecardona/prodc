@@ -6,6 +6,8 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- `report` takes `--goal ID` and `--only-must` to scope the needs, and `--out` as another name for
+  `--output` (#64).
 - `report --format csv`, `--format jira` and `--format confluence` render the board for product
   tooling: one CSV row per need, Jira wiki markup, and Confluence storage format (#65).
 - A source can carry an `anchor`, an exact place inside its locator (`capture --anchor L120-L134`).
