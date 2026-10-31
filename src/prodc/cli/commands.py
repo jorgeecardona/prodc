@@ -233,7 +233,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
             warnings.append(
                 (
                     row.view.key,
-                    "orphan view: no link leads here; link it or set orphan_ok (#106)",
+                    "orphan view: no link leads here; link it, or have a need's path start here (#106)",
                 )
             )
         if not row.justified and cfg.unjustified_views is not None:
@@ -1258,7 +1258,9 @@ def cmd_views(args: argparse.Namespace) -> int:
         )
     else:
         unreachable = {
-            c: n for c, n in view_unreachable(cfg.adapters).items() if args.client in (None, c)
+            c: n
+            for c, n in view_unreachable(results, cfg.adapters).items()
+            if args.client in (None, c)
         }
         print(render_views(rows, unreachable, show_links=args.links))
     return 0

@@ -214,7 +214,7 @@ def render_views(
 
     ``in/out`` counts the links that end and start at the view (#107). ``show_links`` lists each
     view's outgoing links under it with their reason (#104). ``unreachable`` maps a client to the
-    number of views no ``orphan_ok`` entry view leads to (#105).
+    number of views no entry view leads to (#105).
     """
     out: list[str] = []
     client: str | None = None

@@ -6,6 +6,10 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- `orphan_ok` is removed from the view inventory, and a file that still has it fails to load.
+  A view nobody links to is an orphan unless a need's `path.start` names it: an entry point is
+  derived from a need, not flagged on the view. The `unreachable from an entry view` line uses the
+  same entries.
 - A page nested under another page no longer counts as 0 clicks away. Only a section, dialog or
   tab is free inside its parent, so a path between sibling pages needs a link (#109).
 - View links are checked. `lint` warns on an orphan view and fails on a link to a view that is

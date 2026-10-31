@@ -29,7 +29,6 @@ class View:
     kind: str | None = None  # free string (page, screen, section, dialog...); None = untyped
     parent: str | None = None  # the view that contains this one, same client
     section: str | None = None
-    orphan_ok: bool = False  # no inbound link on purpose (top-level views only)
     needless_ok: bool = False  # no need is expected (redirect, auth, public)
 
     @property
@@ -145,6 +144,10 @@ def load_file(path: Path) -> ViewInventory:
         vid = raw.get("id")
         if not isinstance(vid, str) or not vid:
             raise ViewInventoryError(f"{at}: 'id' must be a non-empty string")
+        if "orphan_ok" in raw:
+            raise ViewInventoryError(
+                f"{at}: 'orphan_ok' was removed: a view is an entry when a need's path starts there"
+            )
         parent = _opt_str(raw, "parent", at)
         views.append(
             View(
@@ -153,7 +156,6 @@ def load_file(path: Path) -> ViewInventory:
                 kind=_opt_str(raw, "kind", at),
                 parent=normalise_id(parent) if parent is not None else None,
                 section=_opt_str(raw, "section", at),
-                orphan_ok=_bool(raw, "orphan_ok", at),
                 needless_ok=_bool(raw, "needless_ok", at),
             )
         )
@@ -222,12 +224,13 @@ def _subtree(children: dict[str, list[str]], root: str) -> set[str]:
     return seen
 
 
-def orphans(inv: ViewInventory) -> set[str]:
+def orphans(inv: ViewInventory, entries: set[str]) -> set[str]:
     """Keys (``client:id``) of top-level views nobody links to (#106).
 
     A child view is reached through its parent, so only a view with no known parent can be an
     orphan. A link to the view or to a view it contains counts, unless it starts inside the same
-    subtree. ``orphan_ok`` views are not orphans. A client with no links at all is skipped.
+    subtree. An entry is not an orphan: ``entries`` holds the ``client:id`` of every view a
+    need's ``path.start`` names. A client with no links at all is skipped.
     """
     out: set[str] = set()
     for client in inv.clients():
@@ -237,7 +240,7 @@ def orphans(inv: ViewInventory) -> set[str]:
         nested = {c for kids in children.values() for c in kids}
         links = [lk for lk in inv.links if lk.client == client]
         for v in inv.views:
-            if v.client != client or v.orphan_ok or v.id in nested:
+            if v.client != client or v.key in entries or v.id in nested:
                 continue
             tree = _subtree(children, v.id)
             if not any(lk.target in tree and lk.source not in tree for lk in links):
@@ -281,13 +284,13 @@ def clicks(inv: ViewInventory, client: str, starts: set[str], goals: set[str]) -
     return min(best) if best else None
 
 
-def unreachable(inv: ViewInventory, client: str) -> int | None:
-    """How many views cannot be reached from an ``orphan_ok`` entry view (#105).
+def unreachable(inv: ViewInventory, client: str, entries: set[str]) -> int | None:
+    """How many views cannot be reached from an entry view (#105).
 
     None when the client has no links or no entry view, so there is nothing to measure from.
     """
-    entries = {v.id for v in inv.views if v.client == client and v.orphan_ok}
-    if not entries or not has_links(inv, client):
+    starts = {k.partition(":")[2] for k in entries if k.partition(":")[0] == client}
+    if not starts or not has_links(inv, client):
         return None
     ids = {v.id for v in inv.views if v.client == client}
-    return len(ids - set(_distances(inv, client, entries)))
+    return len(ids - set(_distances(inv, client, starts)))

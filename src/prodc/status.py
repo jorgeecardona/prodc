@@ -1316,7 +1316,7 @@ class ViewRow:
     needs: tuple[str, ...]  # ids of needs whose proofs or path name this view
     state: NeedState | None  # group state of those needs; None when no need points here
     justified: bool  # a need points here or at a child, or ``needless_ok`` is set
-    orphan: bool = False  # top-level, no inbound link, not ``orphan_ok`` (#106)
+    orphan: bool = False  # top-level, no inbound link, not a path start (#106)
     inbound: tuple[ViewLink, ...] = ()  # links that end at this view (#107)
     outbound: tuple[ViewLink, ...] = ()  # links that start at this view (#107)
 
@@ -1336,8 +1336,9 @@ def view_report(
     views_by_name = {n: a for n, a in adapters.items() if isinstance(a, ViewsAdapter)}
     inv = _inventory(list(views_by_name.values()))
     all_views = list(inv.views)
-    orphaned = orphan_views(inv)
     clients = _view_clients(list(views_by_name.values()))
+    entries = view_entries(results, adapters)
+    orphaned = orphan_views(inv, entries)
     pointing: dict[str, list[str]] = {}
     for r in results:
         payloads = [
@@ -1402,11 +1403,30 @@ def view_report(
     return out
 
 
-def view_unreachable(adapters: dict[str, Adapter]) -> dict[str, int]:
-    """Per client, how many views cannot be reached from an ``orphan_ok`` entry view (#105).
+def view_entries(results: list[NeedResult], adapters: dict[str, Adapter]) -> set[str]:
+    """The views users start from: every view a need's ``path.start`` names, as ``client:id``.
+
+    An entry is derived from a need, never flagged on the view, so there is no switch that
+    excuses a view nobody links to.
+    """
+    views = [a for a in adapters.values() if isinstance(a, ViewsAdapter)]
+    clients = _view_clients(views)
+    out: set[str] = set()
+    for r in results:
+        if r.need.path is None:
+            continue
+        payload = _view_payload(r.need.path.start, clients)
+        if payload is not None:
+            out.update(k for a in views for k in a.covers(payload))
+    return out
+
+
+def view_unreachable(results: list[NeedResult], adapters: dict[str, Adapter]) -> dict[str, int]:
+    """Per client, how many views cannot be reached from an entry view (#105).
 
     A client with no links or no entry view is left out.
     """
     inv = _inventory([a for a in adapters.values() if isinstance(a, ViewsAdapter)])
-    counts = {c: unreachable_count(inv, c) for c in inv.clients()}
+    entries = view_entries(results, adapters)
+    counts = {c: unreachable_count(inv, c, entries) for c in inv.clients()}
     return {c: n for c, n in counts.items() if n is not None}

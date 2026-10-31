@@ -17,7 +17,7 @@ _WEB: dict[str, object] = {
     "schema": 1,
     "client": "web",
     "views": [
-        {"id": "/", "kind": "page", "orphan_ok": True},
+        {"id": "/", "kind": "page"},
         {"id": "/pricing", "kind": "page"},
         {"id": "/install", "kind": "page"},
         {"id": "/install#steps", "kind": "section", "parent": "/install"},
@@ -46,9 +46,9 @@ def test_link_why_and_need_load_and_default_to_none(tmp_path: Path) -> None:
     assert links[0].file.endswith("web.json")
 
 
-def test_orphan_is_top_level_unlinked_and_not_orphan_ok(tmp_path: Path) -> None:
-    # /lost has no inbound link; / is orphan_ok; /install#steps is reached through its parent.
-    assert v.orphans(_inv(tmp_path)) == {"web:/lost"}
+def test_orphan_is_top_level_unlinked_and_not_an_entry(tmp_path: Path) -> None:
+    # /lost has no inbound link; / is an entry (a path starts there); /install#steps is reached through its parent.
+    assert v.orphans(_inv(tmp_path), {"web:/"}) == {"web:/lost"}
 
 
 def test_link_into_a_child_keeps_the_parent_from_being_orphan(tmp_path: Path) -> None:
@@ -56,11 +56,11 @@ def test_link_into_a_child_keeps_the_parent_from_being_orphan(tmp_path: Path) ->
         **_WEB,
         "links": [{"from": "/", "to": "/install#steps"}],
     }
-    assert "web:/install" not in v.orphans(_inv(tmp_path, doc))
+    assert "web:/install" not in v.orphans(_inv(tmp_path, doc), {"web:/"})
 
 
 def test_no_links_at_all_skips_the_orphan_check(tmp_path: Path) -> None:
-    assert v.orphans(_inv(tmp_path, {**_WEB, "links": []})) == set()
+    assert v.orphans(_inv(tmp_path, {**_WEB, "links": []}), set()) == set()
 
 
 def test_dangling_link_is_found(tmp_path: Path) -> None:
@@ -82,7 +82,7 @@ _NESTED: dict[str, object] = {
     "schema": 1,
     "client": "web",
     "views": [
-        {"id": "/app", "kind": "page", "orphan_ok": True},
+        {"id": "/app", "kind": "page"},
         {"id": "/app/a", "kind": "page", "parent": "/app"},
         {"id": "/app/b", "kind": "page", "parent": "/app"},
         {"id": "/app#menu", "kind": "section", "parent": "/app"},
@@ -105,16 +105,20 @@ def test_a_section_under_a_page_is_free_both_ways(tmp_path: Path) -> None:
 
 
 def test_unreachable_counts_a_nested_page_without_a_link(tmp_path: Path) -> None:
-    assert v.unreachable(_inv(tmp_path, _NESTED), "web") == 1  # /app/b
+    assert v.unreachable(_inv(tmp_path, _NESTED), "web", {"web:/app"}) == 1  # /app/b
 
 
 def test_unreachable_from_entry_views(tmp_path: Path) -> None:
-    assert v.unreachable(_inv(tmp_path), "web") == 1  # /lost
-    no_entry: dict[str, object] = {
-        **_WEB,
-        "views": [{"id": "/", "kind": "page"}, {"id": "/pricing", "kind": "page"}],
-    }
-    assert v.unreachable(_inv(tmp_path, no_entry), "web") is None
+    inv = _inv(tmp_path)
+    assert v.unreachable(inv, "web", {"web:/"}) == 1  # /lost
+    assert v.unreachable(inv, "web", set()) is None  # no entry, nothing to measure from
+
+
+def test_orphan_ok_is_rejected(tmp_path: Path) -> None:
+    bad: dict[str, object] = {**_WEB, "views": [{"id": "/", "orphan_ok": True}]}
+    (tmp_path / "web.json").write_text(json.dumps(bad), encoding="utf-8")
+    with pytest.raises(v.ViewInventoryError, match="orphan_ok' was removed"):
+        v.load_file(tmp_path / "web.json")
 
 
 def _adapters(tmp_path: Path, doc: dict[str, object] | None = None) -> dict[str, Adapter]:
@@ -167,6 +171,11 @@ needs:
   - id: R-1
     text: a visitor installs after seeing pricing
     proofs: ["views:web:/install"]
+  - id: R-2
+    text: a visitor lands on the home page and reaches the install page
+    path:
+      start: web:/
+      outcome: web:/install
 """
 
 
@@ -208,9 +217,9 @@ def test_graph_mermaid_output(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     assert main(["views", "--config", _project(tmp_path), "--graph", "mermaid"]) == 0
     assert capsys.readouterr().out == (
         "## web\n\n```mermaid\nflowchart LR\n"
-        '  v0["/"]:::unjustified\n'
+        '  v0["/"]:::gap\n'
         '  v1["/far"]:::unjustified\n'
-        '  v2["/install"]:::delivered\n'
+        '  v2["/install"]:::gap\n'
         '  v3["/install#steps"]:::unjustified\n'
         '  v5["/pricing"]:::unjustified\n'
         '  subgraph orphans ["no inbound link"]\n'

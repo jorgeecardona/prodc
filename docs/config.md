@@ -102,7 +102,7 @@ files = ["product/views/web.json", "product/views/ios.json"]
   "generated_from": "apps/website/src/router.tsx@<sha>",
   "views": [
     {"id": "/roast/sessions/$planId", "kind": "page", "parent": null, "section": "roast",
-     "orphan_ok": false, "needless_ok": false},
+     "needless_ok": false},
     {"id": "/roast/sessions/$planId#batches", "kind": "section", "parent": "/roast/sessions/$planId"}
   ],
   "links": [
@@ -115,15 +115,16 @@ files = ["product/views/web.json", "product/views/ios.json"]
 - `id`: the view. `:id` and `{id}` path params are read as `$id`.
 - `kind`: free text (page, screen, section, dialog, window). Null means untyped.
 - `parent`: the view that contains this one. `links` are navigation. They are separate relations.
-- `orphan_ok`: the view has no inbound link on purpose (top-level views only).
+- `orphan_ok` was removed, and a file that still has it fails to load. There is no flag that
+  excuses an orphan. A view is an entry (a place users start) when a need's `path.start` names it.
 - `needless_ok`: no need is expected for this view (redirect, auth, public page).
 - link `why`: the reason a user takes the link. Optional. A link may also carry `need`, a need id.
 
 Link checks run only for a client whose file has at least one link:
 
-- Orphan view: a top-level view with no inbound link and no `orphan_ok`. `lint` warns, and
+- Orphan view: a top-level view with no inbound link that no need's `path.start` names. `lint` warns, and
   `prodc views` shows `[orphan]`. A child view is reached through its parent, so it is never an
-  orphan. Silence it with `orphan_ok`.
+  orphan. Fix it with a link, or with a need whose `path` starts there.
 - Dangling link: a `from` or `to` that is not a view of the same client. `lint` fails.
 - Walkable path: a need's `path.start` and `path.outcome` on the same client must be joined by
   links. A link costs one click. Containment costs none for a child that is not a `page` (a

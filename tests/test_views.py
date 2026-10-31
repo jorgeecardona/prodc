@@ -26,7 +26,7 @@ _WEB = {
             "kind": "section",
             "parent": "/roast/sessions/$planId",
         },
-        {"id": "/login", "kind": "page", "orphan_ok": True, "needless_ok": True},
+        {"id": "/login", "kind": "page", "needless_ok": True},
     ],
     "links": [{"from": "/roast/sessions", "to": "/roast/sessions/$planId"}],
 }
