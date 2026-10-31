@@ -8,7 +8,10 @@ same matcher feeds recurrence-link suggestion (#56) and proof discovery (#54).
 
 from __future__ import annotations
 
+import math
 import re
+from collections import defaultdict
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from functools import cache
 
@@ -58,6 +61,38 @@ def _score_if_reachable(ta: frozenset[str], tb: frozenset[str], threshold: float
     if lo < threshold * hi:
         return 0.0
     return _jaccard(ta, tb)
+
+
+def candidate_pairs(sets: Sequence[frozenset[str]], threshold: float) -> Iterator[tuple[int, int]]:
+    """Index pairs ``(i, j)``, ``i < j``, whose Jaccard can reach ``threshold`` (#62).
+
+    Prefix filtering: order each set's trigrams rare-first, and index only the first
+    ``n - ceil(threshold * n) + 1`` of them. Two sets with Jaccard >= ``threshold`` must share a
+    trigram in those prefixes, so a pair that shares none is skipped without being scored. The
+    result is a superset of the true matches, never a subset: the caller still scores each pair.
+    Empty sets never match anything. The cost follows the number of candidates, not n squared.
+    """
+    freq: dict[str, int] = defaultdict(int)
+    for tg in sets:
+        for t in tg:
+            freq[t] += 1
+    order = sorted(
+        (i for i, tg in enumerate(sets) if tg), key=lambda i: (len(sets[i]), i)
+    )  # smaller sets first, so every earlier set is no larger than the one probing
+    index: dict[str, list[int]] = defaultdict(list)
+    for i in order:
+        n = len(sets[i])
+        ranked = sorted(sets[i], key=lambda t: (freq[t], t))
+        # the -1e-9 only ever lengthens the prefix, which keeps the filter safe against rounding
+        prefix = ranked[: max(1, n - math.ceil(threshold * n - 1e-9) + 1)]
+        seen: set[int] = set()
+        for t in prefix:
+            for j in index[t]:
+                if j not in seen and len(sets[j]) >= threshold * n - 1e-9:
+                    seen.add(j)
+                    yield (j, i) if j < i else (i, j)
+        for t in prefix:
+            index[t].append(i)
 
 
 def similarity(a: str, b: str) -> float:
@@ -133,15 +168,15 @@ def variant_suggestions(needs: list[Need], threshold: float) -> list[VariantGrou
         return x
 
     edges: list[tuple[str, str, float]] = []
-    for i in range(len(needs)):
-        for j in range(i + 1, len(needs)):
-            a, b = needs[i], needs[j]
-            if not _variant_candidate(a, b):
-                continue
-            score = _score_if_reachable(trigrams[a.id], trigrams[b.id], threshold)
-            if score >= threshold:
-                edges.append((a.id, b.id, score))
-                parent[find(a.id)] = find(b.id)
+    sets = [trigrams[n.id] for n in needs]
+    for i, j in sorted(candidate_pairs(sets, threshold)):
+        a, b = needs[i], needs[j]
+        if not _variant_candidate(a, b):
+            continue
+        score = _score_if_reachable(trigrams[a.id], trigrams[b.id], threshold)
+        if score >= threshold:
+            edges.append((a.id, b.id, score))
+            parent[find(a.id)] = find(b.id)
 
     by_id = {n.id: n for n in needs}
     groups: dict[str, list[str]] = {}
@@ -171,15 +206,15 @@ def duplicate_pairs(
     """
     pairs: list[DupPair] = []
     trigrams = {n.id: _trigrams(n.text) for n in needs}
-    for i in range(len(needs)):
-        for j in range(i + 1, len(needs)):
-            a, b = needs[i], needs[j]
-            if not include_acknowledged and _acknowledged(a, b):
-                continue
-            score = _score_if_reachable(trigrams[a.id], trigrams[b.id], threshold)
-            if score >= threshold:
-                same = a.client == b.client and a.goal == b.goal
-                pairs.append(DupPair(a, b, score, same))
+    sets = [trigrams[n.id] for n in needs]
+    for i, j in candidate_pairs(sets, threshold):
+        a, b = needs[i], needs[j]
+        if not include_acknowledged and _acknowledged(a, b):
+            continue
+        score = _score_if_reachable(trigrams[a.id], trigrams[b.id], threshold)
+        if score >= threshold:
+            same = a.client == b.client and a.goal == b.goal
+            pairs.append(DupPair(a, b, score, same))
     pairs.sort(key=lambda p: (-p.score, not p.same_scope, p.a.id, p.b.id))
     return pairs
 

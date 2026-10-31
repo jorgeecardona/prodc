@@ -6,6 +6,8 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- `dupes` and variant suggestions skip pairs that cannot reach the threshold (prefix filter), so
+  they are about 4x faster on 3000 needs. The results are the same (#62).
 - `lint` warns when a client's view inventory has links but no entry view (#110). The `must-have
   is an opinion` error now says whether the need has no source or only an assumption, and how to
   fix it (#86).
