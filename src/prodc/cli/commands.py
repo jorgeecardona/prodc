@@ -29,6 +29,7 @@ from ..dedup import (
 from ..loader import LoaderError, load
 from ..model import Need, NeedResult, NeedState, PrincipleState, board_needs
 from ..report import render_markdown
+from ..report_export import export_rows, render_confluence, render_csv, render_jira
 from ..report_html import render_html
 from ..status import (
     ProofSuggestion,
@@ -1101,14 +1102,23 @@ def cmd_report(args: argparse.Namespace) -> int:
         # silently dropped them, which breaks the moment the report renders them (#0.4).
         scoped = applicable_needs(list(model.needs), args.client)
         model = replace(model, needs=tuple(scoped))
+    if args.format != "md" and (args.title or args.hide_empty or args.only_open):
+        print(
+            "prodc: --title, --hide-empty and --only-open work with --format md only",
+            file=sys.stderr,
+        )
+        return 2
     if args.format == "html":
-        if args.title or args.hide_empty or args.only_open:
-            print(
-                "prodc: --title, --hide-empty and --only-open work with --format md only",
-                file=sys.stderr,
-            )
-            return 2
         text = render_html(cfg, model, client=args.client, rev=git_rev(cfg.root))
+    elif args.format in ("csv", "jira", "confluence"):
+        rows = export_rows(gather(cfg, model).results)
+        heading = f"{cfg.root.name}{': ' + args.client if args.client else ''}: product status"
+        if args.format == "csv":
+            text = render_csv(rows)
+        elif args.format == "jira":
+            text = render_jira(rows, heading)
+        else:
+            text = render_confluence(rows, heading)
     else:
         text = render_markdown(
             cfg,
@@ -1125,7 +1135,7 @@ def cmd_report(args: argparse.Namespace) -> int:
         dest.write_text(text, encoding="utf-8")
         print(f"wrote report to {dest}")
     else:
-        print(text)
+        print(text, end="" if text.endswith("\n") else "\n")
     return 0
 
 

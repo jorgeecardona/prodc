@@ -6,6 +6,8 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- `report --format csv`, `--format jira` and `--format confluence` render the board for product
+  tooling: one CSV row per need, Jira wiki markup, and Confluence storage format (#65).
 - A source can carry an `anchor`, an exact place inside its locator (`capture --anchor L120-L134`).
   For a local file with a quote, `status` and `lint` warn when the quote is no longer inside those
   lines (#57). `show` prints `locator#anchor`.

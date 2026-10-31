@@ -655,9 +655,10 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     rp.add_argument(
         "--format",
-        choices=["md", "html"],
+        choices=["md", "html", "csv", "jira", "confluence"],
         default="md",
-        help="md (default) or html : a self-contained, interactive, read-only viewer (#79)",
+        help="md (default); html: a self-contained, interactive viewer (#79); csv: one row per "
+        "need; jira: wiki markup; confluence: storage format (#65)",
     )
     rp.add_argument(
         "--output",
