@@ -6,6 +6,9 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- The markdown `report` names the concrete source behind a need: `secondary (ticket)`, `(merge
+  request)`, `(message)`, `(email)` or `(post)`, read from the source locator. It also shows an
+  identifier such as `safety-analyst` as `Safety analyst` in headings and the roster (#68).
 - `dupes` and variant suggestions skip pairs that cannot reach the threshold (prefix filter), so
   they are about 4x faster on 3000 needs. The results are the same (#62).
 - `lint` warns when a client's view inventory has links but no entry view (#110). The `must-have

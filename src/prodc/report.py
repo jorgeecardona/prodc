@@ -9,6 +9,7 @@ left to the reader's own tooling: prodc stays pyyaml-only).
 
 from __future__ import annotations
 
+import re
 from datetime import date
 
 from .board import gather, path_summary
@@ -25,10 +26,53 @@ _LABEL = {
 }
 
 
+# (pattern, name) in order: the first pattern that matches a source locator names its type (#68).
+_SOURCE_TYPES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (re.compile(p, re.IGNORECASE), name)
+    for p, name in (
+        (r"/merge_requests/\d+|/pull/\d+|![0-9]+$", "merge request"),
+        (r"/issues/\d+|/work_items/\d+|/browse/|(?-i:\b[A-Z][A-Z0-9]+-\d+\b)", "ticket"),
+        (r"slack\.com/archives|discord\.com/channels|t\.me/|matrix\.to", "message"),
+        (r"^mailto:|^mail:|\.eml\b|^<[^>]+@[^>]+>$", "email"),
+        (r"canny\.io|productboard|uservoice|/feedback/|reddit\.com|news\.ycombinator", "post"),
+    )
+)
+
+
+def source_type(locator: str | None) -> str | None:
+    """The concrete type of a source (ticket, post, message, email...), read from its locator.
+
+    None when the locator is missing or matches no known shape; the caller falls back to the
+    source kind. Only reads the text: it never opens the locator.
+    """
+    if not locator:
+        return None
+    return next((name for pat, name in _SOURCE_TYPES if pat.search(locator)), None)
+
+
+def display_title(identifier: str) -> str:
+    """An identifier as a human label: ``safety-analyst`` becomes ``Safety analyst``.
+
+    A plain word is returned as written, so a name like ``jordan`` is not rewritten.
+    """
+    if "-" not in identifier and "_" not in identifier:
+        return identifier
+    words = re.sub(r"[-_]+", " ", identifier).strip()
+    return words[:1].upper() + words[1:]
+
+
 def _warrant(r: NeedResult) -> str:
-    """The user signal behind a need: its strongest source kind, or 'opinion' when unsourced."""
+    """The user signal behind a need: its strongest source kind, or 'opinion' when unsourced.
+
+    The kind is followed by the concrete type of the first strongest source that has one, for
+    example ``secondary (ticket)``.
+    """
     strongest = r.need.strongest_kind
-    return strongest.value if strongest is not None else "opinion"
+    if strongest is None:
+        return "opinion"
+    kinds = (source_type(s.locator) for s in r.need.sources if s.kind is strongest)
+    typed = next((t for t in kinds if t), None)
+    return f"{strongest.value} ({typed})" if typed else strongest.value
 
 
 def _summary_line(total: int, delivered: int, coverage: float, must_hole: int, broken: int) -> str:
@@ -144,7 +188,7 @@ def render_markdown(
         out += ["", "## Needs", ""]
         for who in sorted(groups):
             rs = sorted(groups[who], key=state_priority)
-            out.append(f"### {who}")
+            out.append(f"### {display_title(who)}")
             out.append("")
             out.append("| need | state | text | user signal |")
             out.append("|---|---|---|---|")
@@ -202,7 +246,7 @@ def render_markdown(
                 if rsum.total
                 else "(no need yet)"
             )
-            out.append(f"| {role.id} | {cov} | {role.text} |")
+            out.append(f"| {display_title(role.id)} | {cov} | {role.text} |")
         if unroled:
             out.append("")
             out.append(

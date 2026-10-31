@@ -160,3 +160,46 @@ def test_report_flags_are_md_only(tmp_path: Path, capsys: pytest.CaptureFixture[
     code = main(["report", "--config", str(_project(tmp_path)), "--format", "html", "--title", "x"])
     assert code == 2
     assert "md only" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("locator", "expected"),
+    [
+        ("https://gitlab.com/g/p/-/issues/12", "ticket"),
+        ("PROJ-123", "ticket"),
+        ("https://gitlab.com/g/p/-/merge_requests/7", "merge request"),
+        ("https://acme.slack.com/archives/C01/p123", "message"),
+        ("mailto:a@b.com", "email"),
+        ("https://acme.canny.io/requests/42", "post"),
+        ("notes/interview-1.md", None),
+        (None, None),
+    ],
+)
+def test_source_type_is_read_from_the_locator(locator: str | None, expected: str | None) -> None:
+    from prodc.report import source_type
+
+    assert source_type(locator) == expected
+
+
+def test_display_title_titles_identifiers_and_keeps_plain_names() -> None:
+    from prodc.report import display_title
+
+    assert display_title("safety-analyst") == "Safety analyst"
+    assert display_title("master_description") == "Master description"
+    assert display_title("jordan") == "jordan"
+
+
+def test_report_signal_names_the_source_type(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    main_cfg = _project(tmp_path)
+    (tmp_path / "needs" / "a.yaml").write_text(
+        "who: night-shift\nneeds:\n  - id: N-9\n    text: see past-due orders\n    sources:\n"
+        "      - kind: secondary\n        locator: https://gitlab.com/g/p/-/issues/12\n"
+        "        date: 2026-09-21\n",
+        encoding="utf-8",
+    )
+    assert main(["report", "--config", str(main_cfg)]) == 0
+    out = capsys.readouterr().out
+    assert "| secondary (ticket) |" in out
+    assert "### Night shift" in out

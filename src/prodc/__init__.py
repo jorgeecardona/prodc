@@ -1,3 +1,3 @@
 """prodc: product management as code."""
 
-__version__ = "0.4.29"  # the single source of truth; pyproject reads it via [tool.hatch.version]
+__version__ = "0.4.30"  # the single source of truth; pyproject reads it via [tool.hatch.version]
