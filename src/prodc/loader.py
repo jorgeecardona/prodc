@@ -238,6 +238,7 @@ def _source(raw: object, where: str) -> Source:
         quote=_opt_str(tbl.get("quote"), f"{where}.quote"),
         locator=_opt_str(tbl.get("locator"), f"{where}.locator"),
         observed_at=_opt_str(tbl.get("observed_at"), f"{where}.observed_at"),
+        anchor=_opt_str(tbl.get("anchor"), f"{where}.anchor"),
     )
 
 

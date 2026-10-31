@@ -152,6 +152,7 @@ own (#89); it never enters coverage.
 | `date` | when it was said/written; missing = warned |
 | `quote` | verbatim (a primary source wants a quote or a locator) |
 | `locator` | ticket/doc ref (a secondary source needs one); `[sources.*]` adapters check it resolves |
+| `anchor` | An exact place inside `locator`: a line range `L120-L134` for a local file, a page `p.7`, a time `00:14:32`. `show` prints `locator#anchor`. For a local file with a `quote`, `status` and `lint` warn when the quote is no longer inside the lines (`source anchor drifted`). Other anchors are not checked |
 | `observed_at` | ISO date the evidence was recorded; `capture` stamps it. Newest across sources = the need's evidence age (`status --stale`, `[lint].stale_after_days`) |
 
 ## Ladders

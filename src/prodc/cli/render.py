@@ -582,7 +582,7 @@ def render_show(
                     ("who", s.who),
                     ("role", s.role),
                     ("date", s.date),
-                    ("locator", s.locator),
+                    ("locator", s.ref),
                 )
                 if v
             ]

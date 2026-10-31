@@ -977,6 +977,7 @@ def cmd_capture(args: argparse.Namespace) -> int:
             date=args.date,
             quote=args.quote,
             locator=args.locator,
+            anchor=args.anchor,
             observed_at=args.observed_at or date.today().isoformat(),
             expect_sha=args.expect_sha,
             dry_run=args.dry_run,

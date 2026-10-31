@@ -111,6 +111,14 @@ class Source:
     quote: str | None = None
     locator: str | None = None
     observed_at: str | None = None  # ISO date this evidence was recorded/refreshed (#58)
+    anchor: str | None = None  # an exact place inside ``locator``: L120-L134, p.7, 00:14:32 (#57)
+
+    @property
+    def ref(self) -> str | None:
+        """The locator with its anchor, ``locator#anchor``, ready to paste; None without a locator."""
+        if not self.locator:
+            return None
+        return f"{self.locator}#{self.anchor}" if self.anchor else self.locator
 
     def warnings(self) -> list[str]:
         """Soft hygiene checks from Torres. Never fails the build."""
@@ -121,6 +129,8 @@ class Source:
             out.append("primary source without a verbatim quote or a locator")
         if self.kind is SourceKind.SECONDARY and not self.locator:
             out.append("secondary source without a locator")
+        if self.anchor and not self.locator:
+            out.append("source anchor without a locator")
         if not self.date:
             out.append("source without a date")
         return out

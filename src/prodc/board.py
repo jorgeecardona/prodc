@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Literal
 
+from .anchor import anchor_drift
 from .config import Config
 from .dedup import duplicate_pairs, variant_suggestions, who_variants
 from .model import (
@@ -164,6 +165,15 @@ def _declared_only_warnings(results: list[NeedResult]) -> None:
             )
 
 
+def _anchor_warnings(results: list[NeedResult], cfg: Config) -> None:
+    """Warn when a source quote is no longer at the lines its anchor names (#57)."""
+    for r in results:
+        for s in r.need.sources:
+            why = anchor_drift(cfg.root, s)
+            if why is not None:
+                r.warnings.append(f"source anchor drifted: {why} (#57)")
+
+
 def annotate_need_warnings(results: list[NeedResult], needs: list[Need], cfg: Config) -> None:
     """Append every per-need hygiene warning, in one fixed order (#81).
 
@@ -179,6 +189,7 @@ def annotate_need_warnings(results: list[NeedResult], needs: list[Need], cfg: Co
     _importance_warnings(results, cfg)
     _draft_age_warnings(results, cfg)
     _declared_only_warnings(results)
+    _anchor_warnings(results, cfg)
 
 
 def warrant(need: Need) -> str:
@@ -301,6 +312,7 @@ def need_payload(r: NeedResult, *, flavor: Literal["board", "html"] = "board") -
                     "date": s.date,
                     "quote": s.quote,
                     "locator": s.locator,
+                    "anchor": s.anchor,
                 }
                 for s in need.sources
             ],

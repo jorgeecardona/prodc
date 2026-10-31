@@ -323,6 +323,11 @@ def main(argv: list[str] | None = None) -> int:
     cp.add_argument("--quote", default=None, help="a verbatim quote (for a primary source)")
     cp.add_argument("--locator", default=None, help="a source locator (for a secondary source)")
     cp.add_argument(
+        "--anchor",
+        default=None,
+        help="an exact place inside the locator: L120-L134 for a local file, p.7, 00:14:32 (#57)",
+    )
+    cp.add_argument(
         "--observed-at",
         default=None,
         metavar="ISO",

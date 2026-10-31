@@ -6,6 +6,9 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- A source can carry an `anchor`, an exact place inside its locator (`capture --anchor L120-L134`).
+  For a local file with a quote, `status` and `lint` warn when the quote is no longer inside those
+  lines (#57). `show` prints `locator#anchor`.
 - The markdown `report` names the concrete source behind a need: `secondary (ticket)`, `(merge
   request)`, `(message)`, `(email)` or `(post)`, read from the source locator. It also shows an
   identifier such as `safety-analyst` as `Safety analyst` in headings and the roster (#68).

@@ -587,6 +587,7 @@ def capture_source(
     quote: str | None,
     locator: str | None,
     observed_at: str | None = None,
+    anchor: str | None = None,
     expect_sha: str | None,
     dry_run: bool,
 ) -> Edit:
@@ -595,6 +596,7 @@ def capture_source(
     Records evidence as given; the loader's soft hygiene checks (a primary source wants a who and a
     quote-or-locator, a secondary source wants a locator) still apply on the next read.
     ``observed_at`` dates when the evidence was recorded, so the board can flag stale needs (#58).
+    ``anchor`` points at an exact place inside ``locator`` (#57).
     ``role`` records which declared role the ``who`` spoke as (validated against ``roles:`` on the
     next load): whose signal it is, orthogonal to the evidence tier (#52 follow-up).
     """
@@ -606,6 +608,7 @@ def capture_source(
         ("date", date),
         ("quote", quote),
         ("locator", locator),
+        ("anchor", anchor),
         ("observed_at", observed_at),
     ):
         if value is not None:
@@ -1051,6 +1054,7 @@ def _source_dict(s: Source) -> dict[str, object]:
         ("date", s.date),
         ("quote", s.quote),
         ("locator", s.locator),
+        ("anchor", s.anchor),
         ("observed_at", s.observed_at),
     ):
         if value is not None:
