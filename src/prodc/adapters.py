@@ -813,6 +813,11 @@ class External:
         self._inner = inner
         self._repo = repo
 
+    @property
+    def inner(self) -> Adapter:
+        """The wrapped adapter, so a caller can tell what kind of proof it resolves."""
+        return self._inner
+
     def resolve(self, payload: str) -> ProofResult:
         if not self._repo.exists():
             return ProofResult(

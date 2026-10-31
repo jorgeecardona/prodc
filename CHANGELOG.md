@@ -6,6 +6,10 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- A need can declare `expects: test|eval|observed|accept|prototype`, the proof kind it waits for
+  (#78). A HOLE then reads `awaiting an eval`, `suggest` looks only in that kind of inventory (an
+  eval or observed inventory is offered whole), and `lint` warns when the wired proofs are another
+  kind. Set it with `prodc set N-1 expects=eval`.
 - `suggest` reads the keys of `external` (observable outcome) and `evalgate` proofs. Name one with
   `--kind` and it offers every recorded key, ranked by text score and not cut by `--min-score`,
   because an outcome or metric name rarely shares words with a need (#75, #76).

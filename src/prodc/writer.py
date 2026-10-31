@@ -40,6 +40,7 @@ _SCALAR_FIELDS = frozenset(
         "claim",
         "goal",
         "release",
+        "expects",
         "variant_of",
         "client",
         "product",

@@ -29,6 +29,7 @@ from .model import (
     NeedPath,
     Outcome,
     Principle,
+    ProofKind,
     Release,
     Role,
     Source,
@@ -157,6 +158,18 @@ def _attestation(raw: object, where: str) -> Attestation | None:
     )
 
 
+def _expects(raw: object, where: str) -> ProofKind | None:
+    """Parse ``expects: test|eval|observed|accept|prototype`` into a :class:`ProofKind` (#78)."""
+    if raw is None:
+        return None
+    name = _as_str(raw, where)
+    try:
+        return ProofKind(name)
+    except ValueError:
+        kinds = "|".join(k.value for k in ProofKind)
+        raise LoaderError(f"{where}: unknown proof kind {name!r} ({kinds})") from None
+
+
 def _answer(raw: object, where: str) -> Answer | None:
     """Parse ``answer: yes|no|inconclusive`` into an :class:`Answer`, validated like other enums.
 
@@ -282,6 +295,7 @@ def _need(
     attestation = _attestation(tbl.get("attestation"), f"{where}.attestation")
     goal = _opt_str(tbl.get("goal"), f"{where}.goal")
     release = _opt_str(tbl.get("release"), f"{where}.release")
+    expects = _expects(tbl.get("expects"), f"{where}.expects")
     product = _as_bool(tbl["product"], f"{where}.product") if "product" in tbl else True
     draft = _as_bool(tbl["draft"], f"{where}.draft") if "draft" in tbl else False
     draft_added = _opt_str(tbl.get("draft_added"), f"{where}.draft_added")
@@ -353,6 +367,7 @@ def _need(
         attestation=attestation,
         goal=goal,
         release=release,
+        expects=expects,
         product=product,
         not_duplicate_of=not_duplicate_of,
         not_variant_of=not_variant_of,

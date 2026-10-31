@@ -12,14 +12,20 @@ from datetime import date
 from itertools import pairwise
 
 from .adapters import (
+    AcceptAdapter,
     Adapter,
     Enumerable,
     EvalGateAdapter,
+    External,
+    GherkinAdapter,
     Inventoried,
     OutcomeAdapter,
     ProofResult,
+    PrototypeAdapter,
+    PytestAdapter,
     SourceAdapter,
     ViewsAdapter,
+    VitestAdapter,
 )
 from .dedup import similarity
 from .model import (
@@ -35,6 +41,7 @@ from .model import (
     NeedState,
     Principle,
     PrincipleState,
+    ProofKind,
     ProofState,
     Release,
     Role,
@@ -53,6 +60,23 @@ from .views import unreachable as unreachable_count
 #: payload is another need id. Resolved by the :class:`Resolver` itself, not a config adapter,
 #: so it never appears in ``[proofs.*]``; a ``[proofs.need]`` block would be shadowed by this.
 _NEEDREF = "need"
+
+
+def proof_kind(adapter: Adapter) -> ProofKind | None:
+    """The :class:`ProofKind` an adapter resolves, or None for kinds with no named group (#78)."""
+    if isinstance(adapter, External):
+        return proof_kind(adapter.inner)
+    if isinstance(adapter, GherkinAdapter | PytestAdapter | VitestAdapter):
+        return ProofKind.TEST
+    if isinstance(adapter, EvalGateAdapter):
+        return ProofKind.EVAL
+    if isinstance(adapter, OutcomeAdapter):
+        return ProofKind.OBSERVED
+    if isinstance(adapter, AcceptAdapter):
+        return ProofKind.ACCEPT
+    if isinstance(adapter, PrototypeAdapter):
+        return ProofKind.PROTOTYPE
+    return None
 
 
 def _text_warnings(need: Need) -> list[str]:
@@ -453,7 +477,8 @@ class Resolver:
 
     def _resolve_leaf(self, need: Need) -> NeedResult:
         if not need.proofs:
-            return NeedResult(need, NeedState.HOLE)
+            reason = [need.expects.awaiting] if need.expects is not None else []
+            return NeedResult(need, NeedState.HOLE, detail=reason)
         results = [self._resolve_one(p) for p in need.proofs]
         detail = [
             f"{p} → {r.state.value}{'*' if r.declared else ''} ({r.detail})"
@@ -667,9 +692,16 @@ def proof_suggestions(
     adapter is left out unless named by ``kind``: a view exists, it does not prove a need (#100).
     An outcome or evalgate key rarely shares words with the need text, so when one of those is
     named by ``kind`` every key is offered, ranked by text score but not cut by ``min_score`` (#76).
+    A need with ``expects`` set looks only in adapters of that proof kind (#78).
     """
-    inventories: list[tuple[str, list[str], bool]] = [
-        (name, ad.inventory(), name == kind and isinstance(ad, (OutcomeAdapter, EvalGateAdapter)))
+    # (adapter name, its ids, offer every id uncut, the proof kind it resolves)
+    inventories: list[tuple[str, list[str], bool, ProofKind | None]] = [
+        (
+            name,
+            ad.inventory(),
+            name == kind and isinstance(ad, (OutcomeAdapter, EvalGateAdapter)),
+            proof_kind(ad),
+        )
         for name, ad in adapters.items()
         if isinstance(ad, Inventoried)
         and (name == kind if kind is not None else not isinstance(ad, ViewsAdapter))
@@ -679,7 +711,16 @@ def proof_suggestions(
         if r.state is not NeedState.HOLE or r.need.children:
             continue
         scored: list[ProofSuggestion] = []
-        for name, ids, ungated in inventories:
+        for name, ids, by_kind, pk in inventories:
+            # a need that declares what it awaits looks only in that kind of inventory (#78), and
+            # a named eval or outcome inventory is offered whole (#76)
+            if kind is None and r.need.expects is not None and pk is not r.need.expects:
+                continue
+            ungated = by_kind or (
+                kind is None
+                and r.need.expects in (ProofKind.EVAL, ProofKind.OBSERVED)
+                and pk is r.need.expects
+            )
             for inv in ids:
                 score = similarity(r.need.text, _matchable(inv))
                 if ungated or score >= min_score:

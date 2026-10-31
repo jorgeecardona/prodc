@@ -78,6 +78,32 @@ class PrincipleState(StrEnum):
     UNRESOLVED = "unresolved"  # a proof's source could not be read (e.g. sibling repo absent)
 
 
+class ProofKind(StrEnum):
+    """The kind of proof a need is expected to be delivered by (#78).
+
+    Advisory metadata on a need: it says what a HOLE is waiting for and where ``suggest`` should
+    look. It never changes how a proof resolves. Each value groups adapter kinds: ``test`` is
+    gherkin, pytest and vitest; ``eval`` is evalgate; ``observed`` is the observable-outcome
+    (``external``) adapter; ``accept`` and ``prototype`` are their own adapters.
+    """
+
+    TEST = "test"
+    EVAL = "eval"
+    OBSERVED = "observed"
+    ACCEPT = "accept"
+    PROTOTYPE = "prototype"
+
+    @property
+    def with_article(self) -> str:
+        """The kind with its article: ``an eval``, ``a test``."""
+        return f"{'an' if self.value[0] in 'aeiou' else 'a'} {self.value}"
+
+    @property
+    def awaiting(self) -> str:
+        """The HOLE reason: ``awaiting an eval``, ``awaiting a test``."""
+        return f"awaiting {self.with_article}"
+
+
 class Answer(StrEnum):
     """Which way a settled question resolved: the research board's direction axis.
 
@@ -402,6 +428,7 @@ class Need:
     attestation: Attestation | None = None  # human sign-off that the proofs establish the claim
     goal: str | None = None  # id of the Goal this need serves; None = no objective (flagged)
     release: str | None = None  # id of the Release slice this need ships in; None = unslotted
+    expects: ProofKind | None = None  # the proof kind this need is waiting for (#78); advisory
     product: bool = True  # False = infra/NFR/internal, excluded from product coverage (#48)
     draft: bool = False  # True = staged, not yet counted on the board until promoted (#60)
     draft_added: str | None = (

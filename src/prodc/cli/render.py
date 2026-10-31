@@ -603,7 +603,8 @@ def render_show(
         lines.append("  proofs:")
         lines += [f"    - {d}" for d in r.detail]
     elif not need.children:
-        lines.append("  proofs: (none, HOLE)")
+        why = f", {need.expects.awaiting}" if need.expects else ""
+        lines.append(f"  proofs: (none, HOLE{why})")
     if decisions:
         lines.append("  decisions (how it's built):")
         for d in decisions:

@@ -116,6 +116,7 @@ withdrawn or product need. No need state changes: BLOCKED belongs to the decisio
 | `tags` | flat filter labels (`status --tag X`); `lint` flags singletons, near-duplicate spellings, and a tag that names a goal/role/release/client |
 | `goal` | Goal id; absent = flagged ungoaled |
 | `release` | Release id |
+| `expects` | The proof kind this need waits for: `test` (gherkin, pytest, vitest), `eval` (evalgate), `observed` (external), `accept` or `prototype`. Advisory: a HOLE shows `awaiting an eval`, `suggest` looks only in that kind of inventory, and `lint` warns when the wired proofs are of another kind. It never changes how a proof resolves |
 | `product` | `false` = infra/NFR, listed but not counted |
 | `withdrawn` | `reason`, `date`; a decision against the need (won't-do): always off the active board and out of coverage, with the record as its trace; set with `withdraw`, cleared with `reinstate` (#74) |
 | `answer` | `yes`/`no`/`inconclusive`: which way a settled need resolved. DELIVERED = settled; `answer` is the direction. A settled-NO (a disproven hypothesis, a failed A/B test, a refuted conjecture) is DELIVERED and still counts (a result, not a gap, not `withdrawn`). Universal: a product bet and a research question use it the same way. Authored, never computed; unset = open-ended. Flagged if set while not DELIVERED |

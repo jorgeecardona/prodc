@@ -40,6 +40,7 @@ from .status import (
     last_observed,
     orphans,
     principle_report,
+    proof_kind,
     recurrence,
     release_report,
     resolve,
@@ -174,6 +175,21 @@ def _anchor_warnings(results: list[NeedResult], cfg: Config) -> None:
                 r.warnings.append(f"source anchor drifted: {why} (#57)")
 
 
+def _expects_warnings(results: list[NeedResult], cfg: Config) -> None:
+    """Warn when a need declares the proof kind it awaits but is wired to other kinds (#78)."""
+    for r in results:
+        want = r.need.expects
+        if want is None or not r.need.proofs:
+            continue
+        names = [p.partition(":")[0] for p in r.need.proofs]
+        kinds = {proof_kind(cfg.adapters[n]) for n in names if n in cfg.adapters}
+        if want not in kinds:
+            wired = ", ".join(sorted({n for n in names}))
+            r.warnings.append(
+                f"expects {want.with_article} proof, but its proofs resolve through: {wired} (#78)"
+            )
+
+
 def annotate_need_warnings(results: list[NeedResult], needs: list[Need], cfg: Config) -> None:
     """Append every per-need hygiene warning, in one fixed order (#81).
 
@@ -190,6 +206,7 @@ def annotate_need_warnings(results: list[NeedResult], needs: list[Need], cfg: Co
     _draft_age_warnings(results, cfg)
     _declared_only_warnings(results)
     _anchor_warnings(results, cfg)
+    _expects_warnings(results, cfg)
 
 
 def warrant(need: Need) -> str:
@@ -277,6 +294,7 @@ def need_payload(r: NeedResult, *, flavor: Literal["board", "html"] = "board") -
             "goal": need.goal,
             "release": need.release,
             "claim": need.claim,
+            "expects": need.expects.value if need.expects else None,
             "answer": need.answer.value if need.answer else None,
             "withdrawn": (
                 {
@@ -349,6 +367,7 @@ def need_payload(r: NeedResult, *, flavor: Literal["board", "html"] = "board") -
         ),
         "confidence": r.confidence.value if r.confidence else None,
         "confidence_detail": list(r.confidence_detail),
+        "expects": need.expects.value if need.expects else None,
         "answer": need.answer.value if need.answer else None,
         "withdrawn": (
             {
