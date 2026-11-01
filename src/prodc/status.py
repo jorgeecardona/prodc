@@ -220,37 +220,49 @@ def _outcome_warnings(need: Need, result: NeedResult) -> list[str]:
     return out
 
 
-def _path_warnings(need: Need, result: NeedResult) -> list[str]:
-    """Flag a click budget with no test to enforce it, or a path proof that does not pass (#99)."""
+def _path_warnings(need: Need, result: NeedResult, budget_measured: bool = False) -> list[str]:
+    """Flag a click budget with no test to enforce it, or a path proof that does not pass (#99).
+
+    A budget the view links already measured (``budget_measured``) needs no test of its own (#108).
+    """
     path = need.path
     if path is None or path.max_clicks is None:
         return []
     if path.proof is None:
+        if budget_measured:
+            return []
         return [f"path budget of {path.max_clicks} click(s) has no proof (#99)"]
     if result.path_state is not ProofState.DELIVERED and result.path_state is not None:
         return [f"path proof '{path.proof}' is {result.path_state.value.upper()} (#99)"]
     return []
 
 
-def _path_view_warnings(need: Need, adapters: dict[str, Adapter]) -> list[str]:
-    """Flag a path start or outcome that is not a view, when a ``views`` adapter exists (#101).
+def _path_view_warnings(need: Need, adapters: dict[str, Adapter]) -> tuple[list[str], bool]:
+    """Check a path against the view inventory: ``(warnings, budget_measured)`` (#101, #105, #108).
 
     A value is ``client:id`` or a bare id; a bare id means the only client when there is one.
     An outcome that is a proof locator of a configured adapter (a test id) is not a view and
-    is not checked. Silent when no ``views`` adapter is configured.
+    is not checked. A name can be both a proof adapter and a view client (``web``): the outcome
+    is a view when a view fits it, and a test locator otherwise. Silent when no ``views`` adapter
+    is configured. ``budget_measured`` is True when the links gave ``max_clicks`` a real count.
     """
     path = need.path
     views = [a for a in adapters.values() if isinstance(a, ViewsAdapter)]
     if path is None or not views:
-        return []
+        return [], False
     clients = _view_clients(views)
     out: list[str] = []
     found: dict[str, set[str]] = {}
     for label, value in (("start", path.start), ("outcome", path.outcome)):
         prefix, sep, _ = value.partition(":")
-        if label == "outcome" and sep and prefix in adapters:
-            continue
         payload = _view_payload(value, clients)
+        if (
+            label == "outcome"
+            and sep
+            and prefix in adapters
+            and (payload is None or not any(a.covers(payload) for a in views))
+        ):
+            continue
         if payload is None:
             out.append(f"path {label} '{value}' names no client: write it as client:id (#101)")
             continue
@@ -259,9 +271,11 @@ def _path_view_warnings(need: Need, adapters: dict[str, Adapter]) -> list[str]:
             out.append(f"path {label} '{payload}' is not a view (#101)")
         else:
             found[label] = keys
+    measured = False
     if len(found) == 2:
-        out += _path_link_warnings(path, found, _inventory(views))
-    return out
+        link_warnings, measured = _path_link_warnings(path, found, _inventory(views))
+        out += link_warnings
+    return out, measured
 
 
 def _inventory(views: list[ViewsAdapter]) -> ViewInventory:
@@ -274,18 +288,19 @@ def _inventory(views: list[ViewsAdapter]) -> ViewInventory:
 
 def _path_link_warnings(
     path: NeedPath, found: dict[str, set[str]], inv: ViewInventory
-) -> list[str]:
-    """Check a path over the view links: a route must exist and fit ``max_clicks`` (#105, #108).
+) -> tuple[list[str], bool]:
+    """Check a path over the view links: ``(warnings, route found)`` (#105, #108).
 
-    Skipped when the two ends are on different clients, or the client has no links at all.
+    A route must exist and fit ``max_clicks``. Skipped when the two ends are on different clients,
+    or the client has no links at all.
     """
     start_clients = {k.partition(":")[0] for k in found["start"]}
     out_clients = {k.partition(":")[0] for k in found["outcome"]}
     if len(start_clients) != 1 or start_clients != out_clients:
-        return []
+        return [], False
     client = next(iter(start_clients))
     if not client_has_links(inv, client):
-        return []
+        return [], False
     starts = {k.partition(":")[2] for k in found["start"]}
     goals = {k.partition(":")[2] for k in found["outcome"]}
     n = view_clicks(inv, client, starts, goals)
@@ -293,13 +308,13 @@ def _path_link_warnings(
         return [
             f"path outcome '{path.outcome}' cannot be reached from start '{path.start}' "
             "over the view links (#105)"
-        ]
+        ], False
     if path.max_clicks is not None and n > path.max_clicks:
         return [
             f"path takes {n} click(s) over the view links, over the budget of "
             f"{path.max_clicks} (#108)"
-        ]
-    return []
+        ], True
+    return [], True
 
 
 def view_link_errors(adapters: dict[str, Adapter]) -> list[str]:
@@ -393,13 +408,14 @@ class Resolver:
             result.confidence, result.confidence_detail = leaf_confidence(need, result)
         if need.path is not None and need.path.proof is not None:
             result.path_state = self._resolve_one(need.path.proof).state
+        view_warnings, budget_measured = _path_view_warnings(need, self._adapters)
         result.warnings = (
             _text_warnings(need)
             + _source_warnings(need, self._source_adapters)
             + _warrant_warnings(need, result)
             + _answer_warnings(need, result)
-            + _path_warnings(need, result)
-            + _path_view_warnings(need, self._adapters)
+            + _path_warnings(need, result, budget_measured)
+            + view_warnings
             + _outcome_warnings(need, result)
             + result.warnings
         )

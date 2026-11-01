@@ -6,6 +6,9 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- `max_clicks` is now checked against the view links when a proof adapter has the same name as the
+  view client (`web` and `web:/pack`). Before, the outcome was read as a test locator and the
+  check was skipped. A `max_clicks` the links measured no longer warns "has no proof" (#108).
 - prodc reads issue files (#36). Set `[prodc].issues = ["docs/issues/*.md"]`. An issue's front
   matter `needs:` ties it to the needs it serves, and `sources:` points at the same issue in
   another system. `lint` flags an unknown need (error), an issue that serves no need, a closed

@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from prodc import views as v
-from prodc.adapters import Adapter, ViewsAdapter
+from prodc.adapters import Adapter, FilesAdapter, ViewsAdapter
 from prodc.cli import main
 from prodc.model import Need, NeedPath
 from prodc.status import resolve
@@ -155,6 +155,40 @@ def test_path_over_budget_warns(tmp_path: Path) -> None:
 def test_path_check_is_skipped_for_a_client_without_links(tmp_path: Path) -> None:
     ads = _adapters(tmp_path, {**_WEB, "links": []})
     assert _path_warnings(ads, "/", "/lost", max_clicks=1) == []
+
+
+def test_budget_is_checked_when_a_proof_adapter_has_the_clients_name(tmp_path: Path) -> None:
+    # `web` is both the view client and a proof adapter: `web:/far` is still a view (#108)
+    ads = _adapters(tmp_path)
+    ads["web"] = FilesAdapter(tmp_path)
+    assert _path_warnings(ads, "web:/", "web:/far", max_clicks=2) == [
+        "path takes 3 click(s) over the view links, over the budget of 2 (#108)"
+    ]
+
+
+def test_an_outcome_that_is_a_test_locator_is_still_not_a_view(tmp_path: Path) -> None:
+    ads = _adapters(tmp_path)
+    ads["web"] = FilesAdapter(tmp_path)
+    assert _path_warnings(ads, "web:/", "web:checkout.feature#Pay", max_clicks=1) == []
+
+
+def _all_path_warnings(ads: dict[str, Adapter], max_clicks: int, outcome: str) -> list[str]:
+    need = Need(
+        id="R-1",
+        text="x",
+        path=NeedPath(start="/", outcome=outcome, max_clicks=max_clicks),
+    )
+    (r,) = resolve([need], ads)
+    return r.warnings
+
+
+def test_a_measured_budget_needs_no_proof_but_an_unmeasured_one_does(tmp_path: Path) -> None:
+    ads = _adapters(tmp_path)
+    measured = _all_path_warnings(ads, 5, "/install")
+    assert not any("has no proof" in w for w in measured)
+    # an outcome the links cannot reach is not measured, so the missing proof still shows
+    unmeasured = _all_path_warnings(ads, 5, "/lost")
+    assert any("has no proof" in w for w in unmeasured)
 
 
 _TOML = """\
