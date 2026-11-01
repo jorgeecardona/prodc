@@ -518,6 +518,17 @@ def test_agent_prints_playbook(capsys: pytest.CaptureFixture[str]) -> None:
     assert "A need with no external evidence is an opinion" in out  # the first rule is present
 
 
+def test_agent_playbook_says_where_bugs_journeys_and_entries_go(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["agent"]) == 0
+    out = capsys.readouterr().out
+    assert "## What goes in prodc, and what does not" in out
+    assert "a bug or defect" in out and "your tracker, not prodc" in out
+    assert "A navigation journey is a `path:` on the need" in out
+    assert "A view is an entry when some need's" in out
+
+
 def test_agent_write_creates_file_and_refuses_overwrite(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

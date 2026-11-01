@@ -87,6 +87,34 @@ awaited need with its state; `status` tags the decision; `lint` warns when a dec
 committed (`draft: false`) while blocked, decided against its own research, or waits on a
 withdrawn or product need. No need state changes: BLOCKED belongs to the decision.
 
+## Where things go
+
+Decide where a thing goes before you write it.
+
+| It is | It goes | Example |
+|---|---|---|
+| something a person wants | a need (`product: true`, the default) with a source | `When an invited user opens the invite link, they can set a password` |
+| engineering work with a proof, that no user asked for | a need with `product: false` | `A transaction roll-up stays under 50 ms at 1M rows` (proof `evalgate:rollup_ms<=50`) |
+| a bug or defect | your tracker, not prodc | `the view generator drops links from shared components` |
+
+- `product: false` needs are listed as out of scope. They are never counted and never a HOLE.
+- prodc never calls a tracker. A bug lives in the tracker, and its fix is a code change.
+- A bug that breaks a delivered need shows up on its own: the proof turns PENDING or BROKEN. Fix
+  the code. Do not edit the need.
+- A bug that shows users cannot do something at all is a missing want. Write that as a need.
+- Want a test-backed claim about an engineering defect? Write one `product: false` need with a
+  proof. Do not write a need per bug.
+
+A navigation journey is a `path:` on the need for the task it serves. "From the dashboard the
+operator reaches Pack in 1 click" is `path: {start: dashboard, outcome: pack, max_clicks: 1}` on
+the need "the operator packs an order". Give the journey its own need only when no task need
+exists and people want the navigation itself.
+
+An entry (where users arrive from outside) has no flag. A view is an entry when some need's
+`path.start` names it. This holds for deep links too: an invite email, a URL a CLI prints, a store
+listing, a post-login redirect. Each one is expected to be a need with a `path:` that starts at
+that view. A route that only redirects is not a screen: leave it out of the view inventory.
+
 ## Need fields
 
 | Field | Means |
