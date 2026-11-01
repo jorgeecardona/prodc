@@ -81,7 +81,7 @@ Read first, then act, then check.
    it as `primary`. If it is your own inference, record it as an `assumption` and let it show as the
    weaker signal it is. Stage anything still half-formed with `add … --draft`. It loads but stays off the
    counted board until you promote it. `prodc review` is the triage surface: it lists the staged
-   drafts with a duplicate score, and `--promote <id>…` / `--promote-all` move them onto the board
+   drafts with a duplicate score, and `--promote <id>…` moves a need one stage up (captured, triaged, committed) and `--promote-all` commits them
    while `--drop <id>…` deletes the ones that were noise.
 4. **Find the proof.** For a HOLE need, `prodc suggest <id>` ranks candidate proofs from the test
    suite; `prodc suggest <id> --apply` writes the best one (preview with `--dry-run`).
@@ -105,7 +105,7 @@ sharing a needs file.
 | rank the backlog | `prodc plan` |
 | prep a client meeting | `prodc brief <client>` |
 | record a new need (with honest provenance) | `prodc add need <id> --text "…" --who <you> --kind assumption --file needs/<f>.yaml` |
-| triage staged drafts | `prodc review`: list them; `--promote <id>…`/`--promote-all` onto the board, `--drop <id>…` to delete |
+| triage staged drafts | `prodc review`: list them; `--promote <id>…` one stage up, `--promote-all` to committed, `--drop <id>…` to delete |
 | declare a role (the roster) | `prodc add role <id> --text "…" --file product/roles.yaml` |
 | declare a product principle (the vision, held as given) | `prodc add principle <id> --text "…" --file product/principles.yaml`: the frame that decides between clients who want opposite things; what an `out_of_scope` decision cites |
 | revise a principle (fires the re-review ripple) | `prodc revise principle <id> [--text "…"] [--date ISO]`: re-stamps `revised_at`, so every need withdrawn under it with an earlier date comes back up |

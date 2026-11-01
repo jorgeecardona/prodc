@@ -6,6 +6,11 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- A need has a capture `stage`: `captured`, `triaged` or `committed` (#77). `draft: true` is the
+  captured stage, and a need with neither is committed, so existing boards do not change. Only
+  committed needs count toward coverage. `status` lists the triaged ones apart. **Behaviour
+  change:** `review --promote` now moves a need one stage (captured to triaged, triaged to
+  committed). Use `review --promote-all` to commit everything at once.
 - `prodc attest` now requires `--verdict` (pass, concerns or fail), so a review with no conclusion
   cannot be recorded. `[lint].ai_attestation = "counts"` stops warning that an AI review is not a
   human one, for boards where a model is the reviewer. `lint` groups the unattested-proof warnings

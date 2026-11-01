@@ -45,6 +45,7 @@ _SCALAR_FIELDS = frozenset(
         "client",
         "product",
         "draft",
+        "stage",
     }
 )
 _LIST_FIELDS = frozenset({"proofs", "children", "contradicts", "tags"})

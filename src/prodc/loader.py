@@ -35,6 +35,7 @@ from .model import (
     Role,
     Source,
     SourceKind,
+    Stage,
     Verdict,
     Withdrawal,
     WithdrawalKind,
@@ -157,6 +158,25 @@ def _attestation(raw: object, where: str) -> Attestation | None:
         verdict=verdict,
         comment=_opt_str(tbl.get("comment"), f"{where}.comment"),
     )
+
+
+def _stage(raw: object, draft: bool, where: str) -> Stage:
+    """The capture stage of a need: ``stage:``, else ``captured`` for a draft, else ``committed``.
+
+    ``draft: true`` is the captured stage, so ``stage: triaged`` or ``committed`` next to it is a
+    contradiction and is rejected (#77).
+    """
+    if raw is None:
+        return Stage.CAPTURED if draft else Stage.COMMITTED
+    name = _as_str(raw, where)
+    try:
+        stage = Stage(name)
+    except ValueError:
+        stages = "|".join(s.value for s in Stage)
+        raise LoaderError(f"{where}: unknown stage {name!r} ({stages})") from None
+    if draft and stage is not Stage.CAPTURED:
+        raise LoaderError(f"{where}: draft: true means captured, not {stage.value}")
+    return stage
 
 
 def _expects(raw: object, where: str) -> ProofKind | None:
@@ -299,6 +319,8 @@ def _need(
     expects = _expects(tbl.get("expects"), f"{where}.expects")
     product = _as_bool(tbl["product"], f"{where}.product") if "product" in tbl else True
     draft = _as_bool(tbl["draft"], f"{where}.draft") if "draft" in tbl else False
+    stage = _stage(tbl.get("stage"), draft, f"{where}.stage")
+    draft = draft or stage is Stage.CAPTURED  # one definition of "staged off the board"
     draft_added = _opt_str(tbl.get("draft_added"), f"{where}.draft_added")
     withdrawn = _withdrawal(tbl.get("withdrawn"), f"{where}.withdrawn")
     answer = _answer(tbl.get("answer"), f"{where}.answer")
@@ -378,6 +400,7 @@ def _need(
         outcome=outcome,
         importance_set_at=importance_set_at,
         draft=draft,
+        stage=stage,
         draft_added=draft_added,
         withdrawn=withdrawn,
         answer=answer,

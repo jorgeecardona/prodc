@@ -362,6 +362,7 @@ def need_payload(r: NeedResult, *, flavor: Literal["board", "html"] = "board") -
         "release": need.release,
         "product": need.product,
         "draft": need.draft,
+        "stage": need.stage.value,
         "contradicts": list(need.contradicts),
         "tags": list(need.tags),
         "path": path_payload(r),

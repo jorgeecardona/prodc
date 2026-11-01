@@ -176,7 +176,8 @@ that view. A route that only redirects is not a screen: leave it out of the view
 | `not_duplicate_of` | ids confirmed *not* a duplicate; silences `dupes` / lint for that pair |
 | `importance` | positive int, refines `plan` ranking only; must be on the `[importance]` rubric when one is declared |
 | `importance_set_at` | ISO date `importance` was last set; `set importance=` stamps it, lint flags it missing or older than `[lint].importance_revisit_days` |
-| `draft` | `true` = staged: loads, but hidden and uncounted until promoted (`set <id> draft=false`); `--include-drafts` shows it |
+| `draft` | `true` = staged: loads, but hidden and uncounted until promoted (`set <id> draft=false`); `--include-drafts` shows it. Same as `stage: captured` |
+| `stage` | The capture funnel: `captured` (a raw idea, hidden), `triaged` (reviewed, listed under `status`, not counted), `committed` (counted). No `stage` and no `draft` means `committed`, so an existing board does not change. `draft: true` next to `stage: triaged` or `committed` is an error |
 | `claim` | what delivering this would establish |
 | `attestation` | `who`, `date`, `kind` human/ai, `verdict`, `comment` |
 | `tags` | flat filter labels (`status --tag X`); `lint` flags singletons, near-duplicate spellings, and a tag that names a goal/role/release/client |

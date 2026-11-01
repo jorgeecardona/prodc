@@ -28,7 +28,7 @@ from ..dedup import (
 )
 from ..issues import issue_findings
 from ..loader import LoaderError, load
-from ..model import Need, NeedResult, NeedState, PrincipleState, board_needs
+from ..model import Need, NeedResult, NeedState, PrincipleState, Stage, board_needs
 from ..report import render_markdown
 from ..report_export import export_rows, render_confluence, render_csv, render_jira
 from ..report_html import render_html
@@ -334,6 +334,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     # Draft needs (#60) are staged: kept off the counted board (and coverage, recurrence,
     # orphans) until promoted with `set <id> draft=false`, unless --include-drafts is passed.
     draft_count = sum(1 for n in needs if n.draft and not n.is_withdrawn)
+    triaged = [n for n in needs if n.stage is Stage.TRIAGED and not n.is_withdrawn]
     withdrawn_count = sum(1 for n in needs if n.is_withdrawn)
     # Break withdrawals down by kind (#74 follow-up), so "declined but valid" (out_of_scope) is
     # legible on the board apart from plain won't-do; wont_do is the implicit default, not listed.
@@ -401,6 +402,10 @@ def cmd_status(args: argparse.Namespace) -> int:
         print(summary_line(summary))
         if draft_count and not args.include_drafts:
             print(f"drafts: {draft_count} staged (hidden; --include-drafts to show) (#60)")
+        if triaged and not args.include_drafts:
+            print(f"triaged: {len(triaged)} reviewed, not committed (not counted) (#77)")
+            for n in sorted(triaged, key=lambda x: x.id):
+                print(f"  {n.id:<12} {n.text[:70]}")
         if withdrawn_count:
             extra = ", ".join(f"{c} {k}" for k, c in sorted(withdrawn_kinds.items()))
             suffix = f" ({extra})" if extra else ""
@@ -897,7 +902,7 @@ def cmd_review(args: argparse.Namespace) -> int:
         return 2
     cfg, model = loaded
     needs = list(model.needs)
-    drafts = [n for n in needs if n.draft and not n.is_withdrawn]
+    drafts = [n for n in needs if n.stage is not Stage.COMMITTED and not n.is_withdrawn]
     draft_ids = {n.id for n in drafts}
 
     drop = list(args.drop or [])
@@ -910,7 +915,7 @@ def cmd_review(args: argparse.Namespace) -> int:
     if unknown:
         print(
             f"prodc: not a staged draft: {', '.join(unknown)} "
-            "(review acts only on drafts: withdraw a real need instead)",
+            "(review acts only on captured or triaged needs: withdraw a real need instead)",
             file=sys.stderr,
         )
         return 2
@@ -921,7 +926,22 @@ def cmd_review(args: argparse.Namespace) -> int:
 
     if not promote and not drop:
         return _review_list(cfg, drafts, needs, args.json)
-    return _review_apply(cfg, promote, drop, args)
+    return _review_apply(cfg, promote, drop, args, {n.id: n.stage for n in drafts})
+
+
+def _promote(cfg: Config, nid: str, now: Stage, target: Stage, dry_run: bool) -> Edit:
+    """Move one need from ``now`` to ``target`` with validated edits (#77).
+
+    A captured need clears ``draft`` first, so the file is valid after each edit. Committed is the
+    default stage, so the ``stage`` key is written only for ``triaged``.
+    """
+    steps = ["draft=false"] if now is Stage.CAPTURED else []
+    if target is Stage.TRIAGED:
+        steps.append("stage=triaged")
+    elif now is Stage.TRIAGED:
+        steps.append("stage=committed")
+    edits = [set_field(cfg, nid, s, expect_sha=None, dry_run=dry_run) for s in steps]
+    return edits[-1]
 
 
 def _review_list(cfg: Config, drafts: list[Need], needs: list[Need], as_json: bool) -> int:
@@ -937,6 +957,7 @@ def _review_list(cfg: Config, drafts: list[Need], needs: list[Need], as_json: bo
                 "text": d.text,
                 "who": d.who,
                 "client": d.client,
+                "stage": d.stage.value,
                 "sources": [s.kind.value for s in d.sources],
                 "staged": d.draft_added,
                 "duplicate": dup,
@@ -949,7 +970,8 @@ def _review_list(cfg: Config, drafts: list[Need], needs: list[Need], as_json: bo
         who = f" ({r['who']})" if r["who"] else ""
         client = f" [{r['client']}]" if r["client"] else ""
         staged = f" (staged {r['staged']})" if r["staged"] else ""
-        print(f"{r['id']}{who}{client}{staged}: {r['text']}")
+        stage = f" [{r['stage']}]" if r["stage"] != "captured" else ""
+        print(f"{r['id']}{who}{client}{staged}{stage}: {r['text']}")
         kinds = cast("list[str]", r["sources"])
         if kinds:
             print(f"        sources: {', '.join(kinds)}")
@@ -961,9 +983,16 @@ def _review_list(cfg: Config, drafts: list[Need], needs: list[Need], as_json: bo
 
 
 def _review_apply(
-    cfg: Config, promote: list[str], drop: list[str], args: argparse.Namespace
+    cfg: Config,
+    promote: list[str],
+    drop: list[str],
+    args: argparse.Namespace,
+    stages: dict[str, Stage],
 ) -> int:
-    """Promote (`draft=false`) and/or drop (delete) the named drafts, each a validated edit (#60).
+    """Promote and/or drop (delete) the named needs, each a validated edit (#60, #77).
+
+    ``--promote`` moves a need one stage (captured to triaged, triaged to committed).
+    ``--promote-all`` moves every one to committed.
 
     Sequential and independent, like `suggest --apply`: each need is one reload-gated, single-file
     write applied in id order, and a rejection aborts with a non-zero exit (earlier writes stand).
@@ -971,7 +1000,8 @@ def _review_apply(
     applied: list[tuple[str, str, Edit]] = []  # (action, need_id, edit)
     try:
         for nid in sorted(promote):
-            edit = set_field(cfg, nid, "draft=false", expect_sha=None, dry_run=args.dry_run)
+            target = Stage.COMMITTED if args.promote_all else stages[nid].next
+            edit = _promote(cfg, nid, stages[nid], target, args.dry_run)
             applied.append(("promote", nid, edit))
         for nid in sorted(drop):
             edit = delete_need(cfg, nid, dry_run=args.dry_run)

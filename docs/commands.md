@@ -11,7 +11,7 @@ Commands take `--config prodc.toml` (default) and `--json`, except: `report` and
 | `show <id>` | One need as a citable answer (grounds, warrant, sources, proofs), or one decision (what it serves, rejected, rests on, and BLOCKED/READY on the research it `awaits`) | `prodc show N-1` |
 | `brief <client>` | Pre-meeting agenda for one client: its opinions and HOLEs, must first | `prodc brief acme` |
 | `plan` | Ranked backlog: must + state + evidence + recurrence; `importance` refines; `--revisit DAYS` lists only needs whose importance is undated or older than DAYS; `--include-drafts` | `prodc plan --json` |
-| `review` | Triage staged drafts: `--promote ID…`, `--promote-all` (except any in `--drop`), `--drop ID…` (deletes a draft, never a real need); `--dry-run` | `prodc review --promote N-9` |
+| `review` | Triage the capture funnel (captured and triaged needs): `--promote ID…` moves each one stage (captured to triaged, triaged to committed), `--promote-all` commits all of them (except any in `--drop`), `--drop ID…` (deletes a staged need, never a committed one); `--dry-run` | `prodc review --promote N-9` |
 | `diff <snapshot>` | State changes since a saved `status --json` | `prodc diff last.json` |
 | `portfolio <path>…` | Many boards, one scoreboard (+ totals footer); a path is a prodc.toml or a dir to discover boards under (prunes VCS/vendor/hidden dirs, `--max-depth` default 4) | `prodc portfolio projects/` |
 | `dupes` | Candidate duplicate need pairs by text similarity; `--threshold` overrides `[lint].duplicate_threshold` | `prodc dupes --threshold 0.7` |

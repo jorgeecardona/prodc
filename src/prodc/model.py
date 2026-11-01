@@ -78,6 +78,25 @@ class PrincipleState(StrEnum):
     UNRESOLVED = "unresolved"  # a proof's source could not be read (e.g. sibling repo absent)
 
 
+class Stage(StrEnum):
+    """Where a need is in the capture funnel: raw idea, reviewed, or accepted as work (#77).
+
+    Only ``committed`` needs count toward coverage. ``captured`` is what ``draft: true`` always
+    meant (hidden until promoted), so ``draft: true`` and ``stage: captured`` are the same stage.
+    A need with neither is ``committed``, so no existing board changes.
+    """
+
+    CAPTURED = "captured"
+    TRIAGED = "triaged"
+    COMMITTED = "committed"
+
+    @property
+    def next(self) -> Stage:
+        """The stage one promotion up the funnel; ``committed`` stays ``committed``."""
+        order = list(Stage)
+        return order[min(order.index(self) + 1, len(order) - 1)]
+
+
 class ProofKind(StrEnum):
     """The kind of proof a need is expected to be delivered by (#78).
 
@@ -431,6 +450,7 @@ class Need:
     expects: ProofKind | None = None  # the proof kind this need is waiting for (#78); advisory
     product: bool = True  # False = infra/NFR/internal, excluded from product coverage (#48)
     draft: bool = False  # True = staged, not yet counted on the board until promoted (#60)
+    stage: Stage = Stage.COMMITTED  # the capture funnel (#77); ``draft`` is the captured stage
     draft_added: str | None = (
         None  # ISO date this need was staged (#60); lets a lint age-gate it later
     )
@@ -448,6 +468,13 @@ class Need:
     tags: tuple[
         str, ...
     ] = ()  # flat, many-to-many, stateless labels: a filter axis, not a group (#80)
+
+    def __post_init__(self) -> None:
+        """Keep ``draft`` and ``stage`` one fact: ``draft`` is the captured stage (#77)."""
+        if self.draft and self.stage is Stage.COMMITTED:
+            object.__setattr__(self, "stage", Stage.CAPTURED)
+        elif self.stage is Stage.CAPTURED and not self.draft:
+            object.__setattr__(self, "draft", True)
 
     @property
     def is_variant(self) -> bool:
@@ -508,6 +535,8 @@ class Need:
             return "withdrawn"
         if self.draft:
             return "draft"
+        if self.stage is Stage.TRIAGED:
+            return "triaged"
         if not self.product:
             return "nonproduct"
         return None
@@ -523,7 +552,7 @@ def board_needs(needs: list[Need], *, include_drafts: bool) -> list[Need]:
     board-membership rule lives, shared by ``status`` and ``plan`` so the two never diverge.
     """
     kept = [n for n in needs if not n.is_withdrawn]
-    return kept if include_drafts else [n for n in kept if not n.draft]
+    return kept if include_drafts else [n for n in kept if n.stage is Stage.COMMITTED]
 
 
 #: ``status`` values that mean the work is finished. Anything else counts as open.
