@@ -12,7 +12,7 @@ import json
 from ..board import need_payload
 from ..board import warrant as _warrant
 from ..dedup import DupPair, VariantGroup
-from ..model import Decision, Goal, NeedResult, NeedState, Release, Role
+from ..model import Decision, Goal, Issue, NeedResult, NeedState, Release, Role
 from ..status import (
     DecisionReadiness,
     Handoff,
@@ -23,6 +23,21 @@ from ..status import (
     rank,
 )
 from .common import brief_open
+
+
+def issue_payload(i: Issue) -> dict[str, object]:
+    """One issue as a plain dict (#36)."""
+    return {
+        "id": i.id,
+        "title": i.title,
+        "status": i.status,
+        "closed": i.is_closed,
+        "needs": list(i.needs),
+        "sources": list(i.sources),
+        "area": i.area,
+        "fixed_in": i.fixed_in,
+        "path": i.path,
+    }
 
 
 def _decision_payload(d: Decision) -> dict[str, object]:
@@ -173,12 +188,15 @@ def decision_show_json(
     return json.dumps(payload, indent=2)
 
 
-def show_json(r: NeedResult, decisions: list[Decision] | None = None) -> str:
+def show_json(
+    r: NeedResult, decisions: list[Decision] | None = None, issues: list[Issue] | None = None
+) -> str:
     need = r.need
     payload = need_payload(r)  # the shared core, never drifts from the board
     payload.update(
         {
             "decisions": [_decision_payload(d) for d in (decisions or [])],
+            "issues": [issue_payload(i) for i in (issues or [])],
             "sources": [
                 {
                     "kind": s.kind.value,

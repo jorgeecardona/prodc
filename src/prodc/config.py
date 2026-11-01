@@ -204,6 +204,7 @@ class Config:
     # [prodc].files (+ the older alias [prodc].needs): the prodc files. Every matched file may
     # carry any noun list (needs:, goals:, roles:, principles:, decisions:, …). (#95)
     need_globs: list[str]
+    issue_globs: list[str] = field(default_factory=list[str])  # [prodc].issues: issue files (#36)
     adapters: dict[str, Adapter] = field(default_factory=dict[str, Adapter])
     source_adapters: dict[str, SourceAdapter] = field(default_factory=dict[str, SourceAdapter])
     duplicate_threshold: float = 0.8  # [lint].duplicate_threshold: dupe score to flag (#55)
@@ -288,6 +289,7 @@ class Config:
         need_globs = files + [g for g in needs if g not in files]
         if not need_globs:
             raise ConfigError("[prodc].files must list at least one glob")
+        issue_globs = _as_str_list(prodc_tbl.get("issues", []), "[prodc].issues")
 
         adapters: dict[str, Adapter] = {}
         proofs = _as_dict(raw.get("proofs", {}), "[proofs]")
@@ -399,6 +401,7 @@ class Config:
         return cls(
             root=root,
             need_globs=need_globs,
+            issue_globs=issue_globs,
             adapters=adapters,
             source_adapters=source_adapters,
             duplicate_threshold=float(dup),

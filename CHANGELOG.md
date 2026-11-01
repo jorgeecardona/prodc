@@ -6,6 +6,11 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- prodc reads issue files (#36). Set `[prodc].issues = ["docs/issues/*.md"]`. An issue's front
+  matter `needs:` ties it to the needs it serves, and `sources:` points at the same issue in
+  another system. `lint` flags an unknown need (error), an issue that serves no need, a closed
+  issue on an unproven need, an open issue whose needs are all delivered, and a broken source.
+  `prodc issues` lists them and `prodc show` lists the issues serving a need.
 - The agent playbook (`prodc agent`) and `docs/model.md` now say where things go: a product need,
   a principle, or an issue in your own tracker for engineering work and bugs. They also say a
   navigation journey is a `path:` on the task's need, and that an entry, deep links included, is a

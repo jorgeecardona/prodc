@@ -526,6 +526,29 @@ def board_needs(needs: list[Need], *, include_drafts: bool) -> list[Need]:
     return kept if include_drafts else [n for n in kept if not n.draft]
 
 
+#: ``status`` values that mean the work is finished. Anything else counts as open.
+CLOSED_STATUSES = frozenset({"done", "closed", "resolved"})
+
+
+@dataclass(frozen=True)
+class Issue:
+    """One issue file: what it serves, where else it lives, and what the file says its state is."""
+
+    id: str  # the file name without ``.md``
+    title: str
+    status: str  # as recorded: open, in-progress, blocked, done...
+    needs: tuple[str, ...]
+    sources: tuple[str, ...]
+    area: str | None
+    fixed_in: str | None
+    path: str  # relative to the project root
+
+    @property
+    def is_closed(self) -> bool:
+        """True when the recorded status is one of :data:`CLOSED_STATUSES`."""
+        return self.status.strip().lower() in CLOSED_STATUSES
+
+
 @dataclass(frozen=True)
 class Model:
     """Everything loaded from the prodc files: the nouns and their cross-references.
@@ -541,6 +564,8 @@ class Model:
     roles: tuple[Role, ...] = ()  # the roles needs' `who` play (#52)
     principles: tuple[Principle, ...] = ()  # the product vision, held as given
     decisions: tuple[Decision, ...] = ()  # the solutions chosen for needs (OST), with alternatives
+    issues: tuple[Issue, ...] = ()  # the engineering work behind needs, from [prodc].issues (#36)
+    issues_skipped: tuple[str, ...] = ()  # issue files with no front matter: not readable
     # Removed keys (0.3 `label:`, `argument:`) found and ignored. `lint` fails on any (#96).
     notices: tuple[str, ...] = ()
 

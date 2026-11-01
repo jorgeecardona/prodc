@@ -16,6 +16,7 @@ from ..board import warrant as _warrant
 from ..model import (
     Decision,
     Goal,
+    Issue,
     Need,
     NeedResult,
     NeedState,
@@ -518,6 +519,7 @@ def render_show(
     r: NeedResult,
     importance_label: str | None = None,
     decisions: list[Decision] | None = None,
+    issues: list[Issue] | None = None,
 ) -> str:
     """One need as a citable answer. Drop it into a thread."""
     need = r.need
@@ -610,8 +612,22 @@ def render_show(
         for d in decisions:
             alt = f"  (over {', '.join(d.alternatives)})" if d.alternatives else ""
             lines.append(f"    - {d.id}: {d.text}{alt}")
+    if issues:
+        lines.append("  issues (the work):")
+        lines += [f"    - {i.id} [{i.status}] {i.title}" for i in issues]
     lines += [f"  ⚠ {w}" for w in r.warnings]
     return "\n".join(lines)
+
+
+def render_issues(issues: list[Issue], by_state: dict[str, str]) -> str:
+    """The issue list: id, recorded status, the state of the needs it serves, and its title (#36)."""
+    out = [f"  {'issue':<52} {'status':<12} {'needs':<26} title"]
+    for i in issues:
+        needs = ", ".join(f"{n}:{by_state.get(n, '?')}" for n in i.needs) or "(none)"
+        flag = "" if i.needs else "  [no need]"
+        out.append(f"  {i.id[:52]:<52} {i.status:<12} {needs[:26]:<26} {i.title}{flag}")
+    out.append(f"\nissues: {len(issues)}, serving no need: {sum(1 for i in issues if not i.needs)}")
+    return "\n".join(out)
 
 
 def render_brief(

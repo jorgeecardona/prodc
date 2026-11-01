@@ -10,6 +10,9 @@ serves a product PM and a research lab head with no mode, because "When a roaste
 she can see today's orders" and "Prove that π is irrational" are the same claim under uncertainty.
 Source-hygiene warnings (about evidence, not phrasing) always run.
 
+`[prodc].issues` is an optional list of globs for issue files (for example `docs/issues/*.md`).
+See [Issues](model.md#issues). It is off until you set it.
+
 ```toml
 [prodc]
 files = ["needs/*.yaml"]

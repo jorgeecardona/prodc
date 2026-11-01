@@ -17,6 +17,7 @@ from typing import cast
 import yaml
 
 from .config import Config
+from .issues import read_issues
 from .model import (
     Answer,
     Attestation,
@@ -641,6 +642,7 @@ def load(config: Config) -> Model:
     _check_principle_scopes(acc.principles, config.principle_scopes)
     _check_flow_steps(acc.needs, config.flow_steps)
     acc.needs = _symmetrize_contradicts(acc.needs)
+    folder = read_issues(config.root, config.issue_globs)
     return Model(
         needs=tuple(acc.needs),
         goals=tuple(acc.goals),
@@ -649,6 +651,8 @@ def load(config: Config) -> Model:
         principles=tuple(acc.principles),
         decisions=tuple(acc.decisions),
         notices=tuple(acc.notices),
+        issues=folder.issues,
+        issues_skipped=folder.skipped,
     )
 
 

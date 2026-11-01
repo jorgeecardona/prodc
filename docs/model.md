@@ -87,6 +87,41 @@ awaited need with its state; `status` tags the decision; `lint` warns when a dec
 committed (`draft: false`) while blocked, decided against its own research, or waits on a
 withdrawn or product need. No need state changes: BLOCKED belongs to the decision.
 
+## Issues
+
+An issue is engineering work. prodc holds product needs and principles; an issue is a markdown file
+with YAML front matter (the format cabildo's issue tools write and check). Set
+`[prodc].issues = ["docs/issues/*.md"]` and prodc reads them. It never writes one.
+
+```yaml
+---
+title: "Export the run sheet as CSV"
+status: in-progress          # open, in-progress, blocked, done, closed, resolved
+needs: [US-1201]             # the needs this issue serves
+sources: ["gitlab:#123"]     # pointers into other systems
+---
+```
+
+| Key | Means |
+|---|---|
+| `needs` | need ids the issue serves. None means the issue has no want behind it |
+| `sources` | `<source adapter>:<payload>` pointers, checked by the adapter you configured under `[sources.<name>]` |
+| `status` | as the file says. `done`, `closed` and `resolved` mean finished; anything else is open |
+
+`prodc lint` reads the issues against the board:
+
+| Finding | Level |
+|---|---|
+| `needs` names an id that is not a need | error |
+| the issue serves no need | warning |
+| closed, but a need it serves is not DELIVERED | warning (closed but unproven) |
+| open, but every need it serves is DELIVERED | warning (proven but open) |
+| a `sources` pointer does not resolve | warning |
+| a file in the glob has no front matter | one warning for the folder |
+
+`prodc issues` lists them, and `prodc show <need>` lists the issues that serve it. A ticket's state
+never makes a need DELIVERED: only a proof does.
+
 ## Where things go
 
 Decide where a thing goes before you write it.

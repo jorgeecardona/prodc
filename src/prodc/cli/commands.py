@@ -26,6 +26,7 @@ from ..dedup import (
     tag_warnings,
     variant_suggestions,
 )
+from ..issues import issue_findings
 from ..loader import LoaderError, load
 from ..model import Need, NeedResult, NeedState, PrincipleState, board_needs
 from ..report import render_markdown
@@ -99,6 +100,7 @@ from .render import (
     render_decisions,
     render_goals,
     render_handoffs,
+    render_issues,
     render_orphans,
     render_out_of_scope,
     render_plan,
@@ -116,6 +118,7 @@ from .serialize import (
     brief_json,
     decision_show_json,
     dup_payload,
+    issue_payload,
     plan_json,
     show_json,
     to_json,
@@ -260,6 +263,18 @@ def cmd_lint(args: argparse.Namespace) -> int:
                 warnings.append(
                     (row.view.key, f"link to {lk.target} cites unknown need {lk.need} (#104)")
                 )
+    # Issues (#36): the engineering work joined to needs through `needs:` and `sources:`.
+    issue_errors, issue_warnings = issue_findings(model.issues, results, cfg.source_adapters)
+    errors += issue_errors
+    warnings += issue_warnings
+    if model.issues_skipped:
+        warnings.append(
+            (
+                "issues",
+                f"{len(model.issues_skipped)} issue file(s) have no front matter and were skipped: "
+                "run cabildo issues check (#36)",
+            )
+        )
     # Flow step hygiene (#90): once [flows].steps declares a vocabulary, grade each journey's
     # shape: never-terminal, out-of-order, mixed bare/stepped. Silent when no vocab is declared.
     warnings += flow_step_warnings(needs, cfg.flow_steps)
@@ -428,10 +443,13 @@ def cmd_show(args: argparse.Namespace) -> int:
         )
         return 0
     decisions = decisions_for(args.need_id, list(model.decisions))  # the 'how' behind this need
+    work = [i for i in model.issues if args.need_id in i.needs]  # the issues that serve it
     print(
-        show_json(r, decisions=decisions)
+        show_json(r, decisions=decisions, issues=work)
         if args.json
-        else render_show(r, cfg.importance_label(r.need.importance), decisions=decisions)
+        else render_show(
+            r, cfg.importance_label(r.need.importance), decisions=decisions, issues=work
+        )
     )
     return 0
 
@@ -1246,6 +1264,28 @@ def cmd_guide(args: argparse.Namespace) -> int:
         print(f"wrote prodc guide to {dest}")
         return 0
     print(text, end="")
+    return 0
+
+
+def cmd_issues(args: argparse.Namespace) -> int:
+    """List the issues read from ``[prodc].issues``, with the state of the needs they serve (#36)."""
+    loaded = load_or_report(args)
+    if loaded is None:
+        return 2
+    cfg, model = loaded
+    if not cfg.issue_globs:
+        print(
+            "prodc: no [prodc].issues globs in the config (for example docs/issues/*.md)",
+            file=sys.stderr,
+        )
+        return 2
+    results = resolve(list(model.needs), cfg.adapters, cfg.source_adapters)
+    by_state = {r.need.id: r.state.value.upper() for r in results}
+    issues = [i for i in model.issues if args.need is None or args.need in i.needs]
+    if args.json:
+        print(json.dumps([issue_payload(i) for i in issues], indent=2))
+    else:
+        print(render_issues(issues, by_state))
     return 0
 
 

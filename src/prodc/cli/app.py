@@ -22,6 +22,7 @@ from .commands import (
     cmd_diff,
     cmd_dupes,
     cmd_guide,
+    cmd_issues,
     cmd_lint,
     cmd_outcome,
     cmd_plan,
@@ -634,6 +635,14 @@ def main(argv: list[str] | None = None) -> int:
         help="similarity to flag (0..1); overrides [lint].duplicate_threshold",
     )
     du.set_defaults(func=cmd_dupes)
+
+    isp = sub.add_parser(
+        "issues", help="list the issue files ([prodc].issues) with the needs they serve (#36)"
+    )
+    isp.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    isp.add_argument("--json", action="store_true", help="machine-readable output")
+    isp.add_argument("--need", default=None, metavar="ID", help="only issues serving this need")
+    isp.set_defaults(func=cmd_issues)
 
     vw = sub.add_parser("views", help="list each client's views with the needs that point at them")
     vw.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
