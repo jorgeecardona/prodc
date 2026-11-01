@@ -42,17 +42,15 @@ Decide where a thing goes before you write it.
 
 | It is | It goes | Example |
 |---|---|---|
-| something a person wants | a need (`product: true`, the default) with a source | `When an invited user opens the invite link, they can set a password` |
-| engineering work with a proof, that no user asked for | a need with `product: false` | `A transaction roll-up stays under 50 ms at 1M rows` (proof `evalgate:rollup_ms<=50`) |
-| a bug or defect | your tracker, not prodc | `the view generator drops links from shared components` |
+| something a person wants | a need, with a source | `When an invited user opens the invite link, they can set a password` |
+| a rule that decides between wants | a principle | `We do not build per-client forks` |
+| engineering work or a bug | an issue in your tracker, not prodc | `the view generator drops links from shared components` |
 
-- `product: false` needs are listed as out of scope. They are never counted and never a HOLE.
-- prodc never calls a tracker. A bug lives in the tracker, and its fix is a code change.
+- prodc never calls a tracker. Engineering work and bugs are issues there.
 - A bug that breaks a delivered need shows up on its own: the proof turns PENDING or BROKEN. Fix
   the code. Do not edit the need.
 - A bug that shows users cannot do something at all is a missing want. Write that as a need.
-- Want a test-backed claim about an engineering defect? Write one `product: false` need with a
-  proof. Do not write a need per bug.
+- Do not write a need per bug or per refactor.
 
 A navigation journey is a `path:` on the need for the task it serves. "From the dashboard the
 operator reaches Pack in 1 click" is `path: {start: dashboard, outcome: pack, max_clicks: 1}` on
