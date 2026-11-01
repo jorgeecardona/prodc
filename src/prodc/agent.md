@@ -118,7 +118,7 @@ sharing a needs file.
 | propose / attach a proof for a HOLE | `prodc suggest <id> [--apply] [--dry-run]` |
 | relink a BROKEN proof (renamed test) | `prodc suggest --relink [<id>] [--apply] [--dry-run]`: proposes the nearest live inventory entry to replace the broken locator |
 | link a recurring want to a shared baseline | `prodc recurrence --suggest --apply --baseline-id <id> --file needs/<f>.yaml` |
-| record a human/AI review of the warrant | `prodc attest <id> --by <who> --date <ISO> [--ai]` |
+| record a human/AI review of the warrant | `prodc attest <id> --by <who> --date <ISO> --verdict pass|concerns|fail [--ai]` |
 | record that a green need did not move its goal | `prodc outcome <id> --not-landed --by <who> --date <ISO> [--evidence ...]` |
 | record a human acceptance pass | `prodc accept <id> --who <person> --date <ISO>` |
 | decide against a need (won't-do) | `prodc withdraw <id> --reason "…" [--kind out_of_scope\|duplicate]`: off the board + out of coverage (use `out_of_scope` for a real need that isn't this product); `prodc reinstate <id>` puts it back |

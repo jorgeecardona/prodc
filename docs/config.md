@@ -166,6 +166,7 @@ resolves to UNRESOLVED.
 | `duplicate_threshold` | text similarity in `(0, 1]` that flags a pair in `dupes`, `add`, `recurrence --suggest` and lint | `0.8` |
 | `stale_after_days` | lint warns when a need's newest `observed_at` is older than this | off |
 | `importance_revisit_days` | lint warns when `importance_set_at` is older than this | off |
+| `ai_attestation` | `"counts"` or `"warns"`: with `counts`, a review by an AI no longer warns that it is not a human review | `"warns"` |
 | `draft_max_age_days` | lint warns when a staged draft's `draft_added` is older than this, so a batch is not forgotten (triage with `prodc review`) | off |
 | `unjustified_views` | `"warn"` or `"error"`: lint reports a view no need points at | off |
 | `link_without_why` | `"warn"` or `"error"`: lint reports a view link with no `why` | off |

@@ -640,14 +640,17 @@ def attest(
 ) -> Edit:
     """Record a human or AI review that a need's proofs establish its claim (#13).
 
-    ``who`` is a person's name or a model id; ``kind`` is ``human`` or ``ai``. The verdict and
-    comment are kept on the need as the review's register. Replaces any existing attestation.
+    ``who`` is a person's name or a model id; ``kind`` is ``human`` or ``ai``. The verdict is
+    required: a review with no conclusion cannot be acted on. The verdict and comment are kept on
+    the need as the review's register. Replaces any existing attestation.
     """
     if kind not in ("human", "ai"):
         raise WriteError(f"attestation kind must be human or ai, not {kind!r}")
-    att: dict[str, object] = {"who": who, "date": date, "kind": kind}
-    if verdict is not None:
-        att["verdict"] = verdict
+    if verdict not in ("pass", "concerns", "fail"):
+        raise WriteError(
+            f"an attestation needs a verdict: pass, concerns or fail, not {verdict!r} (#87)"
+        )
+    att: dict[str, object] = {"who": who, "date": date, "kind": kind, "verdict": verdict}
     if comment is not None:
         att["comment"] = comment
     return _edit_one_need(

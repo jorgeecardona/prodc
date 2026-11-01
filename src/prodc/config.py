@@ -216,6 +216,7 @@ class Config:
     draft_max_age_days: int | None = None  # [lint].draft_max_age_days: flag stale drafts (#60)
     unjustified_views: str | None = None  # [lint].unjustified_views: "warn" | "error" (#108)
     link_without_why: str | None = None  # [lint].link_without_why: "warn" | "error" (#104)
+    ai_attestation: str = "warns"  # [lint].ai_attestation: "counts" | "warns" (#87)
     default_draft: bool = False  # [add].default_draft: ``add`` stages as draft by default (#60)
     callbacks: tuple[Callback, ...] = ()  # [[callbacks.hooks]]: lifecycle callbacks (#71)
     callback_state_file: str = ".prodc/state.json"  # [callbacks].state_file: the state ledger
@@ -354,6 +355,10 @@ class Config:
                 raise ConfigError(f'[lint].{key} must be "warn" or "error"')
             lint_levels[key] = level
 
+        ai_attestation = lint_tbl.get("ai_attestation", "warns")
+        if ai_attestation not in ("counts", "warns"):
+            raise ConfigError('[lint].ai_attestation must be "counts" or "warns"')
+
         importance_levels: dict[int, tuple[str, str]] = {}
         imp_tbl = _as_dict(raw.get("importance", {}), "[importance]")
         rows = imp_tbl.get("levels", [])
@@ -411,6 +416,7 @@ class Config:
             draft_max_age_days=draft_max_age,
             unjustified_views=lint_levels["unjustified_views"],
             link_without_why=lint_levels["link_without_why"],
+            ai_attestation=ai_attestation,
             default_draft=default_draft,
             callbacks=callbacks,
             callback_state_file=callback_state_file,

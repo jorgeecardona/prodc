@@ -37,6 +37,7 @@ from .status import (
     flow_orphan_warnings,
     goal_report,
     handoffs,
+    is_ai_attested_warning,
     last_observed,
     orphans,
     principle_report,
@@ -175,6 +176,14 @@ def _anchor_warnings(results: list[NeedResult], cfg: Config) -> None:
                 r.warnings.append(f"source anchor drifted: {why} (#57)")
 
 
+def _ai_attestation_policy(results: list[NeedResult], cfg: Config) -> None:
+    """With ``[lint].ai_attestation = "counts"``, an AI review no longer warns it is not human (#87)."""
+    if cfg.ai_attestation != "counts":
+        return
+    for r in results:
+        r.warnings[:] = [w for w in r.warnings if not is_ai_attested_warning(w)]
+
+
 def _expects_warnings(results: list[NeedResult], cfg: Config) -> None:
     """Warn when a need declares the proof kind it awaits but is wired to other kinds (#78)."""
     for r in results:
@@ -207,6 +216,7 @@ def annotate_need_warnings(results: list[NeedResult], needs: list[Need], cfg: Co
     _declared_only_warnings(results)
     _anchor_warnings(results, cfg)
     _expects_warnings(results, cfg)
+    _ai_attestation_policy(results, cfg)
 
 
 def warrant(need: Need) -> str:

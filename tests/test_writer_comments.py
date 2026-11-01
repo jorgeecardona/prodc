@@ -187,7 +187,7 @@ def test_attest_only_adds_its_lines(tmp_path: Path) -> None:
         who="claude",
         date="2026-10-16",
         kind="ai",
-        verdict=None,
+        verdict="pass",
         comment=None,
         expect_sha=None,
         dry_run=False,
@@ -199,6 +199,7 @@ def test_attest_only_adds_its_lines(tmp_path: Path) -> None:
         "      who: claude",
         "      date: '2026-10-16'",
         "      kind: ai",
+        "      verdict: pass",
     ]
     assert out.replace("\n".join(added) + "\n", "") == _STYLED
 

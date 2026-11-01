@@ -33,6 +33,7 @@ from ..report import render_markdown
 from ..report_export import export_rows, render_confluence, render_csv, render_jira
 from ..report_html import render_html
 from ..status import (
+    UNATTESTED_WARNING,
     ProofSuggestion,
     RelinkSuggestion,
     applicable_needs,
@@ -141,6 +142,32 @@ def _lint_errors(results: list[NeedResult]) -> list[str]:
     return errors
 
 
+def _group_unattested(warnings: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """Replace every unattested-proof warning with one summary line, so a new one stands out (#87).
+
+    The summary sits where the first one was. ``--strict`` and ``--all-warnings`` skip this and
+    list each need.
+    """
+    ids = [i for i, w in warnings if w == UNATTESTED_WARNING]
+    if len(ids) < 2:
+        return warnings
+    summary = (
+        "attestation",
+        f"{len(ids)} delivered needs have an unattested proof link ({', '.join(ids)}): "
+        "pass --all-warnings to list each (#87)",
+    )
+    out: list[tuple[str, str]] = []
+    placed = False
+    for item in warnings:
+        if item[1] == UNATTESTED_WARNING:
+            if not placed:
+                out.append(summary)
+                placed = True
+            continue
+        out.append(item)
+    return out
+
+
 def cmd_lint(args: argparse.Namespace) -> int:
     """Gate the board: fail on hard problems (BROKEN, must-opinion); list hygiene warnings.
 
@@ -199,6 +226,8 @@ def cmd_lint(args: argparse.Namespace) -> int:
     warnings = [
         (r.need.id, w) for r in sorted(results, key=lambda x: x.need.id) for w in r.warnings
     ] + principle_warnings
+    if not (args.all_warnings or args.strict):
+        warnings = _group_unattested(warnings)
     # Decision drift (keyed by the decision id, not a need): a decision left serving only
     # withdrawn/non-product needs is engineering with no live product reason; a decision decided
     # under a principle that was revised later comes back up (the same ripple a withdrawal gets).

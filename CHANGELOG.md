@@ -6,6 +6,10 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- `prodc attest` now requires `--verdict` (pass, concerns or fail), so a review with no conclusion
+  cannot be recorded. `[lint].ai_attestation = "counts"` stops warning that an AI review is not a
+  human one, for boards where a model is the reviewer. `lint` groups the unattested-proof warnings
+  into one line; `--all-warnings` or `--strict` lists each need (#87).
 - `max_clicks` is now checked against the view links when a proof adapter has the same name as the
   view client (`web` and `web:/pack`). Before, the outcome was read as a test locator and the
   check was skipped. A `max_clicks` the links measured no longer warns "has no proof" (#108).

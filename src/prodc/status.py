@@ -167,6 +167,17 @@ def _source_warnings(need: Need, source_adapters: dict[str, SourceAdapter]) -> l
     return out
 
 
+UNATTESTED_WARNING = "DELIVERED on an unattested proof link (warrant not reviewed) (#13)"
+_AI_ATTESTED_SUFFIX = "(AI), not a human (#13)"
+
+
+def is_ai_attested_warning(warning: str) -> bool:
+    """True for the warning that a warrant was reviewed by an AI and not a human (#13, #87)."""
+    return warning.startswith("DELIVERED, warrant reviewed by ") and warning.endswith(
+        _AI_ATTESTED_SUFFIX
+    )
+
+
 def _warrant_warnings(need: Need, result: NeedResult) -> list[str]:
     """Flag a leaf that is green on its proofs but whose link no human has attested (#13).
 
@@ -178,11 +189,11 @@ def _warrant_warnings(need: Need, result: NeedResult) -> list[str]:
         return []
     att = need.attestation
     if att is None:
-        return ["DELIVERED on an unattested proof link (warrant not reviewed) (#13)"]
+        return [UNATTESTED_WARNING]
     out: list[str] = []
     if att.kind is AttestationKind.AI:
         # an AI review is a middle rung: better than nothing, weaker than a human sign-off
-        out.append(f"DELIVERED, warrant reviewed by {att.who} (AI), not a human (#13)")
+        out.append(f"DELIVERED, warrant reviewed by {att.who} {_AI_ATTESTED_SUFFIX}")
     if att.verdict is not Verdict.PASS:
         # a recorded fail/concerns (or no verdict) must NOT read as a green warrant. The board
         # cannot lie. Only `pass` clears the review (0.4 false-green fix).

@@ -123,6 +123,11 @@ def main(argv: list[str] | None = None) -> int:
     ln.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     ln.add_argument("--json", action="store_true", help="machine-readable output")
     ln.add_argument("--strict", action="store_true", help="also fail on any hygiene warning")
+    ln.add_argument(
+        "--all-warnings",
+        action="store_true",
+        help="list every unattested-proof warning instead of one summary line (#87)",
+    )
     ln.set_defaults(func=cmd_lint)
 
     sh = sub.add_parser("show", help="show one need or decision as a citable answer")
@@ -355,7 +360,7 @@ def main(argv: list[str] | None = None) -> int:
     at.add_argument(
         "--verdict",
         choices=["pass", "concerns", "fail"],
-        default=None,
+        required=True,
         help="the reviewer's conclusion; only pass clears the warrant (anything else warns)",
     )
     at.add_argument("--comment", default=None, help="the review's feedback, kept on the record")
