@@ -48,7 +48,7 @@ _SCALAR_FIELDS = frozenset(
         "stage",
     }
 )
-_LIST_FIELDS = frozenset({"proofs", "children", "contradicts", "tags"})
+_LIST_FIELDS = frozenset({"proofs", "children", "contradicts", "tags", "terms"})
 
 # Source-kind aliases accepted on write (old names → the primary/secondary/assumption ladder),
 # normalised so new files use the current vocabulary even when an author types the old kind.

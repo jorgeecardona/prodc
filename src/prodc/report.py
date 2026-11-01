@@ -14,6 +14,7 @@ from datetime import date
 
 from .board import gather, path_summary
 from .config import Config
+from .glossary import collisions
 from .model import Model, NeedResult, NeedState
 from .status import active_decisions, group_state, state_priority
 
@@ -300,6 +301,16 @@ def render_markdown(
             over = ", ".join(a.replace("|", "\\|") for a in d.alternatives) or "none"
             rests = ", ".join(d.principles) or "none"
             out.append(f"| {d.id}: {text} | {', '.join(d.needs)} | {over} | {rests} |")
+        out.append("")
+
+    if model.glossary:
+        differing = {(c.term, c.client) for c in collisions(model.glossary)}
+        out += ["## Glossary", "", "| term | scope | meaning |", "|---|---|---|"]
+        for t in sorted(model.glossary, key=lambda x: (x.term, x.scope or "")):
+            note = " _(differs from the global meaning)_" if (t.term, t.client) in differing else ""
+            out.append(
+                f"| {t.term} | {t.scope or 'global'} | {t.text.replace('|', chr(92) + '|')}{note} |"
+            )
         out.append("")
 
     out += _open_questions(results, hide_empty=hide_empty)

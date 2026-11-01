@@ -6,6 +6,9 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- A `glossary:` says what a term means, globally or for one client (`scope: client:acme`). A need
+  lists the terms it uses in `terms:`. `lint` errors on a term with no definition for that need,
+  and warns when a client meaning differs from the global one. `report` renders the glossary (#72).
 - A need has a capture `stage`: `captured`, `triaged` or `committed` (#77). `draft: true` is the
   captured stage, and a need with neither is committed, so existing boards do not change. Only
   committed needs count toward coverage. `status` lists the triaged ones apart. **Behaviour

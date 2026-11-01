@@ -36,6 +36,7 @@ from .model import (
     Source,
     SourceKind,
     Stage,
+    Term,
     Verdict,
     Withdrawal,
     WithdrawalKind,
@@ -364,6 +365,10 @@ def _need(
         _as_str(t, f"{where}.tags[{i}]")
         for i, t in enumerate(_as_list(tbl.get("tags"), f"{where}.tags"))
     )
+    terms = tuple(
+        _as_str(t, f"{where}.terms[{i}]")
+        for i, t in enumerate(_as_list(tbl.get("terms"), f"{where}.terms"))
+    )
     if children and proofs:
         raise LoaderError(
             f"{where} ({nid}): a flow (need with children) proves its steps via the "
@@ -396,6 +401,7 @@ def _need(
         not_variant_of=not_variant_of,
         contradicts=contradicts,
         tags=tags,
+        terms=terms,
         path=path,
         outcome=outcome,
         importance_set_at=importance_set_at,
@@ -423,6 +429,21 @@ def _release(raw: object, where: str) -> Release:
     return Release(
         id=_as_str(tbl.get("id"), f"{where}.id"),
         text=_as_str(tbl.get("text"), f"{where}.text"),
+    )
+
+
+def _term(raw: object, where: str) -> Term:
+    """Parse one ``glossary:`` entry: a term, what it means, and its optional scope (#72)."""
+    tbl = _as_mapping(raw, where)
+    scope = _opt_str(tbl.get("scope"), f"{where}.scope")
+    if scope is not None and scope != "global":
+        kind, _, ident = scope.partition(":")
+        if kind != "client" or not ident:
+            raise LoaderError(f"{where}.scope: must be 'global' or 'client:<id>', not {scope!r}")
+    return Term(
+        term=_as_str(tbl.get("term"), f"{where}.term"),
+        text=_as_str(tbl.get("text"), f"{where}.text"),
+        scope=None if scope in (None, "global") else scope,
     )
 
 
@@ -509,6 +530,7 @@ class _Loaded:
     roles: list[Role] = field(default_factory=list[Role])
     principles: list[Principle] = field(default_factory=list[Principle])
     decisions: list[Decision] = field(default_factory=list[Decision])
+    glossary: list[Term] = field(default_factory=list[Term])
     notices: list[str] = field(default_factory=list[str])
 
 
@@ -609,6 +631,8 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
         decision = _decision(raw, f"{where}.decisions[{i}]")
         _unique("decision", decision.id)
         out.decisions.append(decision)
+    for i, raw in enumerate(_as_list(tbl.get("glossary"), f"{where}.glossary")):
+        out.glossary.append(_term(raw, f"{where}.glossary[{i}]"))
     if "argument" in tbl:
         # Tombstone (0.4): the GSN ``argument`` graph was removed. A notice, not an error, so the
         # writer can still edit the board while the author migrates (#96). Removed for good in 0.5.
@@ -617,6 +641,17 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
             "need.claim, prove it with proofs, and review it with `prodc attest`"
         )
     return out
+
+
+def _check_glossary(glossary: list[Term]) -> None:
+    """A term has one entry per scope: a second one for the same scope is a typo you own (#72)."""
+    seen: set[tuple[str, str | None]] = set()
+    for t in glossary:
+        key = (t.term, t.scope)
+        if key in seen:
+            where = t.scope or "global"
+            raise LoaderError(f"duplicate glossary entry for term {t.term!r} in scope {where}")
+        seen.add(key)
 
 
 def load(config: Config) -> Model:
@@ -646,6 +681,7 @@ def load(config: Config) -> Model:
         acc.roles.extend(f.roles)
         acc.principles.extend(f.principles)
         acc.decisions.extend(f.decisions)
+        acc.glossary.extend(f.glossary)
         acc.notices.extend(f.notices)
     _check_variants(acc.needs)
     _check_children(acc.needs)
@@ -665,6 +701,7 @@ def load(config: Config) -> Model:
     _check_principle_scopes(acc.principles, config.principle_scopes)
     _check_flow_steps(acc.needs, config.flow_steps)
     acc.needs = _symmetrize_contradicts(acc.needs)
+    _check_glossary(acc.glossary)
     folder = read_issues(config.root, config.issue_globs)
     return Model(
         needs=tuple(acc.needs),
@@ -673,6 +710,7 @@ def load(config: Config) -> Model:
         roles=tuple(acc.roles),
         principles=tuple(acc.principles),
         decisions=tuple(acc.decisions),
+        glossary=tuple(acc.glossary),
         notices=tuple(acc.notices),
         issues=folder.issues,
         issues_skipped=folder.skipped,

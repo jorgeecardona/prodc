@@ -26,6 +26,7 @@ from ..dedup import (
     tag_warnings,
     variant_suggestions,
 )
+from ..glossary import glossary_findings
 from ..issues import issue_findings
 from ..loader import LoaderError, load
 from ..model import Need, NeedResult, NeedState, PrincipleState, Stage, board_needs
@@ -304,6 +305,11 @@ def cmd_lint(args: argparse.Namespace) -> int:
                 "run cabildo issues check (#36)",
             )
         )
+    # Glossary (#72): every listed term is defined for the need's client, and a term does not mean
+    # two things between its global and a client definition.
+    term_errors, term_warnings = glossary_findings(model.glossary, needs)
+    errors += term_errors
+    warnings += term_warnings
     # Flow step hygiene (#90): once [flows].steps declares a vocabulary, grade each journey's
     # shape: never-terminal, out-of-order, mixed bare/stepped. Silent when no vocab is declared.
     warnings += flow_step_warnings(needs, cfg.flow_steps)

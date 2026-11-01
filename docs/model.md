@@ -87,6 +87,34 @@ awaited need with its state; `status` tags the decision; `lint` warns when a dec
 committed (`draft: false`) while blocked, decided against its own research, or waits on a
 withdrawn or product need. No need state changes: BLOCKED belongs to the decision.
 
+## Glossary
+
+The same word can mean different things in different places. A `glossary:` list (in any prodc
+file) says what a term means, globally or for one client.
+
+```yaml
+glossary:
+  - term: risk
+    text: the chance a roast batch is lost
+  - term: risk
+    text: the chance an order ships late
+    scope: client:acme          # absent or "global" = every need
+needs:
+  - id: N-1
+    text: When a roaster plans a day, they can see the risk
+    client: acme
+    terms: [risk]               # the terms this need uses
+```
+
+- A need lists the terms it uses in `terms`. prodc never looks for terms in need text.
+- A term has one entry per scope. Two entries for the same term and scope fail to load.
+- For a need of client `acme`, the `client:acme` entry is its meaning; otherwise the global one.
+- `lint` errors when a need lists a term that has no definition for it.
+- `lint` warns when a term has a global meaning and a different one for a client. Spelling and
+  spacing differences do not count.
+- `report` has a Glossary section, and marks a client meaning that differs from the global one.
+- Scopes are `global` and `client:<id>` only.
+
 ## Issues
 
 An issue is engineering work. prodc holds product needs and principles; an issue is a markdown file
@@ -180,6 +208,7 @@ that view. A route that only redirects is not a screen: leave it out of the view
 | `stage` | The capture funnel: `captured` (a raw idea, hidden), `triaged` (reviewed, listed under `status`, not counted), `committed` (counted). No `stage` and no `draft` means `committed`, so an existing board does not change. `draft: true` next to `stage: triaged` or `committed` is an error |
 | `claim` | what delivering this would establish |
 | `attestation` | `who`, `date`, `kind` human/ai, `verdict`, `comment` |
+| `terms` | glossary terms this need uses (see Glossary). Each must be defined for the need's client |
 | `tags` | flat filter labels (`status --tag X`); `lint` flags singletons, near-duplicate spellings, and a tag that names a goal/role/release/client |
 | `goal` | Goal id; absent = flagged ungoaled |
 | `release` | Release id |

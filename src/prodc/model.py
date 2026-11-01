@@ -468,6 +468,7 @@ class Need:
     tags: tuple[
         str, ...
     ] = ()  # flat, many-to-many, stateless labels: a filter axis, not a group (#80)
+    terms: tuple[str, ...] = ()  # glossary terms this need uses (#72); each must be defined
 
     def __post_init__(self) -> None:
         """Keep ``draft`` and ``stage`` one fact: ``draft`` is the captured stage (#77)."""
@@ -579,6 +580,26 @@ class Issue:
 
 
 @dataclass(frozen=True)
+class Term:
+    """What a word means here, globally or for one client (#72).
+
+    The same word can mean different things in different places ("risk" for one client is not
+    "risk" for the next). An entry names the term, says what it means, and says where: ``scope`` is
+    ``None`` for every need, or ``client:<id>`` for the needs of that client. A need lists the terms
+    it uses in ``terms``. prodc never looks for terms in need text: a listed term is a claim.
+    """
+
+    term: str
+    text: str
+    scope: str | None = None  # None = global; "client:<id>" = that client's needs only
+
+    @property
+    def client(self) -> str | None:
+        """The client id of a ``client:<id>`` scope, else None."""
+        return self.scope.partition(":")[2] if self.scope else None
+
+
+@dataclass(frozen=True)
 class Model:
     """Everything loaded from the prodc files: the nouns and their cross-references.
 
@@ -593,6 +614,7 @@ class Model:
     roles: tuple[Role, ...] = ()  # the roles needs' `who` play (#52)
     principles: tuple[Principle, ...] = ()  # the product vision, held as given
     decisions: tuple[Decision, ...] = ()  # the solutions chosen for needs (OST), with alternatives
+    glossary: tuple[Term, ...] = ()  # what each term means, globally or per client (#72)
     issues: tuple[Issue, ...] = ()  # the engineering work behind needs, from [prodc].issues (#36)
     issues_skipped: tuple[str, ...] = ()  # issue files with no front matter: not readable
     # Removed keys (0.3 `label:`, `argument:`) found and ignored. `lint` fails on any (#96).
