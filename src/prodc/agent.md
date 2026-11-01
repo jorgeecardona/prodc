@@ -51,9 +51,11 @@ Decide where a thing goes before you write it.
   the code. Do not edit the need.
 - A bug that shows users cannot do something at all is a missing want. Write that as a need.
 - Do not write a need per bug or per refactor.
-- An issue that records the want behind a need is that need's source: put the issue in the source
-  `locator` (`#123` with a `gitlab` source, or a `docs/issues/*.md#heading` with a `frontmatter`
-  source) and prodc checks it exists. An issue that is purely engineering has no link at all.
+- Aim for every issue to trace to a need. An issue that records the want behind a need is that
+  need's source: put the issue in the source `locator` (`#123` with a `gitlab` source, or a
+  `docs/issues/*.md#heading` with a `frontmatter` source) and prodc checks it exists.
+- An issue with no need behind it is a smell. Either a want is missing (write the need) or the
+  work does not earn its place. Do not leave it as a free-standing engineering issue.
 
 A navigation journey is a `path:` on the need for the task it serves. "From the dashboard the
 operator reaches Pack in 1 click" is `path: {start: dashboard, outcome: pack, max_clicks: 1}` on
