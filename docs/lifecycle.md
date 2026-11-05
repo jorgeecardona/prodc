@@ -10,6 +10,24 @@ A need moves through states as evidence arrives. Two things anchor this page:
   Habits* (see [Grounding (Torres)](grounding-torres.md)). Transitions with no PM-literature source
   are flagged as prodc's own: they track delivery integrity, which a discovery-only model omits.
 
+## Capture stages
+
+A need has a capture `stage` (#77). Only `committed` needs count toward coverage.
+
+| Stage | Meaning | Shown by `status` |
+|---|---|---|
+| `captured` | a raw idea, same as `draft: true` | hidden, shown with `--include-drafts` |
+| `triaged` | reviewed, not committed | listed apart, not counted |
+| `committed` | accepted as work, the default with no `stage` and no `draft` | on the board, counted |
+
+Move a need with `prodc review`:
+
+- `--promote ID` moves it one stage: `captured` to `triaged`, or `triaged` to `committed`.
+- `--promote-all` moves every staged need to `committed`, except any named in `--drop`.
+- `--drop ID` deletes it.
+
+The stages are separate from the leaf states below, which are resolved from sources and proofs.
+
 ## Leaf states
 
 A leaf need (no children) is resolved from its proofs.
