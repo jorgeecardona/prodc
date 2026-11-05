@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import cast
 
 from .adapters import (
+    PYTEST_PATHS,
+    VITEST_PATHS,
     AcceptAdapter,
     Adapter,
     CitationAdapter,
@@ -144,6 +146,16 @@ def _gherkin(c: _Spec) -> Adapter:
     )
 
 
+def _pytest(c: _Spec) -> Adapter:
+    paths = _as_str_list(c.tbl.get("paths", list(PYTEST_PATHS)), f"[proofs.{c.name}].paths")
+    return PytestAdapter(root=_sub_root(c), results=c.results, paths=paths)
+
+
+def _vitest(c: _Spec) -> Adapter:
+    paths = _as_str_list(c.tbl.get("paths", list(VITEST_PATHS)), f"[proofs.{c.name}].paths")
+    return VitestAdapter(root=_sub_root(c), results=c.results, paths=paths)
+
+
 def _playwright(c: _Spec) -> Adapter:
     where = f"[proofs.{c.name}]"
     paths = _as_str_list(
@@ -161,8 +173,8 @@ def _command_proof(c: _Spec) -> Adapter:
 # cannot drift from the supported set (#83). `External` wrapping is applied once, by the loader.
 _PROOF_BUILDERS: dict[str, Callable[[_Spec], Adapter]] = {
     "gherkin": _gherkin,
-    "pytest": lambda c: PytestAdapter(root=_sub_root(c), results=c.results),
-    "vitest": lambda c: VitestAdapter(root=_sub_root(c), results=c.results),
+    "pytest": _pytest,
+    "vitest": _vitest,
     "playwright": _playwright,
     "playwright-ct": _playwright,  # the same adapter; component tests are Playwright tests (#112)
     "files": lambda c: FilesAdapter(root=_sub_root(c)),

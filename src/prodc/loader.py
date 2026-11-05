@@ -8,8 +8,9 @@ IDs are globally unique (children reference ids across files), so a duplicate is
 from __future__ import annotations
 
 import datetime
+import difflib
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import cast
@@ -298,11 +299,8 @@ def _need(
     file_who: str | None,
     file_client: str | None,
     file_role: str | None = None,
-    notices: list[str] | None = None,
 ) -> Need:
     tbl = _as_mapping(raw, where)
-    if "label" in tbl and notices is not None:
-        notices.append(_label_notice(where, tbl.get("who") or file_who, tbl["label"]))
     nid = _as_str(tbl.get("id"), f"{where}.id")
     text = _as_str(tbl.get("text"), f"{where}.text")
     description = _opt_str(tbl.get("description"), f"{where}.description")
@@ -534,22 +532,69 @@ class _Loaded:
     notices: list[str] = field(default_factory=list[str])
 
 
-def _label_notice(where: str, who: object, label: object) -> str:
-    """The 0.3 ``label:`` tombstone as a notice that shows the exact 0.4 YAML to write (#96).
+@dataclass(frozen=True)
+class _Shape:
+    """The keys one YAML mapping may carry, and the shape of the mappings nested under them."""
 
-    A notice, not a :class:`LoaderError`: a load failure would also block every write, so the
-    board could not be fixed with ``prodc add role``. ``lint`` still exits 1 on it. The value
-    stays in the file (the writer never touches it); only the model ignores it.
+    keys: frozenset[str]
+    nested: Mapping[str, _Shape] = field(default_factory=dict[str, "_Shape"])
+
+
+def _shape(keys: str, **nested: _Shape) -> _Shape:
+    return _Shape(frozenset(keys.split()) | frozenset(nested), nested)
+
+
+_SOURCE_SHAPE = _shape("kind who role date quote locator observed_at anchor")
+_WITHDRAWAL_SHAPE = _shape("reason date kind principle of")
+_FILE_SHAPE = _shape(
+    "who client role",
+    needs=_shape(
+        "id text description must who role client variant_of importance importance_set_at claim "
+        "goal release expects product draft stage draft_added answer proofs seam "
+        "not_duplicate_of not_variant_of contradicts tags terms",
+        sources=_SOURCE_SHAPE,
+        children=_shape("id step"),
+        attestation=_shape("who date kind verdict comment"),
+        withdrawn=_WITHDRAWAL_SHAPE,
+        path=_shape("start outcome max_clicks proof"),
+        outcome=_shape("landed date who evidence"),
+    ),
+    goals=_shape("id text metric description target"),
+    releases=_shape("id text"),
+    roles=_shape("id text"),
+    principles=_shape(
+        "id text scope revised_at implemented_in proofs",
+        sources=_SOURCE_SHAPE,
+    ),
+    decisions=_shape(
+        "id text needs alternatives consequences principles decided_at draft awaits",
+        withdrawn=_WITHDRAWAL_SHAPE,
+    ),
+    glossary=_shape("term text scope"),
+)
+
+
+def _unknown_keys(raw: object, shape: _Shape, where: str) -> list[str]:
+    """A notice for each key ``shape`` does not list, so a typo or a removed key is not lost.
+
+    A notice, not a :class:`LoaderError`: a load failure would also block every write, so the board
+    could not be fixed through the CLI (#96). ``lint`` exits 1 on it. The value stays in the file.
     """
-    rid = who if isinstance(who, str) and who else "<role-id>"
-    text = str(label)[:80]
-    return (
-        f"{where}: 'label' was removed in 0.4 and is ignored. Write it as a role:\n"
-        f"    roles:\n      - id: {rid}\n        text: {text}\n"
-        f"  then bind the needs with `role: {rid}` (per need, or once at the top of the file)"
-        " and delete `label:`.\n"
-        f'  Or: prodc add role {rid} --text "{text}" --file <file>'
-    )
+    if isinstance(raw, list):
+        items = cast("list[object]", raw)
+        return [n for i, x in enumerate(items) for n in _unknown_keys(x, shape, f"{where}[{i}]")]
+    if not isinstance(raw, dict):
+        return []  # a bare child id, or a wrong type the noun parsers already refused
+    tbl = cast("dict[object, object]", raw)
+    out: list[str] = []
+    for key, value in tbl.items():
+        if key not in shape.keys:
+            close = difflib.get_close_matches(str(key), sorted(shape.keys), n=1, cutoff=0.8)
+            hint = f" (did you mean '{close[0]}'?)" if close else ""
+            out.append(f"{where}: unknown key '{key}' is ignored{hint}")
+        elif isinstance(key, str) and key in shape.nested:
+            out += _unknown_keys(value, shape.nested[key], f"{where}.{key}")
+    return out
 
 
 def yaml_error_message(where: str, text: str, exc: yaml.YAMLError) -> str:
@@ -598,8 +643,6 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
     file_client = _opt_str(tbl.get("client"), f"{where}.client")
     # A file may name one role for all its needs, like `who`/`client` (#96); validated at load.
     file_role = _opt_str(tbl.get("role"), f"{where}.role")
-    if "label" in tbl:
-        out.notices.append(_label_notice(where, file_who, tbl["label"]))
 
     def _unique(kind: str, nid: str) -> None:
         prior = seen[kind].get(nid)
@@ -608,7 +651,7 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
         seen[kind][nid] = path
 
     for i, raw in enumerate(_as_list(tbl.get("needs"), f"{where}.needs")):
-        need = _need(raw, f"{where}.needs[{i}]", file_who, file_client, file_role, out.notices)
+        need = _need(raw, f"{where}.needs[{i}]", file_who, file_client, file_role)
         _unique("need", need.id)
         out.needs.append(need)
     for i, raw in enumerate(_as_list(tbl.get("goals"), f"{where}.goals")):
@@ -633,13 +676,7 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
         out.decisions.append(decision)
     for i, raw in enumerate(_as_list(tbl.get("glossary"), f"{where}.glossary")):
         out.glossary.append(_term(raw, f"{where}.glossary[{i}]"))
-    if "argument" in tbl:
-        # Tombstone (0.4): the GSN ``argument`` graph was removed. A notice, not an error, so the
-        # writer can still edit the board while the author migrates (#96). Removed for good in 0.5.
-        out.notices.append(
-            f"{where}: 'argument:' was removed in 0.4 and is ignored. State the warrant as "
-            "need.claim, prove it with proofs, and review it with `prodc attest`"
-        )
+    out.notices.extend(_unknown_keys(tbl, _FILE_SHAPE, where))
     return out
 
 

@@ -29,7 +29,7 @@ from ..dedup import (
 from ..glossary import glossary_findings
 from ..issues import issue_findings
 from ..loader import LoaderError, load
-from ..model import Need, NeedResult, NeedState, PrincipleState, Stage, board_needs
+from ..model import Decision, Need, NeedResult, NeedState, PrincipleState, Stage, board_needs
 from ..report import render_markdown
 from ..report_export import export_rows, render_confluence, render_csv, render_jira
 from ..report_html import render_html
@@ -37,6 +37,7 @@ from ..status import (
     UNATTESTED_WARNING,
     ProofSuggestion,
     RelinkSuggestion,
+    active_decisions,
     applicable_needs,
     awaits_warnings,
     contradictions,
@@ -128,17 +129,23 @@ from .serialize import (
 )
 
 
-def _lint_errors(results: list[NeedResult]) -> list[str]:
-    """Hard problems a lint gate fails on: a dangling proof, or a must-have with no evidence."""
+def _lint_errors(results: list[NeedResult], decisions: list[Decision]) -> list[str]:
+    """Hard problems a lint gate fails on: a dangling proof, or a must-have nothing grounds.
+
+    An active decision grounds a must-have here, because it records the commitment. It does not
+    make the need evidenced: ``is_opinion`` stays true, so the need still reads WEAK (#86).
+    """
     errors: list[str] = []
+    decided = {nid for d in active_decisions(decisions) for nid in d.needs}
     for r in sorted(results, key=lambda x: x.need.id):
         if r.state is NeedState.BROKEN:
             errors.append(f"{r.need.id}: BROKEN proof: {'; '.join(r.detail)}")
-        if r.need.must and r.need.is_opinion:
+        if r.need.must and r.need.is_opinion and r.need.id not in decided:
             has = "only an assumption" if r.need.only_assumption else "no source"
             errors.append(
                 f"{r.need.id}: must-have is an opinion ({has}, no external evidence): add a "
-                "secondary or primary source that records why it is wanted, or lower must (#86)"
+                "secondary or primary source that records why it is wanted, record the decision "
+                "that commits to it, or lower must (#86)"
             )
     return errors
 
@@ -222,8 +229,8 @@ def cmd_lint(args: argparse.Namespace) -> int:
                     f"unresolved contradiction with {far.id}: both live, the vision has not "
                     "decided yet (withdraw one out_of_scope citing the principle, or reconcile)"
                 )
-    errors = _lint_errors(results) + principle_errors
-    errors += [f"TOMBSTONE {n}" for n in model.notices]  # a removed key still in a file (#96)
+    errors = _lint_errors(results, list(model.decisions)) + principle_errors
+    errors += list(model.notices)  # an unknown key, which the load ignored (#96)
     warnings = [
         (r.need.id, w) for r in sorted(results, key=lambda x: x.need.id) for w in r.warnings
     ] + principle_warnings

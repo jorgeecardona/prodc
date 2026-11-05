@@ -127,10 +127,9 @@ def test_label_is_a_lint_failure_not_a_load_error(
     cfg = str(tmp_path / "prodc.toml")
     assert main(["status", "--config", cfg]) == 0
     err = capsys.readouterr().err
-    assert "'label' was removed in 0.4 and is ignored" in err
-    assert "- id: jordan" in err and "text: design partner" in err
+    assert "unknown key 'label' is ignored" in err
     assert main(["lint", "--config", cfg]) == 1
-    assert "TOMBSTONE" in capsys.readouterr().out
+    assert "unknown key 'label' is ignored" in capsys.readouterr().out
 
 
 def test_writes_work_on_a_board_with_label(tmp_path: Path) -> None:

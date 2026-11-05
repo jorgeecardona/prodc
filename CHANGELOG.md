@@ -2,6 +2,31 @@
 
 All notable changes are documented here. Versioning is [SemVer](https://semver.org/).
 
+## [0.5.0] - 2026-11-05
+
+### Breaking
+
+- `lint` now exits 1 on any key prodc does not know, in any need, source, decision or other noun.
+  Before, most unknown keys were dropped with no message. The board still loads and writes still
+  work; `status` prints the same message. A close match gets a hint: `unknown key 'proof' is
+  ignored (did you mean 'proofs'?)`.
+- `label:` and `argument:` no longer have their own messages. They are now reported as unknown keys.
+
+### Migrate
+
+1. Run `prodc lint` and read each `unknown key` line.
+2. Fix a typo, or delete the key. Its value was never read, so deleting it changes nothing.
+3. For `label:`, declare a role with `prodc add role <id> --text "<label>" --file <file>`, then set
+   `role: <id>`.
+4. For `argument:`, state the warrant as `claim:` on the need, and review it with `prodc attest`.
+
+### Added
+
+- An active `decision` that serves a must-have now passes the lint gate when the need has no
+  evidence. A draft or withdrawn decision does not. The need still reads WEAK (#86).
+- `suggest` and `suggest --relink` now find `pytest` and `vitest` tests. Set `paths` on the proof
+  to change which files are read.
+
 ## [0.4.x]
 
 Patch releases on the 0.4 line. Highlights, newest first:

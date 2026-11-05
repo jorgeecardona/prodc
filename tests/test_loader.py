@@ -40,14 +40,14 @@ def test_file_level_who_defaults_each_need(tmp_path: Path) -> None:
     assert needs["J-2"].who == "jane"  # per-need override wins
 
 
-def test_label_key_is_a_removed_tombstone(tmp_path: Path) -> None:
+def test_old_label_key_is_an_unknown_key(tmp_path: Path) -> None:
     cfg = _config(
         tmp_path,
         ("a.yaml", 'needs:\n  - id: N-1\n    text: t\n    label: "design partner"\n'),
     )
     # A notice, not a LoaderError: a load failure would block the writes that fix it (#96).
     (notice,) = load(cfg).notices
-    assert "'label' was removed in 0.4 and is ignored" in notice
+    assert notice == "a.yaml.needs[0]: unknown key 'label' is ignored"
 
 
 def test_source_kind_defaults_to_internal(tmp_path: Path) -> None:
@@ -349,15 +349,14 @@ def test_need_release_unknown_raises(tmp_path: Path) -> None:
         load_needs(cfg)
 
 
-def test_argument_key_is_a_removed_tombstone(tmp_path: Path) -> None:
-    # The GSN argument graph was cut in 0.4. The key is ignored with a notice saying what
-    # replaced it (lint fails on it), not a load error that would block writes (#96).
+def test_old_argument_key_is_an_unknown_key(tmp_path: Path) -> None:
+    # A notice (lint fails on it), not a load error that would block writes (#96).
     cfg = _config(
         tmp_path,
         ("a.yaml", "argument:\n  - id: C-1\n    kind: claim\n    text: t\n"),
     )
     (notice,) = load(cfg).notices
-    assert "'argument:' was removed in 0.4 and is ignored" in notice
+    assert notice == "a.yaml: unknown key 'argument' is ignored"
 
 
 def test_product_flag_defaults_true_and_parses(tmp_path: Path) -> None:
@@ -438,3 +437,36 @@ def test_unquoted_colon_in_claim_names_the_need_and_the_fix(tmp_path: Path) -> N
     assert "N-5" in msg  # the offending need, not just a line/column
     assert "line 4" in msg
     assert "quote the value" in msg  # the actionable hint
+
+
+def test_unknown_keys_are_reported_at_every_level_with_a_hint(tmp_path: Path) -> None:
+    doc = (
+        "needs:\n"
+        "  - id: N-1\n    text: t\n    proof: [a]\n"
+        "    sources:\n      - kind: primary\n        note: n\n"
+        "    withdrawn: {reason: r, date: 2026-01-01, why: w}\n"
+        "decisions:\n  - id: D-1\n    text: d\n    needs: [N-1]\n    owner: me\n"
+    )
+    assert list(load(_config(tmp_path, ("a.yaml", doc))).notices) == [
+        "a.yaml.needs[0]: unknown key 'proof' is ignored (did you mean 'proofs'?)",
+        "a.yaml.needs[0].sources[0]: unknown key 'note' is ignored",
+        "a.yaml.needs[0].withdrawn: unknown key 'why' is ignored",
+        "a.yaml.decisions[0]: unknown key 'owner' is ignored",
+    ]
+
+
+def test_every_key_the_writer_and_docs_use_is_known(tmp_path: Path) -> None:
+    doc = (
+        "who: w\nclient: c\nrole: r\n"
+        "roles:\n  - {id: r, text: t}\n"
+        "goals:\n  - {id: G, text: t, metric: m, description: d, target: x}\n"
+        "releases:\n  - {id: R, text: t}\n"
+        "glossary:\n  - {term: a, text: t, scope: global}\n"
+        "principles:\n  - {id: P, text: t, scope: product, revised_at: 2026-01-01, "
+        "implemented_in: x, sources: [{kind: primary, who: w, role: r, date: 2026-01-01, "
+        "quote: q, locator: l, observed_at: 2026-01-01, anchor: L1}]}\n"
+        "needs:\n  - {id: N, text: t, children: [{id: M, step: s}, O]}\n"
+        "  - {id: M, text: t, path: {start: a, outcome: b, max_clicks: 1, proof: p}}\n"
+        "  - {id: O, text: t}\n"
+    )
+    assert load(_config(tmp_path, ("a.yaml", doc))).notices == ()

@@ -7,6 +7,7 @@ present; otherwise it reports a *declared* state (from tags or existence) and sa
 
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
@@ -15,7 +16,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, cast, runtime_checkable
@@ -300,13 +301,55 @@ class GherkinAdapter:
         return ProofResult(ProofState.PENDING, True, "found, untagged")
 
 
+PYTEST_PATHS = ("**/test_*.py", "**/*_test.py")
+VITEST_PATHS = ("**/*.test.ts", "**/*.test.tsx", "**/*.test.js", "**/*.test.jsx")
+_SKIPPED_DIRS = frozenset({"node_modules", ".venv", "venv", ".git"})
+
+
+def _test_files(root: Path, patterns: Sequence[str]) -> list[tuple[Path, str]]:
+    """Each file the glob ``patterns`` match under ``root`` with its text, once, in path order."""
+    found = {fp for pattern in patterns for fp in root.glob(pattern)}
+    return [
+        (fp, fp.read_text(encoding="utf-8"))
+        for fp in sorted(found)
+        if fp.is_file() and not _SKIPPED_DIRS.intersection(fp.relative_to(root).parts)
+    ]
+
+
+def _pytest_names(body: list[ast.stmt]) -> list[str]:
+    """The ``test*`` functions in ``body`` and, ``Class::``-qualified, those in ``Test*`` classes."""
+    out: list[str] = []
+    for node in body:
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            if node.name.startswith("test"):
+                out.append(node.name)
+        elif isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
+            out += [f"{node.name}::{n}" for n in _pytest_names(node.body)]
+    return out
+
+
 class PytestAdapter:
     """Resolves ``path::test_name`` by existence, upgraded by a junit report if given."""
 
-    def __init__(self, root: Path, results: str | None) -> None:
+    def __init__(
+        self, root: Path, results: str | None, paths: Sequence[str] = PYTEST_PATHS
+    ) -> None:
         self._root = root
         self._results_path = results
+        self._paths = paths
         self._results: dict[str, bool] | None = None
+
+    def inventory(self) -> list[str]:
+        """Every ``file::test`` and ``file::Class::test`` in the configured test files."""
+        out: list[str] = []
+        for fp, text in _test_files(self._root, self._paths):
+            try:
+                tree = ast.parse(text)
+            except SyntaxError:
+                continue  # a broken test file offers nothing; resolving it still reports it
+            rel = fp.relative_to(self._root).as_posix()
+            out += [f"{rel}::{n}" for n in _pytest_names(tree.body)]
+        return sorted(out)
 
     def _load_results(self) -> dict[str, bool]:
         if self._results is not None:
@@ -376,10 +419,17 @@ class VitestAdapter:
     ``classnameTemplate`` that drops the path is still matched when ``addFileAttribute`` is on.
     """
 
-    def __init__(self, root: Path, results: str | None) -> None:
+    def __init__(
+        self, root: Path, results: str | None, paths: Sequence[str] = VITEST_PATHS
+    ) -> None:
         self._root = root
         self._results_path = results
+        self._paths = paths
         self._cases: list[_JunitCase] | None = None
+
+    def inventory(self) -> list[str]:
+        """Every ``file#title`` found by an ``it("...")`` or ``test("...")`` call."""
+        return _js_inventory(self._root, self._paths, _VITEST_TEST_RE)
 
     def _load_cases(self) -> list[_JunitCase]:
         if self._cases is not None:
@@ -440,10 +490,24 @@ def _titles_missing(text: str, title: str, sep: str) -> str | None:
     return None
 
 
+def _js_inventory(root: Path, patterns: Sequence[str], test_re: re.Pattern[str]) -> list[str]:
+    """Every ``file#title`` that ``test_re`` finds; a title with ``${`` is computed, so skipped."""
+    out: set[str] = set()
+    for fp, text in _test_files(root, patterns):
+        rel = fp.relative_to(root).as_posix()
+        out |= {f"{rel}#{m['title']}" for m in test_re.finditer(text) if "${" not in m["title"]}
+    return sorted(out)
+
+
 #: A ``test("title", ...)`` call in a Playwright file. ``test.describe(...)`` does not match: the
 #: character after ``test`` (and an optional ``.only``/``.skip``/...) must be the opening paren.
 _PW_TEST_RE = re.compile(
     r"""\btest(?:\.(?:only|skip|fixme|fail|slow))?\(\s*(?P<q>["'`])(?P<title>(?:\\.|(?!(?P=q)).)*)(?P=q)"""
+)
+#: An ``it("title", ...)`` or ``test("title", ...)`` call in a vitest file. ``.each`` is not matched:
+#: its title is a template, so it names no single test.
+_VITEST_TEST_RE = re.compile(
+    r"""\b(?:it|test)(?:\.(?:only|skip|todo|fails|concurrent|sequential))?\(\s*(?P<q>["'`])(?P<title>(?:\\.|(?!(?P=q)).)*)(?P=q)"""
 )
 _PW_SEP = " \u203a "  # Playwright joins a title path with a single right-pointing angle quote
 _PW_PROJECT_RE = re.compile(r"^\[(?P<project>[^\]]+)\]\s+(?P<rest>.*)$")
@@ -503,16 +567,7 @@ class PlaywrightAdapter:
 
     def inventory(self) -> list[str]:
         """Every ``file#title`` found by a ``test("...")`` call in the configured files (#112)."""
-        out: set[str] = set()
-        for pattern in self._paths:
-            for fp in sorted(self._root.glob(pattern)):
-                if "node_modules" in fp.parts or not fp.is_file():
-                    continue
-                rel = fp.relative_to(self._root).as_posix()
-                for m in _PW_TEST_RE.finditer(fp.read_text(encoding="utf-8")):
-                    if "${" not in m.group("title"):
-                        out.add(f"{rel}#{m.group('title')}")
-        return sorted(out)
+        return _js_inventory(self._root, self._paths, _PW_TEST_RE)
 
     def resolve(self, payload: str) -> ProofResult:
         file_part, sep, title = payload.partition("#")
