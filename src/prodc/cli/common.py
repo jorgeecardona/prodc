@@ -36,7 +36,7 @@ def load_or_report(args: argparse.Namespace) -> tuple[Config, Model] | None:
         return None
     # An unknown key is ignored, not fatal, so writes can still fix the board (#96); say so on
     # every read. stderr keeps --json output clean. `lint` fails on these.
-    for notice in model.notices:
+    for notice in (*cfg.notices, *model.notices):
         print(f"prodc: {notice}", file=sys.stderr)
     return cfg, model
 

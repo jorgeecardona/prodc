@@ -50,7 +50,7 @@ def test_files_and_needs_merge_and_overlap_is_read_once(tmp_path: Path) -> None:
     # product/needs/*.yaml is matched by both keys: it must load once, not as a duplicate id.
     toml = 'files = ["product/**/*.yaml"]\nneeds = ["product/needs/*.yaml"]'
     cfg = Config.load(_project(tmp_path, toml))
-    assert cfg.need_globs == ["product/**/*.yaml", "product/needs/*.yaml"]
+    assert cfg.file_globs == ["product/**/*.yaml", "product/needs/*.yaml"]
     model = load(cfg)
     assert [n.id for n in model.needs] == ["N-1"]
     assert [d.id for d in model.decisions] == ["D-1"]

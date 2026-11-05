@@ -57,14 +57,12 @@ needs:
   - id: Q-ledger-wanted
     text: Roasters want balances derived from movements, not a stock column they edit
     claim: A roaster who sees a derived balance does not ask for a "set stock" field
-    product: false            # research, not product coverage
     tags: [research, interview]
     proofs:
       - accept:jordan@2026-10-27   # added after the interview; until then no proof = HOLE (planned)
   - id: Q-ledger-cost
     text: A transaction roll-up stays under 50 ms at 1M rows
     claim: Deriving every balance is affordable at our scale
-    product: false
     tags: [research, spike]
     proofs:
       - evalgate:rollup_ms<=50

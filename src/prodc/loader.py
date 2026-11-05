@@ -246,7 +246,7 @@ def _withdrawal(raw: object, where: str) -> Withdrawal | None:
 
 
 # Old source-kind names (pre-0.3.58) mapped to the primary/secondary/assumption ladder, so
-# existing need files keep loading. `interview` was live user contact (primary); `artifact` was a
+# existing need files keep loading, with a notice that fails lint. `interview` was live user contact (primary); `artifact` was a
 # cited document (secondary); `proxy`/`internal` were both unevidenced guesses (assumption).
 _SOURCE_KIND_ALIASES = {
     "interview": SourceKind.PRIMARY,
@@ -319,7 +319,6 @@ def _need(
     product = _as_bool(tbl["product"], f"{where}.product") if "product" in tbl else True
     draft = _as_bool(tbl["draft"], f"{where}.draft") if "draft" in tbl else False
     stage = _stage(tbl.get("stage"), draft, f"{where}.stage")
-    draft = draft or stage is Stage.CAPTURED  # one definition of "staged off the board"
     draft_added = _opt_str(tbl.get("draft_added"), f"{where}.draft_added")
     withdrawn = _withdrawal(tbl.get("withdrawn"), f"{where}.withdrawn")
     answer = _answer(tbl.get("answer"), f"{where}.answer")
@@ -403,7 +402,6 @@ def _need(
         path=path,
         outcome=outcome,
         importance_set_at=importance_set_at,
-        draft=draft,
         stage=stage,
         draft_added=draft_added,
         withdrawn=withdrawn,
@@ -597,6 +595,31 @@ def _unknown_keys(raw: object, shape: _Shape, where: str) -> list[str]:
     return out
 
 
+def _deprecated_values(tbl: Mapping[str, object], where: str) -> list[str]:
+    """A notice for each old source kind and each ``product: false``, in file order.
+
+    Both still load, so the board keeps working and ``lint`` names what to change.
+    """
+    out: list[str] = []
+    for noun in ("needs", "principles"):
+        for i, raw in enumerate(_as_list(tbl.get(noun), f"{where}.{noun}")):
+            item = _as_mapping(raw, f"{where}.{noun}[{i}]")
+            if item.get("product") is False:
+                out.append(
+                    f"{where}.{noun}[{i}]: 'product: false' is deprecated: "
+                    "file engineering work as an issue ([prodc].issues)"
+                )
+            sources = _as_list(item.get("sources"), f"{where}.{noun}[{i}].sources")
+            for j, source in enumerate(sources):
+                kind = _as_mapping(source, f"{where}.{noun}[{i}].sources[{j}]").get("kind")
+                if isinstance(kind, str) and kind in _SOURCE_KIND_ALIASES:
+                    out.append(
+                        f"{where}.{noun}[{i}].sources[{j}]: kind '{kind}' is now "
+                        f"'{_SOURCE_KIND_ALIASES[kind].value}'"
+                    )
+    return out
+
+
 def yaml_error_message(where: str, text: str, exc: yaml.YAMLError) -> str:
     """Turn a raw PyYAML parse error into a prodc message naming the file, line and nearest need (#84).
 
@@ -677,6 +700,7 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
     for i, raw in enumerate(_as_list(tbl.get("glossary"), f"{where}.glossary")):
         out.glossary.append(_term(raw, f"{where}.glossary[{i}]"))
     out.notices.extend(_unknown_keys(tbl, _FILE_SHAPE, where))
+    out.notices.extend(_deprecated_values(tbl, where))
     return out
 
 

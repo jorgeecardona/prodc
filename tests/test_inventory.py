@@ -59,3 +59,19 @@ def test_paths_limit_the_inventory(tmp_path: Path) -> None:
     _write(tmp_path, "a/test_a.py", "def test_a(): ...\n")
     _write(tmp_path, "b/test_b.py", "def test_b(): ...\n")
     assert PytestAdapter(tmp_path, None, ["a/*.py"]).inventory() == ["a/test_a.py::test_a"]
+
+
+def test_discovery_skips_a_file_that_is_not_utf8(tmp_path: Path) -> None:
+    (tmp_path / "test_bad.py").write_bytes(b"\xff\xfe")
+    _write(tmp_path, "test_ok.py", "def test_ok(): ...\n")
+    assert PytestAdapter(tmp_path, None).inventory() == ["test_ok.py::test_ok"]
+
+
+def test_star_star_matches_the_top_folder_and_star_stays_in_one(tmp_path: Path) -> None:
+    _write(tmp_path, "test_top.py", "def test_t(): ...\n")
+    _write(tmp_path, "a/b/test_deep.py", "def test_d(): ...\n")
+    assert PytestAdapter(tmp_path, None, ["**/test_*.py"]).inventory() == [
+        "a/b/test_deep.py::test_d",
+        "test_top.py::test_t",
+    ]
+    assert PytestAdapter(tmp_path, None, ["*/test_*.py"]).inventory() == []

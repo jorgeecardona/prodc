@@ -1078,7 +1078,7 @@ def decision_readiness(
     """Readiness for each decision that ``awaits`` research, keyed by decision id (#93).
 
     Each awaited ref resolves exactly like a ``need:`` proof (:meth:`Resolver.resolve_ref`), over
-    every need in the model. A research need is often ``product: false`` and off the board, but it
+    every need in the model. A research need can be off the board, but it
     is still what the decision waits on. Decisions with no ``awaits`` are absent.
     """
     resolver = Resolver(needs, adapters)
@@ -1101,9 +1101,7 @@ def awaits_warnings(
 
     - committed (not ``draft``) while its research is still open;
     - an awaited direction the research answered the other way: decided against its own result;
-    - waiting on a withdrawn need: abandoned research;
-    - waiting on a product need: research belongs on a ``product: false`` need, or it leaks into
-      coverage and blurs the line between research and a delivery proof.
+    - waiting on a withdrawn need: abandoned research.
     """
     by_id = {n.id: n for n in needs}
     out: list[tuple[str, str]] = []
@@ -1128,13 +1126,6 @@ def awaits_warnings(
             if n.withdrawn is not None:
                 out.append(
                     (d.id, f"awaits {nid}, which is withdrawn; drop it or withdraw the decision")
-                )
-            if n.product:
-                out.append(
-                    (
-                        d.id,
-                        f"awaits {nid}, a product need; research belongs on a product: false need",
-                    )
                 )
     return out
 

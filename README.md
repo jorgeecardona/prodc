@@ -141,6 +141,10 @@ prodc lint        # CI gate: exit 1 on a BROKEN proof or a must-have with no evi
 If you rename a scenario and do not update the need, the proof becomes BROKEN and `prodc lint`
 exits 1.
 
+## Python
+
+The Python modules are not a public API. Use the CLI, `--json` and the YAML files.
+
 ## Features
 
 - Source kinds: `primary` (the user's own words), `secondary` (a report, a ticket, an internal

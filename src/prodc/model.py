@@ -306,7 +306,7 @@ class Decision:
     draft: bool = False  # proposed, not yet committed (reuses the Need draft lifecycle)
     withdrawn: Withdrawal | None = None  # superseded / abandoned: the record stays as its trace
     # The research this choice waits on (#93): ``<need-id>`` or ``<need-id>@yes|no|inconclusive``,
-    # the ``need:`` proof grammar. Each is an ordinary need (``product: false`` + ``claim``) whose
+    # the ``need:`` proof grammar. Each is an ordinary need with a ``claim`` whose
     # state comes from its own proofs, so readiness is derived, never hand-set. "Waits on" is not
     # "serves" (``needs``): the loader refuses an id in both.
     awaits: tuple[str, ...] = ()
@@ -449,8 +449,7 @@ class Need:
     release: str | None = None  # id of the Release slice this need ships in; None = unslotted
     expects: ProofKind | None = None  # the proof kind this need is waiting for (#78); advisory
     product: bool = True  # False = infra/NFR/internal, excluded from product coverage (#48)
-    draft: bool = False  # True = staged, not yet counted on the board until promoted (#60)
-    stage: Stage = Stage.COMMITTED  # the capture funnel (#77); ``draft`` is the captured stage
+    stage: Stage = Stage.COMMITTED  # the capture funnel (#77)
     draft_added: str | None = (
         None  # ISO date this need was staged (#60); lets a lint age-gate it later
     )
@@ -470,12 +469,10 @@ class Need:
     ] = ()  # flat, many-to-many, stateless labels: a filter axis, not a group (#80)
     terms: tuple[str, ...] = ()  # glossary terms this need uses (#72); each must be defined
 
-    def __post_init__(self) -> None:
-        """Keep ``draft`` and ``stage`` one fact: ``draft`` is the captured stage (#77)."""
-        if self.draft and self.stage is Stage.COMMITTED:
-            object.__setattr__(self, "stage", Stage.CAPTURED)
-        elif self.stage is Stage.CAPTURED and not self.draft:
-            object.__setattr__(self, "draft", True)
+    @property
+    def draft(self) -> bool:
+        """True while the need is staged off the board: the captured stage (#60, #77)."""
+        return self.stage is Stage.CAPTURED
 
     @property
     def is_variant(self) -> bool:

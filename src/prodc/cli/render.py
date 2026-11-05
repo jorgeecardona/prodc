@@ -11,8 +11,7 @@ import datetime
 import shutil
 from collections.abc import Callable
 
-from ..board import path_summary
-from ..board import warrant as _warrant
+from ..board import path_summary, warrant
 from ..model import (
     Decision,
     Goal,
@@ -53,7 +52,7 @@ def provenance_counts(results: list[NeedResult]) -> dict[str, int]:
     """How many needs carry each evidence tier (primary/secondary/assumption/opinion)."""
     counts = {"primary": 0, "secondary": 0, "assumption": 0, "opinion": 0}
     for r in results:
-        counts[_warrant(r.need).split(":", 1)[0]] += 1
+        counts[warrant(r.need).split(":", 1)[0]] += 1
     return counts
 
 
@@ -125,7 +124,7 @@ def render(results: list[NeedResult], wide: bool = False) -> str:
     # the same in every role block. The need column takes whatever width is left.
     id_w = max([len("id"), *(len(r.need.id) for r in results)])
     grounds_w = max([len("grounds"), *(len(_grounds_cell(r)) for r in results)])
-    warrant_w = max([len("warrant"), *(len(_warrant(r.need)) for r in results)])
+    warrant_w = max([len("warrant"), *(len(warrant(r.need)) for r in results)])
     if wide:
         need_w = max([len("need"), *(len(r.need.text) for r in results)])
     else:
@@ -158,7 +157,7 @@ def render(results: list[NeedResult], wide: bool = False) -> str:
                     r.need.id,
                     _grounds_cell(r),
                     _clip(r.need.text, need_w),
-                    _warrant(r.need),
+                    warrant(r.need),
                 )
             )
             for w in r.warnings:
@@ -173,7 +172,7 @@ COLUMNS: dict[str, tuple[str, Callable[[NeedResult], str]]] = {
     "text": ("need", lambda r: r.need.text),
     "who": ("who", lambda r: r.need.who or ""),
     "role": ("role", lambda r: r.need.role or ""),
-    "warrant": ("warrant", lambda r: _warrant(r.need)),
+    "warrant": ("warrant", lambda r: warrant(r.need)),
     "declared": (
         "declared",
         lambda r: "yes" if (r.declared and r.state is NeedState.DELIVERED) else "",
@@ -529,7 +528,7 @@ def render_show(
     lines = [
         f"{need.id}{'  !!' if need.must else ''}{'  (draft)' if need.draft else ''}  {need.text}",
         f"  who: {who}",
-        f"  grounds: {_LABEL[r.state]}{nm}    warrant: {_warrant(need)}",
+        f"  grounds: {_LABEL[r.state]}{nm}    warrant: {warrant(need)}",
         *(
             [f"  confidence: {r.confidence.value} ({'; '.join(r.confidence_detail)})"]
             if r.confidence
@@ -681,7 +680,7 @@ def render_plan(
         imp = _importance_cell(r.need)
         out.append(
             f"  {i:>3}. {bang} {r.need.id:<12} {_LABEL[r.state]:<10} "
-            f"{_warrant(r.need):<16} {imp:<12} {r.need.text[:48]}"
+            f"{warrant(r.need):<16} {imp:<12} {r.need.text[:48]}"
         )
     return "\n".join(out)
 

@@ -54,7 +54,7 @@ def test_stage_defaults_and_draft_is_captured(tmp_path: Path) -> None:
 
 
 def test_a_need_keeps_draft_and_stage_one_fact() -> None:
-    assert Need(id="X", text="t", draft=True).stage is Stage.CAPTURED
+    assert Need(id="X", text="t", stage=Stage.CAPTURED).stage is Stage.CAPTURED
     assert Need(id="X", text="t", stage=Stage.CAPTURED).draft is True
     assert Need(id="X", text="t").stage is Stage.COMMITTED
 
@@ -82,7 +82,7 @@ def test_an_unknown_stage_is_rejected(tmp_path: Path) -> None:
 def test_the_board_counts_only_committed_needs() -> None:
     needs = [
         Need(id="C", text="t"),
-        Need(id="D", text="t", draft=True),
+        Need(id="D", text="t", stage=Stage.CAPTURED),
         Need(id="T", text="t", stage=Stage.TRIAGED),
     ]
     assert [n.id for n in board_needs(needs, include_drafts=False)] == ["C"]

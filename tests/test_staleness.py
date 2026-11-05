@@ -56,14 +56,14 @@ needs:
   - id: OLD-1
     text: user can see an old thing
     sources:
-      - kind: interview
+      - kind: primary
         who: Ana
         quote: "I need this"
         observed_at: {old}
   - id: FRESH-1
     text: user can see a fresh thing
     sources:
-      - kind: interview
+      - kind: primary
         who: Bob
         quote: "me too"
         observed_at: {fresh}
@@ -138,7 +138,7 @@ needs:
             "capture",
             "N-1",
             "--kind",
-            "interview",
+            "primary",
             "--who",
             "Ana",
             "--quote",

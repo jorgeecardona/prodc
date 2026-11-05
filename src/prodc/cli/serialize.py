@@ -9,8 +9,7 @@ from __future__ import annotations
 
 import json
 
-from ..board import need_payload
-from ..board import warrant as _warrant
+from ..board import need_payload, warrant
 from ..dedup import DupPair, VariantGroup
 from ..model import Decision, Goal, Issue, NeedResult, NeedState, Release, Role
 from ..status import (
@@ -232,7 +231,7 @@ def brief_json(
                     "must": r.need.must,
                     "opinion": r.need.is_opinion,
                     "hole": r.state is NeedState.HOLE,
-                    "warrant": _warrant(r.need),
+                    "warrant": warrant(r.need),
                 }
                 for r in open_
             ],
@@ -259,7 +258,7 @@ def plan_json(
                     "text": r.need.text,
                     "must": r.need.must,
                     "state": r.state.value,
-                    "warrant": _warrant(r.need),
+                    "warrant": warrant(r.need),
                     "recurrence": recurrence_counts.get(r.need.id, 0),
                     "importance": r.need.importance,
                     "importance_is_guess": (r.need.importance is not None and r.need.is_opinion),

@@ -135,7 +135,7 @@ needs:
 """
 
 
-@pytest.mark.parametrize("kind", ["playwright", "playwright-ct"])
+@pytest.mark.parametrize("kind", ["playwright"])
 def test_both_kind_names_work_through_the_config(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], kind: str
 ) -> None:

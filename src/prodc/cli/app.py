@@ -52,10 +52,12 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="run as if prodc was started in DIR (like `terraform -chdir`); must precede the command",
     )
+    config = argparse.ArgumentParser(add_help=False)
+    config.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
+    json_out = argparse.ArgumentParser(add_help=False)
+    json_out.add_argument("--json", action="store_true", help="machine-readable output")
     sub = parser.add_subparsers(dest="command", required=True)
-    st = sub.add_parser("status", help="show the needs board")
-    st.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    st.add_argument("--json", action="store_true", help="machine-readable output")
+    st = sub.add_parser("status", parents=[config, json_out], help="show the needs board")
     st.add_argument("--strict", action="store_true", help="also exit 1 on opinions")
     st.add_argument("--wide", action="store_true", help="never truncate the need text")
     st.add_argument(
@@ -119,9 +121,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     st.set_defaults(func=cmd_status)
 
-    ln = sub.add_parser("lint", help="gate the board: fail on BROKEN proofs and must-opinions")
-    ln.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    ln.add_argument("--json", action="store_true", help="machine-readable output")
+    ln = sub.add_parser(
+        "lint",
+        parents=[config, json_out],
+        help="gate the board: fail on BROKEN proofs and must-opinions",
+    )
     ln.add_argument("--strict", action="store_true", help="also fail on any hygiene warning")
     ln.add_argument(
         "--all-warnings",
@@ -130,21 +134,25 @@ def main(argv: list[str] | None = None) -> int:
     )
     ln.set_defaults(func=cmd_lint)
 
-    sh = sub.add_parser("show", help="show one need or decision as a citable answer")
+    sh = sub.add_parser(
+        "show", parents=[config, json_out], help="show one need or decision as a citable answer"
+    )
     sh.add_argument("need_id", help="the need or decision id to show, e.g. N-1 or D-1")
-    sh.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    sh.add_argument("--json", action="store_true", help="machine-readable output")
     sh.set_defaults(func=cmd_show)
 
-    br = sub.add_parser("brief", help="pre-meeting agenda for one client: open opinions and HOLEs")
+    br = sub.add_parser(
+        "brief",
+        parents=[config, json_out],
+        help="pre-meeting agenda for one client: open opinions and HOLEs",
+    )
     br.add_argument("client", help="the client/variant id to brief, e.g. acme")
-    br.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    br.add_argument("--json", action="store_true", help="machine-readable output")
     br.set_defaults(func=cmd_brief)
 
-    pl = sub.add_parser("plan", help="ranked backlog from must + state + evidence (+ importance)")
-    pl.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    pl.add_argument("--json", action="store_true", help="machine-readable output")
+    pl = sub.add_parser(
+        "plan",
+        parents=[config, json_out],
+        help="ranked backlog from must + state + evidence (+ importance)",
+    )
     pl.add_argument(
         "--include-drafts", action="store_true", help="include draft (staged) needs (#60)"
     )
@@ -158,7 +166,9 @@ def main(argv: list[str] | None = None) -> int:
     pl.set_defaults(func=cmd_plan)
 
     st2 = sub.add_parser(
-        "set", help="set or append one field on a need, or a decision's awaits (writes YAML)"
+        "set",
+        parents=[config, json_out],
+        help="set or append one field on a need, or a decision's awaits (writes YAML)",
     )
     st2.add_argument("need_id", help="the need (or decision) id to edit, e.g. N-1 or D-1")
     st2.add_argument(
@@ -166,8 +176,6 @@ def main(argv: list[str] | None = None) -> int:
         help="key=value, or key+=value to append (proofs/children/…); on a decision, "
         "awaits+=REF / awaits-=REF",
     )
-    st2.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    st2.add_argument("--json", action="store_true", help="machine-readable output")
     st2.add_argument(
         "--dry-run", action="store_true", help="validate and show the diff, don't write"
     )
@@ -181,6 +189,7 @@ def main(argv: list[str] | None = None) -> int:
 
     ad = sub.add_parser(
         "add",
+        parents=[config, json_out],
         help="create a need, or declare a role, a principle, or a decision (writes YAML)",
     )
     ad.add_argument("noun", choices=["need", "role", "principle", "decision"], help="what to add")
@@ -264,10 +273,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     ad.add_argument(
         "--kind",
-        choices=["assumption", "secondary", "internal", "proxy"],
+        choices=["assumption", "secondary"],
         default="assumption",
         help="need only: provenance source kind: assumption (default) or secondary; never "
-        "primary for an agent (internal/proxy accepted as aliases for assumption)",
+        "primary for an agent",
     )
     ad.add_argument(
         "--file",
@@ -275,8 +284,6 @@ def main(argv: list[str] | None = None) -> int:
         metavar="PATH",
         help="prodc file to write into, relative to the config (must match a glob)",
     )
-    ad.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    ad.add_argument("--json", action="store_true", help="machine-readable output")
     ad.add_argument(
         "--strict-dupes",
         action="store_true",
@@ -301,20 +308,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     ad.set_defaults(func=cmd_add)
 
-    cp = sub.add_parser("capture", help="append a source (evidence) to an existing need")
+    cp = sub.add_parser(
+        "capture", parents=[config, json_out], help="append a source (evidence) to an existing need"
+    )
     cp.add_argument("need_id", help="the need id to add evidence to")
     cp.add_argument(
         "--kind",
         required=True,
-        choices=[
-            "primary",
-            "secondary",
-            "assumption",
-            "interview",
-            "artifact",
-            "proxy",
-            "internal",
-        ],
+        choices=["primary", "secondary", "assumption"],
         help="source kind, strongest first: primary > secondary > assumption "
         "(interview/artifact/proxy/internal accepted as aliases)",
     )
@@ -339,8 +340,6 @@ def main(argv: list[str] | None = None) -> int:
         metavar="ISO",
         help="when this evidence was recorded/refreshed (default: today) (#58)",
     )
-    cp.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    cp.add_argument("--json", action="store_true", help="machine-readable output")
     cp.add_argument(
         "--dry-run", action="store_true", help="validate and show the diff, don't write"
     )
@@ -352,7 +351,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     cp.set_defaults(func=cmd_capture)
 
-    at = sub.add_parser("attest", help="record a human or AI review of a need's warrant (#13)")
+    at = sub.add_parser(
+        "attest",
+        parents=[config, json_out],
+        help="record a human or AI review of a need's warrant (#13)",
+    )
     at.add_argument("need_id", help="the need id being attested")
     at.add_argument("--by", required=True, help="who reviewed it: a person's name or a model id")
     at.add_argument("--date", required=True, help="when (ISO, e.g. 2026-10-05)")
@@ -364,8 +367,6 @@ def main(argv: list[str] | None = None) -> int:
         help="the reviewer's conclusion; only pass clears the warrant (anything else warns)",
     )
     at.add_argument("--comment", default=None, help="the review's feedback, kept on the record")
-    at.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    at.add_argument("--json", action="store_true", help="machine-readable output")
     at.add_argument(
         "--dry-run", action="store_true", help="validate and show the diff, don't write"
     )
@@ -377,7 +378,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     at.set_defaults(func=cmd_attest)
 
-    oc = sub.add_parser("outcome", help="record whether a delivered need moved its goal (#97)")
+    oc = sub.add_parser(
+        "outcome",
+        parents=[config, json_out],
+        help="record whether a delivered need moved its goal (#97)",
+    )
     oc.add_argument("need_id", help="the need id")
     landed = oc.add_mutually_exclusive_group(required=True)
     landed.add_argument("--landed", dest="landed", action="store_true", help="it moved the goal")
@@ -387,8 +392,6 @@ def main(argv: list[str] | None = None) -> int:
     oc.add_argument("--by", required=True, help="who observed it")
     oc.add_argument("--date", required=True, help="when (ISO, e.g. 2026-10-24)")
     oc.add_argument("--evidence", default=None, help="what was observed, or where (a locator)")
-    oc.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    oc.add_argument("--json", action="store_true", help="machine-readable output")
     oc.add_argument(
         "--dry-run", action="store_true", help="validate and show the diff, don't write"
     )
@@ -400,13 +403,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     oc.set_defaults(func=cmd_outcome)
 
-    ac = sub.add_parser("accept", help="record a human acceptance pass (accept proof) on a need")
+    ac = sub.add_parser(
+        "accept",
+        parents=[config, json_out],
+        help="record a human acceptance pass (accept proof) on a need",
+    )
     ac.add_argument("need_id", help="the need id that was accepted")
     ac.add_argument("--who", required=True, help="who accepted it")
     ac.add_argument("--date", required=True, help="when (ISO, e.g. 2026-10-05)")
     ac.add_argument("--revoke", action="store_true", help="remove this accept proof instead")
-    ac.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    ac.add_argument("--json", action="store_true", help="machine-readable output")
     ac.add_argument(
         "--dry-run", action="store_true", help="validate and show the diff, don't write"
     )
@@ -419,7 +424,9 @@ def main(argv: list[str] | None = None) -> int:
     ac.set_defaults(func=cmd_accept)
 
     wd = sub.add_parser(
-        "withdraw", help="record a decision against a need: withdrawn / won't-do (#74)"
+        "withdraw",
+        parents=[config, json_out],
+        help="record a decision against a need: withdrawn / won't-do (#74)",
     )
     wd.add_argument("target", help="the need id to withdraw, or 'decision' to withdraw a decision")
     wd.add_argument(
@@ -449,8 +456,6 @@ def main(argv: list[str] | None = None) -> int:
         help="the product principle this decision rests on (validated against principles:). Revising it "
         "later flags this decision for re-review",
     )
-    wd.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    wd.add_argument("--json", action="store_true", help="machine-readable output")
     wd.add_argument(
         "--dry-run", action="store_true", help="validate and show the diff, don't write"
     )
@@ -463,7 +468,9 @@ def main(argv: list[str] | None = None) -> int:
     wd.set_defaults(func=cmd_withdraw)
 
     ri = sub.add_parser(
-        "reinstate", help="remove a need's withdrawal, putting it back on the board (#74)"
+        "reinstate",
+        parents=[config, json_out],
+        help="remove a need's withdrawal, putting it back on the board (#74)",
     )
     ri.add_argument(
         "target", help="the need id to reinstate, or 'decision' to reinstate a decision"
@@ -471,8 +478,6 @@ def main(argv: list[str] | None = None) -> int:
     ri.add_argument(
         "decision_id", nargs="?", default=None, help="the decision id (when target is 'decision')"
     )
-    ri.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    ri.add_argument("--json", action="store_true", help="machine-readable output")
     ri.add_argument(
         "--dry-run", action="store_true", help="validate and show the diff, don't write"
     )
@@ -485,7 +490,9 @@ def main(argv: list[str] | None = None) -> int:
     ri.set_defaults(func=cmd_reinstate)
 
     rvz = sub.add_parser(
-        "revise", help="revise a product principle in place: new text and/or a fresh revised_at"
+        "revise",
+        parents=[config, json_out],
+        help="revise a product principle in place: new text and/or a fresh revised_at",
     )
     rvz.add_argument("noun", choices=["principle"], help="what to revise (principle)")
     rvz.add_argument("principle_id", help="the principle id to revise, e.g. P-1")
@@ -497,8 +504,6 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="the new revised_at (ISO, e.g. 2026-10-15; default: today), fires the ripple",
     )
-    rvz.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    rvz.add_argument("--json", action="store_true", help="machine-readable output")
     rvz.add_argument(
         "--dry-run", action="store_true", help="validate and show the diff, don't write"
     )
@@ -511,10 +516,10 @@ def main(argv: list[str] | None = None) -> int:
     rvz.set_defaults(func=cmd_revise)
 
     rv = sub.add_parser(
-        "review", help="triage staged drafts: list them, or --promote / --drop a batch (#60)"
+        "review",
+        parents=[config, json_out],
+        help="triage staged drafts: list them, or --promote / --drop a batch (#60)",
     )
-    rv.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    rv.add_argument("--json", action="store_true", help="machine-readable output")
     rv.add_argument(
         "--promote",
         nargs="+",
@@ -539,7 +544,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     rv.set_defaults(func=cmd_review)
 
-    pf = sub.add_parser("portfolio", help="roll up many boards into one scoreboard")
+    pf = sub.add_parser(
+        "portfolio", parents=[json_out], help="roll up many boards into one scoreboard"
+    )
     pf.add_argument(
         "configs",
         nargs="+",
@@ -552,14 +559,13 @@ def main(argv: list[str] | None = None) -> int:
         default=4,
         help="how deep to descend when discovering boards under a directory (default 4)",
     )
-    pf.add_argument("--json", action="store_true", help="machine-readable output")
     pf.set_defaults(func=cmd_portfolio)
 
     rc = sub.add_parser(
-        "recurrence", help="baselines shared across clients; --suggest proposes unlinked groups"
+        "recurrence",
+        parents=[config, json_out],
+        help="baselines shared across clients; --suggest proposes unlinked groups",
     )
-    rc.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    rc.add_argument("--json", action="store_true", help="machine-readable output")
     rc.add_argument(
         "--suggest",
         action="store_true",
@@ -596,11 +602,11 @@ def main(argv: list[str] | None = None) -> int:
     rc.set_defaults(func=cmd_recurrence)
 
     sg = sub.add_parser(
-        "suggest", help="propose candidate proofs for HOLE needs from adapter inventories (#54)"
+        "suggest",
+        parents=[config, json_out],
+        help="propose candidate proofs for HOLE needs from adapter inventories (#54)",
     )
     sg.add_argument("need_id", nargs="?", default=None, help="only this need (default: all HOLEs)")
-    sg.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    sg.add_argument("--json", action="store_true", help="machine-readable output")
     sg.add_argument(
         "--min-score",
         type=float,
@@ -629,9 +635,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     sg.set_defaults(func=cmd_suggest)
 
-    du = sub.add_parser("dupes", help="list candidate duplicate need pairs by text similarity")
-    du.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    du.add_argument("--json", action="store_true", help="machine-readable output")
+    du = sub.add_parser(
+        "dupes",
+        parents=[config, json_out],
+        help="list candidate duplicate need pairs by text similarity",
+    )
     du.add_argument(
         "--threshold",
         type=float,
@@ -642,16 +650,18 @@ def main(argv: list[str] | None = None) -> int:
     du.set_defaults(func=cmd_dupes)
 
     isp = sub.add_parser(
-        "issues", help="list the issue files ([prodc].issues) with the needs they serve (#36)"
+        "issues",
+        parents=[config, json_out],
+        help="list the issue files ([prodc].issues) with the needs they serve (#36)",
     )
-    isp.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    isp.add_argument("--json", action="store_true", help="machine-readable output")
     isp.add_argument("--need", default=None, metavar="ID", help="only issues serving this need")
     isp.set_defaults(func=cmd_issues)
 
-    vw = sub.add_parser("views", help="list each client's views with the needs that point at them")
-    vw.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    vw.add_argument("--json", action="store_true", help="machine-readable output")
+    vw = sub.add_parser(
+        "views",
+        parents=[config, json_out],
+        help="list each client's views with the needs that point at them",
+    )
     vw.add_argument("--client", default=None, help="only this client's views (for example web)")
     vw.add_argument("--links", action="store_true", help="list each view's outgoing links and why")
     vw.add_argument(
@@ -664,9 +674,10 @@ def main(argv: list[str] | None = None) -> int:
     vw.set_defaults(func=cmd_views)
 
     rp = sub.add_parser(
-        "report", help="render the board as a shareable document (markdown, or an interactive HTML)"
+        "report",
+        parents=[config],
+        help="render the board as a shareable document (markdown, or an interactive HTML)",
     )
-    rp.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     rp.add_argument(
         "--format",
         choices=["md", "html", "csv", "jira", "confluence"],
@@ -676,7 +687,6 @@ def main(argv: list[str] | None = None) -> int:
     )
     rp.add_argument(
         "--output",
-        "--out",
         "-o",
         default=None,
         metavar="PATH",
@@ -702,9 +712,9 @@ def main(argv: list[str] | None = None) -> int:
 
     sy = sub.add_parser(
         "sync",
+        parents=[config],
         help="run lifecycle callbacks for needs whose state changed since the last sync (#71)",
     )
-    sy.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
     sy.add_argument(
         "--dry-run",
         action="store_true",
@@ -738,11 +748,11 @@ def main(argv: list[str] | None = None) -> int:
     gd.set_defaults(func=cmd_guide)
 
     df = sub.add_parser(
-        "diff", help="diff the current board against a prior status --json snapshot"
+        "diff",
+        parents=[config, json_out],
+        help="diff the current board against a prior status --json snapshot",
     )
     df.add_argument("snapshot", help="path to a saved `prodc status --json` file")
-    df.add_argument("--config", default="prodc.toml", help="path to prodc.toml")
-    df.add_argument("--json", action="store_true", help="machine-readable output")
     df.set_defaults(func=cmd_diff)
 
     args = parser.parse_args(argv)

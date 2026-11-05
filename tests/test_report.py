@@ -220,12 +220,3 @@ def test_report_goal_and_only_must_scope_the_needs(
     out = capsys.readouterr().out
     assert "N-1" in out
     assert "N-2" not in out and "N-3" not in out
-
-
-def test_report_out_is_an_alias_of_output(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    dest = tmp_path / "r.md"
-    assert main(["report", "--config", str(_project(tmp_path)), "--out", str(dest)]) == 0
-    assert dest.read_text(encoding="utf-8").startswith("# ")
-    assert "wrote report to" in capsys.readouterr().out

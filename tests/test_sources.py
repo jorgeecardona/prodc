@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from prodc.config import Config
 from prodc.loader import load
 from prodc.model import Need, Source, SourceKind
@@ -65,21 +67,19 @@ needs:
     assert by_id["N-4"].sources[0].kind is SourceKind.ASSUMPTION
 
 
-def test_capture_normalises_alias_to_canonical(tmp_path: Path) -> None:
-    from prodc.writer import capture_source
+def test_capture_refuses_an_old_kind(tmp_path: Path) -> None:
+    from prodc.writer import WriteError, capture_source
 
     cfg = _project(tmp_path, "needs:\n  - id: N-1\n    text: t\n")
-    # author types the old name; it is stored as the canonical ladder value
-    capture_source(
-        cfg,
-        "N-1",
-        kind="interview",
-        who="Jordan",
-        date="2026-01-01",
-        quote="I need it",
-        locator=None,
-        dry_run=False,
-        expect_sha=None,
-    )
-    n = next(n for n in load(cfg).needs if n.id == "N-1")
-    assert n.sources[0].kind is SourceKind.PRIMARY and not n.is_opinion
+    with pytest.raises(WriteError, match="not 'interview'"):
+        capture_source(
+            cfg,
+            "N-1",
+            kind="interview",
+            who="Jordan",
+            date="2026-01-01",
+            quote="I need it",
+            locator=None,
+            dry_run=False,
+            expect_sha=None,
+        )

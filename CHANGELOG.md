@@ -2,6 +2,44 @@
 
 All notable changes are documented here. Versioning is [SemVer](https://semver.org/).
 
+## [0.5.1] - 2026-11-05
+
+The rest of the 0.5 cleanup. It has breaking changes, so read the migrate steps. 0.5.0 was
+published before this work was finished. Use 0.5.1.
+
+### Breaking
+
+- `lint` exits 1 on a key `prodc.toml` does not use, such as `profile`. The board still loads.
+- `lint` exits 1 on the old source kinds `interview`, `artifact`, `proxy` and `internal`. They still
+  load. `add --kind` and `capture --kind` no longer accept them.
+- `lint` exits 1 on `product: false`, which is deprecated. It still works, and is removed in 0.6.
+- `lint` no longer warns when a decision awaits a need that has no `product: false`.
+- `kind = "playwright-ct"` is removed. Use `kind = "playwright"`.
+- `Need.draft` in Python is now read-only, derived from `Need.stage`. In YAML, `draft: true` still
+  means the captured stage.
+- The Python modules are not a public API. Use the CLI, `--json` and the YAML files.
+
+### Migrate
+
+1. For `profile` in `prodc.toml`, delete the line.
+2. For old source kinds, run this on your need files:
+
+   ```bash
+   sed -i 's/kind: artifact/kind: secondary/; s/kind: interview/kind: primary/; s/kind: \(proxy\|internal\)/kind: assumption/' product/needs/*.yaml
+   ```
+
+3. For `note:` or `comment:` on a source, move the text into `quote`, or delete the key.
+4. For `product: false`, move engineering work to an issue file listed in `[prodc].issues`.
+
+### Fixed
+
+- `suggest` no longer stops on a test file that is not UTF-8, and does not read `.venv` or
+  `node_modules`.
+
+### Added
+
+- `python -m prodc.cli` runs the CLI.
+
 ## [0.5.0] - 2026-11-05
 
 ### Breaking

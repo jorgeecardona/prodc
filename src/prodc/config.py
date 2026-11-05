@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 import tomllib
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -176,7 +177,6 @@ _PROOF_BUILDERS: dict[str, Callable[[_Spec], Adapter]] = {
     "pytest": _pytest,
     "vitest": _vitest,
     "playwright": _playwright,
-    "playwright-ct": _playwright,  # the same adapter; component tests are Playwright tests (#112)
     "files": lambda c: FilesAdapter(root=_sub_root(c)),
     "accept": lambda c: AcceptAdapter(),
     "prototype": lambda c: PrototypeAdapter(),
@@ -221,12 +221,85 @@ _SOURCE_BUILDERS: dict[str, Callable[[_Spec], SourceAdapter]] = {
 }
 
 
+_PROOF_KEYS = frozenset(
+    [
+        "kind",
+        "root",
+        "repo",
+        "results",
+        "paths",
+        "delivered",
+        "pending",
+        "catalog",
+        "schema",
+        "files",
+        "command",
+        "timeout",
+    ]
+)
+_SOURCE_KEYS = frozenset(
+    ["kind", "paths", "base_url", "project", "token_env", "command", "timeout"]
+)
+_HOOK_KEYS = frozenset({"on", "command", "timeout", "from", "to"})
+_TABLE_KEYS: dict[str, frozenset[str]] = {
+    "prodc": frozenset({"files", "needs", "issues"}),
+    "lint": frozenset(
+        {
+            "duplicate_threshold",
+            "stale_after_days",
+            "importance_revisit_days",
+            "draft_max_age_days",
+            "unjustified_views",
+            "link_without_why",
+            "ai_attestation",
+        }
+    ),
+    "importance": frozenset({"levels"}),
+    "add": frozenset({"default_draft"}),
+    "callbacks": frozenset({"state_file", "hooks"}),
+    "principles": frozenset({"scopes"}),
+    "flows": frozenset({"steps"}),
+}
+_TOP_KEYS = frozenset(_TABLE_KEYS) | {"proofs", "sources"}
+
+
+def _unknown_in(tbl: dict[str, object], known: frozenset[str], where: str) -> list[str]:
+    """A notice for each key of ``tbl`` not in ``known``, with a hint when one is close."""
+    out: list[str] = []
+    for key in tbl:
+        if key not in known:
+            close = difflib.get_close_matches(key, sorted(known), n=1, cutoff=0.8)
+            hint = f" (did you mean '{close[0]}'?)" if close else ""
+            out.append(f"prodc.toml: {where}: unknown key '{key}' is ignored{hint}")
+    return out
+
+
+def _unknown_toml_keys(raw: dict[str, object]) -> tuple[str, ...]:
+    """The notices for keys prodc does not read, so a dead setting is not silently ignored.
+
+    Notices, not a :class:`ConfigError`: a load failure would block the writes that fix a board
+    (#96). Only called on a config that already parsed, so every table has the right type.
+    """
+    out = _unknown_in(raw, _TOP_KEYS, "top level")
+    for name, known in _TABLE_KEYS.items():
+        out += _unknown_in(_as_dict(raw.get(name, {}), f"[{name}]"), known, f"[{name}]")
+    for table, known in (("proofs", _PROOF_KEYS), ("sources", _SOURCE_KEYS)):
+        for name, body in _as_dict(raw.get(table, {}), f"[{table}]").items():
+            where = f"[{table}.{name}]"
+            out += _unknown_in(_as_dict(body, where), known, where)
+    hooks = _as_dict(raw.get("callbacks", {}), "[callbacks]").get("hooks", [])
+    for i, hook in enumerate(cast("list[object]", hooks)):
+        where = f"[[callbacks.hooks]][{i}]"
+        out += _unknown_in(_as_dict(hook, where), _HOOK_KEYS, where)
+    return tuple(out)
+
+
 @dataclass
 class Config:
     root: Path
     # [prodc].files (+ the older alias [prodc].needs): the prodc files. Every matched file may
     # carry any noun list (needs:, goals:, roles:, principles:, decisions:, …). (#95)
-    need_globs: list[str]
+    file_globs: list[str]
     issue_globs: list[str] = field(default_factory=list[str])  # [prodc].issues: issue files (#36)
     adapters: dict[str, Adapter] = field(default_factory=dict[str, Adapter])
     source_adapters: dict[str, SourceAdapter] = field(default_factory=dict[str, SourceAdapter])
@@ -245,6 +318,7 @@ class Config:
     callback_state_file: str = ".prodc/state.json"  # [callbacks].state_file: the state ledger
     principle_scopes: tuple[str, ...] = ("product",)  # [principles].scopes: allowed scopes (#88)
     flow_steps: tuple[str, ...] = ()  # [flows].steps: ordered step vocab; () = undeclared (#90)
+    notices: tuple[str, ...] = ()  # unknown prodc.toml keys: printed on reads, fail lint
 
     @property
     def terminal_step(self) -> str | None:
@@ -263,7 +337,7 @@ class Config:
         """
         seen: set[Path] = set()
         out: list[Path] = []
-        for pattern in self.need_globs:
+        for pattern in self.file_globs:
             for path in sorted(self.root.glob(pattern)):
                 if path not in seen:
                     seen.add(path)
@@ -310,8 +384,8 @@ class Config:
         # folder without listing them under a key that says "needs".
         files = _as_str_list(prodc_tbl.get("files", []), "[prodc].files")
         needs = _as_str_list(prodc_tbl.get("needs", []), "[prodc].needs")
-        need_globs = files + [g for g in needs if g not in files]
-        if not need_globs:
+        file_globs = files + [g for g in needs if g not in files]
+        if not file_globs:
             raise ConfigError("[prodc].files must list at least one glob")
         issue_globs = _as_str_list(prodc_tbl.get("issues", []), "[prodc].issues")
 
@@ -428,7 +502,7 @@ class Config:
 
         return cls(
             root=root,
-            need_globs=need_globs,
+            file_globs=file_globs,
             issue_globs=issue_globs,
             adapters=adapters,
             source_adapters=source_adapters,
@@ -445,4 +519,5 @@ class Config:
             callback_state_file=callback_state_file,
             principle_scopes=principle_scopes,
             flow_steps=flow_steps,
+            notices=_unknown_toml_keys(raw),
         )

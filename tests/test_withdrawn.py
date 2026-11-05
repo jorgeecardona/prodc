@@ -10,7 +10,7 @@ import pytest
 
 from prodc.config import Config
 from prodc.loader import LoaderError, load
-from prodc.model import Need, Withdrawal
+from prodc.model import Need, Stage, Withdrawal
 
 _TOML = """
 [prodc]
@@ -64,10 +64,14 @@ needs:
 def test_excluded_reason_precedence() -> None:
     # withdrawn overrides draft and nonproduct
     both = Need(
-        id="X", text="t", draft=True, product=False, withdrawn=Withdrawal("done", "2026-01-01")
+        id="X",
+        text="t",
+        stage=Stage.CAPTURED,
+        product=False,
+        withdrawn=Withdrawal("done", "2026-01-01"),
     )
     assert both.excluded_reason == "withdrawn"
-    assert Need(id="X", text="t", draft=True).excluded_reason == "draft"
+    assert Need(id="X", text="t", stage=Stage.CAPTURED).excluded_reason == "draft"
     assert Need(id="X", text="t", product=False).excluded_reason == "nonproduct"
     assert Need(id="X", text="t").excluded_reason is None
 
@@ -84,7 +88,7 @@ def test_board_needs_always_excludes_withdrawn() -> None:
 
     live = Need(id="A", text="t")
     gone = Need(id="B", text="t", withdrawn=Withdrawal("no", "2026-01-01"))
-    draft = Need(id="C", text="t", draft=True)
+    draft = Need(id="C", text="t", stage=Stage.CAPTURED)
     # withdrawn dropped whether or not drafts are included; drafts still gated by the flag
     assert [n.id for n in board_needs([live, gone, draft], include_drafts=False)] == ["A"]
     assert [n.id for n in board_needs([live, gone, draft], include_drafts=True)] == ["A", "C"]

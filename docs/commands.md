@@ -39,7 +39,7 @@ Commands take `--config prodc.toml` (default) and `--json`, except: `report` and
 | `--max-dangling N` | tolerate N BROKEN proofs (default 0) |
 | `--max-orphans N` | exit 1 above N proofs claimed by no need |
 
-Needs with `product: false` are listed out of scope and not counted.
+Needs with `product: false` (deprecated) are listed out of scope and not counted.
 
 ## Write
 

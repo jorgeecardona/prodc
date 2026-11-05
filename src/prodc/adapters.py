@@ -17,7 +17,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Protocol, cast, runtime_checkable
 
@@ -306,14 +306,31 @@ VITEST_PATHS = ("**/*.test.ts", "**/*.test.tsx", "**/*.test.js", "**/*.test.jsx"
 _SKIPPED_DIRS = frozenset({"node_modules", ".venv", "venv", ".git"})
 
 
+def _glob_regex(pattern: str) -> re.Pattern[str]:
+    """A regex for a glob on a relative posix path: ``**/`` spans directories, ``*`` does not."""
+    parts = re.split(r"(\*\*/|\*|\?)", pattern)
+    tokens = {"**/": "(?:.*/)?", "*": "[^/]*", "?": "[^/]"}
+    return re.compile("".join(tokens.get(p, re.escape(p)) for p in parts))
+
+
 def _test_files(root: Path, patterns: Sequence[str]) -> list[tuple[Path, str]]:
-    """Each file the glob ``patterns`` match under ``root`` with its text, once, in path order."""
-    found = {fp for pattern in patterns for fp in root.glob(pattern)}
-    return [
-        (fp, fp.read_text(encoding="utf-8"))
-        for fp in sorted(found)
-        if fp.is_file() and not _SKIPPED_DIRS.intersection(fp.relative_to(root).parts)
-    ]
+    """Each file ``patterns`` match under ``root`` with its text, in path order.
+
+    Never enters a dependency folder, and skips a file that is not UTF-8: discovery only offers
+    candidates, so one unreadable file must not stop it.
+    """
+    regexes = [_glob_regex(p) for p in patterns]
+    out: list[tuple[Path, str]] = []
+    for folder, dirs, names in os.walk(root):
+        dirs[:] = sorted(d for d in dirs if d not in _SKIPPED_DIRS)
+        for name in names:
+            fp = Path(folder) / name
+            if any(r.fullmatch(fp.relative_to(root).as_posix()) for r in regexes):
+                try:
+                    out.append((fp, fp.read_text(encoding="utf-8")))
+                except UnicodeDecodeError:
+                    continue
+    return sorted(out, key=lambda item: item[0])
 
 
 def _pytest_names(body: list[ast.stmt]) -> list[str]:
@@ -352,21 +369,13 @@ class PytestAdapter:
         return sorted(out)
 
     def _load_results(self) -> dict[str, bool]:
-        if self._results is not None:
-            return self._results
-        out: dict[str, bool] = {}
-        if self._results_path:
-            rp = self._root / self._results_path
-            if rp.exists():
-                tree = ET.parse(rp)
-                for case in tree.iter("testcase"):
-                    name = case.get("name", "")
-                    failed = any(c.tag in ("failure", "error") for c in case)
-                    skipped = any(c.tag == "skipped" for c in case)
-                    if name:
-                        out[name] = not failed and not skipped
-        self._results = out
-        return out
+        if self._results is None:
+            self._results = {
+                c.name: c.outcome == "passed"
+                for c in _junit_cases(self._root, self._results_path)
+                if c.name
+            }
+        return self._results
 
     def resolve(self, payload: str) -> ProofResult:
         # Node id: file[::Class[::Nested]]::test_name, each segment may carry [params].
@@ -405,6 +414,25 @@ class _JunitCase:
     project: str | None = None  # the Playwright project (a viewport) the case ran in (#112)
 
 
+def _junit_cases(root: Path, results: str | None) -> list[_JunitCase]:
+    """Every ``<testcase>`` of a junit report; empty when no report is configured or written."""
+    path = root / results if results else None
+    if path is None or not path.exists():
+        return []
+    out: list[_JunitCase] = []
+    for suite in ET.parse(path).iter("testsuite"):
+        for case in suite.findall("testcase"):
+            if any(c.tag in ("failure", "error") for c in case):
+                outcome = "failed"
+            elif any(c.tag == "skipped" for c in case):
+                outcome = "skipped"
+            else:
+                outcome = "passed"
+            file = case.get("file") or case.get("classname", "")
+            out.append(_JunitCase(file, case.get("name", ""), outcome, suite.get("hostname")))
+    return out
+
+
 class VitestAdapter:
     """Resolves ``path/x.test.ts#title`` by existence, upgraded by a vitest junit report (#91).
 
@@ -432,23 +460,9 @@ class VitestAdapter:
         return _js_inventory(self._root, self._paths, _VITEST_TEST_RE)
 
     def _load_cases(self) -> list[_JunitCase]:
-        if self._cases is not None:
-            return self._cases
-        out: list[_JunitCase] = []
-        if self._results_path:
-            rp = self._root / self._results_path
-            if rp.exists():
-                for case in ET.parse(rp).iter("testcase"):
-                    if any(c.tag in ("failure", "error") for c in case):
-                        outcome = "failed"
-                    elif any(c.tag == "skipped" for c in case):
-                        outcome = "skipped"
-                    else:
-                        outcome = "passed"
-                    file = case.get("file") or case.get("classname", "")
-                    out.append(_JunitCase(file, case.get("name", ""), outcome))
-        self._cases = out
-        return out
+        if self._cases is None:
+            self._cases = _junit_cases(self._root, self._results_path)
+        return self._cases
 
     def resolve(self, payload: str) -> ProofResult:
         file_part, sep, title = payload.partition("#")
@@ -513,6 +527,14 @@ _PW_SEP = " \u203a "  # Playwright joins a title path with a single right-pointi
 _PW_PROJECT_RE = re.compile(r"^\[(?P<project>[^\]]+)\]\s+(?P<rest>.*)$")
 
 
+def _pw_case(case: _JunitCase) -> _JunitCase:
+    """Move a ``[project] `` name prefix, written by ``includeProjectInTestName``, to ``project``."""
+    m = _PW_PROJECT_RE.match(case.name)
+    if m is None:
+        return replace(case, project=case.project or None)
+    return replace(case, name=m["rest"], project=m["project"])
+
+
 class PlaywrightAdapter:
     """Resolves ``path/x.visual.tsx#title`` against Playwright tests and their junit report (#112).
 
@@ -540,30 +562,9 @@ class PlaywrightAdapter:
         self._cases: list[_JunitCase] | None = None
 
     def _load_cases(self) -> list[_JunitCase]:
-        if self._cases is not None:
-            return self._cases
-        out: list[_JunitCase] = []
-        if self._results_path:
-            rp = self._root / self._results_path
-            if rp.exists():
-                for suite in ET.parse(rp).iter("testsuite"):
-                    host = suite.get("hostname") or None
-                    for case in suite.findall("testcase"):
-                        name = case.get("name", "")
-                        m = _PW_PROJECT_RE.match(name)
-                        project = host
-                        if m:
-                            project, name = m.group("project"), m.group("rest")
-                        if any(c.tag in ("failure", "error") for c in case):
-                            outcome = "failed"
-                        elif any(c.tag == "skipped" for c in case):
-                            outcome = "skipped"
-                        else:
-                            outcome = "passed"
-                        file = case.get("file") or case.get("classname", "")
-                        out.append(_JunitCase(file, name, outcome, project))
-        self._cases = out
-        return out
+        if self._cases is None:
+            self._cases = [_pw_case(c) for c in _junit_cases(self._root, self._results_path)]
+        return self._cases
 
     def inventory(self) -> list[str]:
         """Every ``file#title`` found by a ``test("...")`` call in the configured files (#112)."""

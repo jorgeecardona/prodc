@@ -16,7 +16,7 @@ def _config(tmp_path: Path, *files: tuple[str, str]) -> Config:
     needs_dir.mkdir(parents=True)
     for name, body in files:
         (needs_dir / name).write_text(body, encoding="utf-8")
-    return Config(root=tmp_path, need_globs=["product/needs/*.yaml"])
+    return Config(root=tmp_path, file_globs=["product/needs/*.yaml"])
 
 
 def test_file_level_who_defaults_each_need(tmp_path: Path) -> None:
@@ -470,3 +470,17 @@ def test_every_key_the_writer_and_docs_use_is_known(tmp_path: Path) -> None:
         "  - {id: O, text: t}\n"
     )
     assert load(_config(tmp_path, ("a.yaml", doc))).notices == ()
+
+
+def test_old_source_kind_and_product_false_load_with_a_notice(tmp_path: Path) -> None:
+    doc = (
+        "needs:\n  - id: N-1\n    text: t\n    product: false\n"
+        "    sources:\n      - kind: artifact\n"
+    )
+    model = load(_config(tmp_path, ("a.yaml", doc)))
+    assert model.needs[0].sources[0].kind.value == "secondary"
+    assert list(model.notices) == [
+        "a.yaml.needs[0]: 'product: false' is deprecated: "
+        "file engineering work as an issue ([prodc].issues)",
+        "a.yaml.needs[0].sources[0]: kind 'artifact' is now 'secondary'",
+    ]

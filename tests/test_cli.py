@@ -24,7 +24,7 @@ needs:
   - id: D-1
     text: a delivered need
     sources:
-      - kind: interview
+      - kind: primary
         who: John
         quote: "I need this"
         date: 2026-01-01
@@ -33,7 +33,7 @@ needs:
     text: a must-have with no proof
     must: true
     sources:
-      - kind: artifact
+      - kind: secondary
         locator: issues.md#H-1
         date: 2026-01-01
   - id: O-1
@@ -294,7 +294,7 @@ needs:
     client: acme
     variant_of: B-2
     sources:
-      - kind: interview
+      - kind: primary
         who: Ana
         quote: "we need this"
         date: 2026-02-01

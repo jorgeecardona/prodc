@@ -230,7 +230,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
                     "decided yet (withdraw one out_of_scope citing the principle, or reconcile)"
                 )
     errors = _lint_errors(results, list(model.decisions)) + principle_errors
-    errors += list(model.notices)  # an unknown key, which the load ignored (#96)
+    errors += [*cfg.notices, *model.notices]  # what the load ignored or read as an old name (#96)
     warnings = [
         (r.need.id, w) for r in sorted(results, key=lambda x: x.need.id) for w in r.warnings
     ] + principle_warnings

@@ -27,6 +27,7 @@ from prodc.model import (
     ProofState,
     Source,
     SourceKind,
+    Stage,
     Verdict,
     Withdrawal,
     board_needs,
@@ -262,7 +263,8 @@ def _w(s: Life) -> Withdrawal | None:
 
 
 def _life_need(s: Life) -> Need:
-    return Need(id="n", text="x", draft=s.draft, withdrawn=_w(s))
+    stage = Stage.CAPTURED if s.draft else Stage.COMMITTED
+    return Need(id="n", text="x", stage=stage, withdrawn=_w(s))
 
 
 def _life_decision(s: Life) -> Decision:

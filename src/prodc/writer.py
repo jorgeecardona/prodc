@@ -50,24 +50,7 @@ _SCALAR_FIELDS = frozenset(
 )
 _LIST_FIELDS = frozenset({"proofs", "children", "contradicts", "tags", "terms"})
 
-# Source-kind aliases accepted on write (old names → the primary/secondary/assumption ladder),
-# normalised so new files use the current vocabulary even when an author types the old kind.
-# Mirrors the loader's read-side aliases.
-_SOURCE_KIND_ALIASES = {
-    "interview": "primary",
-    "artifact": "secondary",
-    "proxy": "assumption",
-    "internal": "assumption",
-}
 _SOURCE_KINDS = ("primary", "secondary", "assumption")
-
-
-def _canonical_kind(kind: str) -> str:
-    """Normalise a source kind (accepting old aliases) to its canonical ladder value."""
-    k = _SOURCE_KIND_ALIASES.get(kind, kind)
-    if k not in _SOURCE_KINDS:
-        raise WriteError(f"source kind must be one of {', '.join(_SOURCE_KINDS)}, not {kind!r}")
-    return k
 
 
 class WriteError(Exception):
@@ -199,7 +182,7 @@ def _normalize_answer(doc: dict[str, object]) -> None:
     YAML 1.1 reads a bare ``answer: no`` as the boolean ``False``, so the raw dict carries a
     bool; dumping it as-is would write ``answer: false``. Loads fine (the loader coerces it),
     but a reader sees ``false``, not the authored ``no``. Canonicalise here so the on-disk text
-    stays the research vocabulary, the same spirit as ``_canonical_kind`` for source kinds.
+    stays the research vocabulary.
     """
     needs = doc.get("needs")
     if not isinstance(needs, list):
@@ -489,7 +472,7 @@ def _guard_target(config: Config, path: Path) -> None:
         rel = path.resolve().relative_to(config.root.resolve())
     except ValueError:
         raise WriteError(f"{path} is outside the project root") from None
-    if not any(rel.match(pattern) for pattern in config.need_globs):
+    if not any(rel.match(pattern) for pattern in config.file_globs):
         raise WriteError(f"{path.name} does not match any [prodc].files glob")
 
 
@@ -602,7 +585,8 @@ def capture_source(
     ``role`` records which declared role the ``who`` spoke as (validated against ``roles:`` on the
     next load): whose signal it is, orthogonal to the evidence tier (#52 follow-up).
     """
-    kind = _canonical_kind(kind)
+    if kind not in _SOURCE_KINDS:
+        raise WriteError(f"source kind must be one of {', '.join(_SOURCE_KINDS)}, not {kind!r}")
     source: dict[str, object] = {"kind": kind}
     for key, value in (
         ("who", who),
@@ -982,7 +966,6 @@ def add_need(
     board until promoted (#60). The need is appended with the comment-preserving splice (#85), so
     existing needs and their comments stay byte-for-byte; a brand-new file is dumped fresh.
     """
-    kind = _SOURCE_KIND_ALIASES.get(kind, kind)
     if kind not in ("assumption", "secondary"):
         raise WriteError(
             f"agent-authored need source must be assumption or secondary, not {kind!r} "

@@ -23,7 +23,7 @@ from prodc.writer import (
 def _proj(tmp_path: Path, body: str) -> Config:
     (tmp_path / "needs").mkdir(parents=True, exist_ok=True)
     (tmp_path / "needs" / "a.yaml").write_text(body, encoding="utf-8")
-    return Config(root=tmp_path, need_globs=["needs/*.yaml"])
+    return Config(root=tmp_path, file_globs=["needs/*.yaml"])
 
 
 def _a_yaml(cfg: Config) -> str:
@@ -84,7 +84,7 @@ def test_add_need_carries_agent_provenance(tmp_path: Path) -> None:
         "N-2",
         "the roaster can pause a batch",
         who="agent:claude",
-        kind="internal",
+        kind="assumption",
         file="needs/a.yaml",
         expect_sha=None,
         dry_run=False,
@@ -120,7 +120,7 @@ def test_add_need_duplicate_id_rejected(tmp_path: Path) -> None:
             "N-1",
             "t",
             who="agent",
-            kind="internal",
+            kind="assumption",
             file="needs/a.yaml",
             expect_sha=None,
             dry_run=False,
@@ -135,7 +135,7 @@ def test_add_need_outside_glob_rejected(tmp_path: Path) -> None:
             "N-2",
             "t",
             who="agent",
-            kind="internal",
+            kind="assumption",
             file="outside.yaml",
             expect_sha=None,
             dry_run=False,

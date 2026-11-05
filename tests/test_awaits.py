@@ -82,7 +82,6 @@ _NEEDS = """needs:
   - id: Q-1
     text: roasters want derived balances
     claim: a roaster who sees a derived balance does not ask for a set-stock field
-    product: false
     tags: [research]
 """
 
@@ -154,11 +153,6 @@ def test_lint_awaits_withdrawn_need() -> None:
         withdrawn=Withdrawal(reason="dropped", date="2026-10-20", kind=WithdrawalKind.WONT_DO),
     )
     assert any("which is withdrawn" in x for x in _warns(_decision("Q-1"), q))
-
-
-def test_lint_awaits_product_need() -> None:
-    q = Need(id="Q-1", text="r", proofs=("accept:j@2026-10-20",))  # product defaults to True
-    assert any("a product need" in x for x in _warns(_decision("Q-1"), q))
 
 
 def _cli_project(tmp_path: Path, awaits: str, draft: bool = False) -> Path:

@@ -1,7 +1,7 @@
 # Config
 
-Everything lives in `prodc.toml`. Only `[prodc].files` is required (`[prodc].needs` is the older alias;
-the two are merged). Every matched file may carry any noun list (`needs:`, `roles:`, `principles:`,
+Everything lives in `prodc.toml`. Only `[prodc].files` is required (`[prodc].needs` is the same setting;
+the two are merged). A key prodc does not read makes `lint` exit 1 and the board still loads. Every matched file may carry any noun list (`needs:`, `roles:`, `principles:`,
 `decisions:`, …), so decisions can live in their own folder.
 
 The EARS / solution-verb text lint fires only on a need that has not stated its `claim` (the
@@ -54,7 +54,7 @@ A proof is `<name>:<payload>`.
 | `gherkin` | `file.feature#Scenario title` or `tag:@X` | results report passes, else a `delivered` tag | `paths`, `delivered`, `pending`, `results` |
 | `pytest` | `tests/test_x.py::test_y` | junit passes, else the test exists (declared) | `root`, `results`, `paths` (for `suggest`) |
 | `vitest` | `src/x.test.ts#test title` (or the `describe > it` path) | `vitest --reporter=junit` report passes, else the file and title exist (declared); a failing test is PENDING *not* declared, so a principle it guards reads VIOLATED; skipped/todo stays declared | `root` (the vitest root), `results`, `paths` (for `suggest`) |
-| `playwright` (alias `playwright-ct`) | `tests/Row.visual.tsx#test title` (or `describe > test`); a leading `[project] ` pins one project (viewport) | a Playwright `--reporter=junit` report passes, else the file and title exist (declared); a test failing in any project is PENDING *not* declared, so a guard reads VIOLATED; the detail names the failing projects | `root`, `results`, `paths` (default `**/*.visual.tsx`, `**/*.spec.ts`, `**/*.spec.tsx`) |
+| `playwright` | `tests/Row.visual.tsx#test title` (or `describe > test`); a leading `[project] ` pins one project (viewport) | a Playwright `--reporter=junit` report passes, else the file and title exist (declared); a test failing in any project is PENDING *not* declared, so a guard reads VIOLATED; the detail names the failing projects | `root`, `results`, `paths` (default `**/*.visual.tsx`, `**/*.spec.ts`, `**/*.spec.tsx`) |
 | `files` | `path/to/script` | file exists (declared) | `root` |
 | `accept` | `who@date` | always (a human sign-off, declared) | (none) |
 | `prototype` | `ref@who@date` | always (validated with a user, declared) | (none) |
