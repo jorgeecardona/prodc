@@ -1,8 +1,10 @@
-# Draft needs: review command, age gate, portfolio exclusion (follow-up to #60)
-
-scope: M
+---
+title: "Draft needs: review command, age gate, portfolio exclusion (follow-up to #60)"
+status: open
+scope: "M"
 verify: test
 area: cli
+---
 
 ## What is done (#60, 0.3.x)
 

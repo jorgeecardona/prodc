@@ -1,8 +1,10 @@
-# Product principles and the contradiction edge — the vision as the logic's principles
-
-scope: L
+---
+title: "Product principles and the contradiction edge — the vision as the logic's principles"
+status: open
+scope: "L"
 verify: test
 area: model
+---
 
 ## Context
 

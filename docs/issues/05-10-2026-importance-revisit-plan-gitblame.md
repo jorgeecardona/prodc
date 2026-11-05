@@ -1,8 +1,10 @@
-# Importance rubric: plan --revisit, add --importance, git-blame fallback (follow-up to #59)
-
-scope: S
+---
+title: "Importance rubric: plan --revisit, add --importance, git-blame fallback (follow-up to #59)"
+status: open
+scope: "S"
 verify: test
 area: cli
+---
 
 ## What is done (#59, 0.3.x)
 

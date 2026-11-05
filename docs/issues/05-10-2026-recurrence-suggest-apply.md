@@ -1,8 +1,10 @@
-# recurrence --suggest --apply: auto-create the shared baseline (follow-up to #56)
-
-scope: M
+---
+title: "recurrence --suggest --apply: auto-create the shared baseline (follow-up to #56)"
+status: open
+scope: "M"
 verify: test
 area: cli
+---
 
 ## What is done (#56, 0.3.x)
 

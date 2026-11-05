@@ -1,8 +1,10 @@
-# Research-board profile: posed questions traced to answers-with-evidence
-
-scope: L
+---
+title: "Research-board profile: posed questions traced to answers-with-evidence"
+status: open
+scope: "L"
 verify: test
 area: model
+---
 
 ## Context
 

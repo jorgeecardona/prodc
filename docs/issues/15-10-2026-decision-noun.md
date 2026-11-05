@@ -1,8 +1,10 @@
-# The decision noun — how a need gets built (the OST chosen-solution)
-
-scope: M
+---
+title: "The decision noun — how a need gets built (the OST chosen-solution)"
+status: open
+scope: "M"
 verify: test
 area: model
+---
 
 ## Context
 

@@ -1,8 +1,10 @@
-# An idea with no need yet: a draft decision with empty `needs[]`
-
-scope: S
+---
+title: "An idea with no need yet: a draft decision with empty `needs[]`"
+status: open
+scope: "S"
 verify: test
 area: model
+---
 
 ## Context
 

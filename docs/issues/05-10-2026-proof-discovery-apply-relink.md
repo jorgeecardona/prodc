@@ -1,8 +1,10 @@
-# Proof discovery: --apply, more adapter inventories, BROKEN relink (follow-up to #54)
-
-scope: M
+---
+title: "Proof discovery: --apply, more adapter inventories, BROKEN relink (follow-up to #54)"
+status: open
+scope: "M"
 verify: test
 area: adapters
+---
 
 ## What is done (#54, 0.3.x)
 

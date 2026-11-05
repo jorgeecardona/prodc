@@ -1,8 +1,10 @@
-# Out-of-scope: a real need, accepted but declined as not-my-product
-
-scope: M
+---
+title: "Out-of-scope: a real need, accepted but declined as not-my-product"
+status: open
+scope: "M"
 verify: test
 area: model
+---
 
 ## Context
 

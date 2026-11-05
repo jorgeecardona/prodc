@@ -1,8 +1,10 @@
-# Decision awaits: deferred follow-ups (#93)
-
-scope: S
+---
+title: "Decision awaits: deferred follow-ups (#93)"
+status: open
+scope: "S"
 verify: test
 area: cli
+---
 
 ## Context
 

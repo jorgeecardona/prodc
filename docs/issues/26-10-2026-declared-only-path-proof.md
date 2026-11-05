@@ -1,8 +1,10 @@
-# Declared-only warning ignores a path proof
-
-scope: XS
+---
+title: "Declared-only warning ignores a path proof"
+status: open
+scope: "XS"
 verify: test
 area: status
+---
 
 ## Context
 

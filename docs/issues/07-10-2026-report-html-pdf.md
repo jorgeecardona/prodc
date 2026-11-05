@@ -1,8 +1,10 @@
-# Report: HTML output and PDF path (follow-up to `prodc report`)
-
-scope: M
+---
+title: "Report: HTML output and PDF path (follow-up to `prodc report`)"
+status: open
+scope: "M"
 verify: test
 area: cli
+---
 
 ## What is done (0.3.x)
 

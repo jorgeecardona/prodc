@@ -1,8 +1,10 @@
-# Source: a `role` field — which role confirmed the evidence (follow-up to the source-kind redesign)
-
-scope: S
+---
+title: "Source: a `role` field — which role confirmed the evidence (follow-up to the source-kind redesign)"
+status: open
+scope: "S"
 verify: test
 area: model
+---
 
 ## Context
 

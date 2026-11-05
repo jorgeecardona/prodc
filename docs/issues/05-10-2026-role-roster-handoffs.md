@@ -1,8 +1,10 @@
-# Role: roster grouping, orphan report, handoffs, write-back (follow-up to #52)
-
-scope: M
+---
+title: "Role: roster grouping, orphan report, handoffs, write-back (follow-up to #52)"
+status: open
+scope: "M"
 verify: test
 area: cli
+---
 
 ## What is done (#52, 0.3.x)
 

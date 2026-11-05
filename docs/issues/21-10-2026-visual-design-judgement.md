@@ -1,8 +1,10 @@
-# Visual needs need a designer's eye: a judge that is not Claude
-
-scope: ?
+---
+title: "Visual needs need a designer's eye: a judge that is not Claude"
+status: open
+scope: "?"
 verify: inspect
 area: model
+---
 
 ## Need
 

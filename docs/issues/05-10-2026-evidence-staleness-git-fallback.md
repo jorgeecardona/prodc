@@ -1,8 +1,10 @@
-# Evidence staleness: git fallback + brief section (follow-up to #58)
-
-scope: S
+---
+title: "Evidence staleness: git fallback + brief section (follow-up to #58)"
+status: open
+scope: "S"
 verify: test
 area: status
+---
 
 ## What is done (#58, 0.3.x)
 
