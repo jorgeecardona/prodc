@@ -20,6 +20,7 @@ from .adapters import (
     GherkinAdapter,
     Inventoried,
     OutcomeAdapter,
+    PlaywrightAdapter,
     ProofResult,
     PrototypeAdapter,
     PytestAdapter,
@@ -66,7 +67,7 @@ def proof_kind(adapter: Adapter) -> ProofKind | None:
     """The :class:`ProofKind` an adapter resolves, or None for kinds with no named group (#78)."""
     if isinstance(adapter, External):
         return proof_kind(adapter.inner)
-    if isinstance(adapter, GherkinAdapter | PytestAdapter | VitestAdapter):
+    if isinstance(adapter, GherkinAdapter | PlaywrightAdapter | PytestAdapter | VitestAdapter):
         return ProofKind.TEST
     if isinstance(adapter, EvalGateAdapter):
         return ProofKind.EVAL

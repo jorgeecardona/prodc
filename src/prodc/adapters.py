@@ -359,6 +359,7 @@ class _JunitCase:
     file: str  # the test file, relative to the vitest root (``classname`` or ``file``)
     name: str  # the full title path, ``describe > describe > it``
     outcome: str  # "passed" | "failed" | "skipped"
+    project: str | None = None  # the Playwright project (a viewport) the case ran in (#112)
 
 
 class VitestAdapter:
@@ -407,17 +408,9 @@ class VitestAdapter:
         if not fp.exists():
             return ProofResult(ProofState.BROKEN, False, f"no file '{file_part}'")
         text = fp.read_text(encoding="utf-8")
-        # Each title segment must appear in the source; tolerate a quote escaped in the literal.
-        segments = [seg.strip() for seg in title.split(" > ")]
-        missing = [
-            seg
-            for seg in segments
-            if seg not in text
-            and seg.replace("'", "\\'") not in text
-            and seg.replace('"', '\\"') not in text
-        ]
-        if missing:
-            return ProofResult(ProofState.BROKEN, False, f"no test {missing[-1]!r} in {file_part}")
+        missing = _titles_missing(text, title, " > ")
+        if missing is not None:
+            return ProofResult(ProofState.BROKEN, False, f"no test {missing!r} in {file_part}")
         hits = [
             c
             for c in self._load_cases()
@@ -430,6 +423,132 @@ class VitestAdapter:
         if all(c.outcome == "passed" for c in hits):
             return ProofResult(ProofState.DELIVERED, False, "junit: passed")
         return ProofResult(ProofState.PENDING, True, "junit: skipped")
+
+
+def _titles_missing(text: str, title: str, sep: str) -> str | None:
+    """The first segment of ``title`` that does not appear in a test file's source, else None.
+
+    Each title segment must appear in the source. A quote escaped in the literal is tolerated.
+    """
+    for seg in (s.strip() for s in title.split(sep)):
+        if (
+            seg not in text
+            and seg.replace("'", "\\'") not in text
+            and seg.replace('"', '\\"') not in text
+        ):
+            return seg
+    return None
+
+
+#: A ``test("title", ...)`` call in a Playwright file. ``test.describe(...)`` does not match: the
+#: character after ``test`` (and an optional ``.only``/``.skip``/...) must be the opening paren.
+_PW_TEST_RE = re.compile(
+    r"""\btest(?:\.(?:only|skip|fixme|fail|slow))?\(\s*(?P<q>["'`])(?P<title>(?:\\.|(?!(?P=q)).)*)(?P=q)"""
+)
+_PW_SEP = " \u203a "  # Playwright joins a title path with a single right-pointing angle quote
+_PW_PROJECT_RE = re.compile(r"^\[(?P<project>[^\]]+)\]\s+(?P<rest>.*)$")
+
+
+class PlaywrightAdapter:
+    """Resolves ``path/x.visual.tsx#title`` against Playwright tests and their junit report (#112).
+
+    For Playwright component tests (``*.visual.tsx``) and any other Playwright test file. The
+    locator is the file relative to ``root`` and the test title: the leaf title, or the whole
+    ``describe > test`` path to pin one when a leaf repeats. A leading ``[project] `` pins one
+    Playwright project, which is how a viewport is named (``#[mobile] fits on a phone``); with none,
+    every project that ran the test must pass.
+
+    Without a report the test is DELIVERED by existence (declared), like the vitest kind. With
+    Playwright's ``junit`` reporter output it is real: passing is DELIVERED, failing is PENDING with
+    ``declared=False`` (so a principle guarded by it reads VIOLATED), skipped is PENDING declared.
+    A locator whose file or title is not in the source is BROKEN.
+
+    Report matching follows the reporter (checked against Playwright 1.59): ``classname`` is the
+    spec file relative to ``testDir`` (so it matches a locator that ends with it), ``name`` is the
+    title path joined by `` \u203a `` (prefixed ``[project] `` only with ``includeProjectInTestName``),
+    and the project is the ``hostname`` of the ``testsuite``.
+    """
+
+    def __init__(self, root: Path, results: str | None, paths: list[str]) -> None:
+        self._root = root
+        self._results_path = results
+        self._paths = paths
+        self._cases: list[_JunitCase] | None = None
+
+    def _load_cases(self) -> list[_JunitCase]:
+        if self._cases is not None:
+            return self._cases
+        out: list[_JunitCase] = []
+        if self._results_path:
+            rp = self._root / self._results_path
+            if rp.exists():
+                for suite in ET.parse(rp).iter("testsuite"):
+                    host = suite.get("hostname") or None
+                    for case in suite.findall("testcase"):
+                        name = case.get("name", "")
+                        m = _PW_PROJECT_RE.match(name)
+                        project = host
+                        if m:
+                            project, name = m.group("project"), m.group("rest")
+                        if any(c.tag in ("failure", "error") for c in case):
+                            outcome = "failed"
+                        elif any(c.tag == "skipped" for c in case):
+                            outcome = "skipped"
+                        else:
+                            outcome = "passed"
+                        file = case.get("file") or case.get("classname", "")
+                        out.append(_JunitCase(file, name, outcome, project))
+        self._cases = out
+        return out
+
+    def inventory(self) -> list[str]:
+        """Every ``file#title`` found by a ``test("...")`` call in the configured files (#112)."""
+        out: set[str] = set()
+        for pattern in self._paths:
+            for fp in sorted(self._root.glob(pattern)):
+                if "node_modules" in fp.parts or not fp.is_file():
+                    continue
+                rel = fp.relative_to(self._root).as_posix()
+                for m in _PW_TEST_RE.finditer(fp.read_text(encoding="utf-8")):
+                    if "${" not in m.group("title"):
+                        out.add(f"{rel}#{m.group('title')}")
+        return sorted(out)
+
+    def resolve(self, payload: str) -> ProofResult:
+        file_part, sep, title = payload.partition("#")
+        if not sep or not title:
+            return ProofResult(
+                ProofState.BROKEN, False, "playwright locator must be file#test title"
+            )
+        fp = self._root / file_part
+        if not fp.exists():
+            return ProofResult(ProofState.BROKEN, False, f"no file '{file_part}'")
+        project: str | None = None
+        m = _PW_PROJECT_RE.match(title)
+        if m:
+            project, title = m.group("project"), m.group("rest")
+        title = title.replace(" > ", _PW_SEP)
+        missing = _titles_missing(fp.read_text(encoding="utf-8"), title, _PW_SEP)
+        if missing is not None:
+            return ProofResult(ProofState.BROKEN, False, f"no test {missing!r} in {file_part}")
+        hits = [
+            c
+            for c in self._load_cases()
+            if (c.file == file_part or file_part.endswith("/" + c.file))
+            and (c.name == title or c.name.endswith(_PW_SEP + title))
+            and (project is None or c.project == project)
+        ]
+        if not hits:
+            return ProofResult(ProofState.DELIVERED, True, "test exists")
+        where = f" [{project}]" if project else ""
+        if any(c.outcome == "failed" for c in hits):
+            bad = sorted({c.project or "?" for c in hits if c.outcome == "failed"})
+            return ProofResult(
+                ProofState.PENDING, False, f"junit: failing{where} ({', '.join(bad)})"
+            )
+        if all(c.outcome == "passed" for c in hits):
+            return ProofResult(ProofState.DELIVERED, False, f"junit: passed{where}")
+        return ProofResult(ProofState.PENDING, True, f"junit: skipped{where}")
 
 
 class FilesAdapter:

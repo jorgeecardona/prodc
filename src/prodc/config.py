@@ -23,6 +23,7 @@ from .adapters import (
     GherkinAdapter,
     GitLabSource,
     OutcomeAdapter,
+    PlaywrightAdapter,
     PrototypeAdapter,
     PytestAdapter,
     SourceAdapter,
@@ -143,6 +144,14 @@ def _gherkin(c: _Spec) -> Adapter:
     )
 
 
+def _playwright(c: _Spec) -> Adapter:
+    where = f"[proofs.{c.name}]"
+    paths = _as_str_list(
+        c.tbl.get("paths", ["**/*.visual.tsx", "**/*.spec.ts", "**/*.spec.tsx"]), f"{where}.paths"
+    )
+    return PlaywrightAdapter(root=_sub_root(c), results=c.results, paths=paths)
+
+
 def _command_proof(c: _Spec) -> Adapter:
     command, timeout = _hook_command(c.tbl, f"[proofs.{c.name}]")
     return CommandProof(root=c.root, command=command, timeout=timeout)
@@ -154,6 +163,8 @@ _PROOF_BUILDERS: dict[str, Callable[[_Spec], Adapter]] = {
     "gherkin": _gherkin,
     "pytest": lambda c: PytestAdapter(root=_sub_root(c), results=c.results),
     "vitest": lambda c: VitestAdapter(root=_sub_root(c), results=c.results),
+    "playwright": _playwright,
+    "playwright-ct": _playwright,  # the same adapter; component tests are Playwright tests (#112)
     "files": lambda c: FilesAdapter(root=_sub_root(c)),
     "accept": lambda c: AcceptAdapter(),
     "prototype": lambda c: PrototypeAdapter(),

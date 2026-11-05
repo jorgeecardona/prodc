@@ -54,6 +54,7 @@ A proof is `<name>:<payload>`.
 | `gherkin` | `file.feature#Scenario title` or `tag:@X` | results report passes, else a `delivered` tag | `paths`, `delivered`, `pending`, `results` |
 | `pytest` | `tests/test_x.py::test_y` | junit passes, else the test exists (declared) | `root`, `results` |
 | `vitest` | `src/x.test.ts#test title` (or the `describe > it` path) | `vitest --reporter=junit` report passes, else the file and title exist (declared); a failing test is PENDING *not* declared, so a principle it guards reads VIOLATED; skipped/todo stays declared | `root` (the vitest root), `results` |
+| `playwright` (alias `playwright-ct`) | `tests/Row.visual.tsx#test title` (or `describe > test`); a leading `[project] ` pins one project (viewport) | a Playwright `--reporter=junit` report passes, else the file and title exist (declared); a test failing in any project is PENDING *not* declared, so a guard reads VIOLATED; the detail names the failing projects | `root`, `results`, `paths` (default `**/*.visual.tsx`, `**/*.spec.ts`, `**/*.spec.tsx`) |
 | `files` | `path/to/script` | file exists (declared) | `root` |
 | `accept` | `who@date` | always (a human sign-off, declared) | (none) |
 | `prototype` | `ref@who@date` | always (validated with a user, declared) | (none) |

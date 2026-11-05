@@ -6,6 +6,10 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 Patch releases on the 0.4 line. Highlights, newest first:
 
+- New proof kind `playwright` (alias `playwright-ct`) for Playwright component and visual tests. The
+  locator is `file#test title`; `[mobile] title` pins one project. With a junit report, a test
+  that fails in any project is PENDING and the detail names the project. It counts as a `test`
+  for `expects` and `suggest` (#112).
 - A `glossary:` says what a term means, globally or for one client (`scope: client:acme`). A need
   lists the terms it uses in `terms:`. `lint` errors on a term with no definition for that need,
   and warns when a client meaning differs from the global one. `report` renders the glossary (#72).
