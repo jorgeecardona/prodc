@@ -1,6 +1,7 @@
 ---
 title: "recurrence --suggest --apply: auto-create the shared baseline (follow-up to #56)"
-status: open
+status: done
+fixed_in: ec5f34c
 scope: "M"
 verify: test
 area: cli

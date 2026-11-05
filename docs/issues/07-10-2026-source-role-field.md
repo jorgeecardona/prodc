@@ -1,6 +1,7 @@
 ---
 title: "Source: a `role` field — which role confirmed the evidence (follow-up to the source-kind redesign)"
-status: open
+status: done
+fixed_in: a6d8f8c
 scope: "S"
 verify: test
 area: model

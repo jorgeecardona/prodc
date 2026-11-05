@@ -1,6 +1,7 @@
 ---
 title: "Draft needs: review command, age gate, portfolio exclusion (follow-up to #60)"
-status: open
+status: done
+fixed_in: fde67d6
 scope: "M"
 verify: test
 area: cli

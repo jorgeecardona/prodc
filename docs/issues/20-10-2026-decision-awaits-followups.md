@@ -1,6 +1,7 @@
 ---
 title: "Decision awaits: deferred follow-ups (#93)"
-status: open
+status: done
+fixed_in: 986ae63
 scope: "S"
 verify: test
 area: cli

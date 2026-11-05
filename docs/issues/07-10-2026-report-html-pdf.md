@@ -1,6 +1,7 @@
 ---
 title: "Report: HTML output and PDF path (follow-up to `prodc report`)"
-status: open
+status: done
+fixed_in: f31732c
 scope: "M"
 verify: test
 area: cli

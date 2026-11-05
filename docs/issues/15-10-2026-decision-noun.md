@@ -1,6 +1,7 @@
 ---
 title: "The decision noun — how a need gets built (the OST chosen-solution)"
-status: open
+status: done
+fixed_in: ef12931
 scope: "M"
 verify: test
 area: model

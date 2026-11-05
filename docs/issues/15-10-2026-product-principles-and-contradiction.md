@@ -1,6 +1,7 @@
 ---
 title: "Product principles and the contradiction edge — the vision as the logic's principles"
-status: open
+status: done
+fixed_in: f1a79b1
 scope: "L"
 verify: test
 area: model

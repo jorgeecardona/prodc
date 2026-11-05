@@ -1,6 +1,7 @@
 ---
 title: "Out-of-scope: a real need, accepted but declined as not-my-product"
-status: open
+status: done
+fixed_in: c0f34a5
 scope: "M"
 verify: test
 area: model

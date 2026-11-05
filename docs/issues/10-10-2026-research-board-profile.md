@@ -1,6 +1,7 @@
 ---
 title: "Research-board profile: posed questions traced to answers-with-evidence"
-status: open
+status: done
+fixed_in: a47d4a7
 scope: "L"
 verify: test
 area: model
@@ -168,9 +169,9 @@ withdrawn — the concrete reason `answer` is necessary, not cosmetic.
 2. ✅ The `need` (needref) proof adapter — the question→question DAG, cycle-safe for free; reads
    authored `Need.answer` off `Resolver._by_id` for the optional `need:A@yes` directional form.
    Dispatched inside the `Resolver` (`_resolve_needref`), not a config adapter; `need` is reserved.
-3. ✅ `profile = "research"` config switch — silences EARS noise, swaps the grammar. *(shipped:
-   `Profile` enum, `[prodc].profile`, `_text_warnings(need, profile)`; research skips the outcome
-   grammar, source hygiene still runs. No claim grammar yet — "or none" taken.)*
+3. ✅ `profile = "research"` config switch — silences EARS noise, swaps the grammar. *(shipped
+   763f3ba as `[prodc].profile`; dissolved in a47d4a7: no profile fork, the outcome grammar is
+   skipped when `Need.claim` is set, see `status.py` `_text_warnings`.)*
 4. ✅ `evalgate` adapter (#75). *(shipped: threshold in the locator `evalgate:metric>=0.9`
    — per-need, consistent with every adapter — not in config. `>=`/`<=`/`>`/`<`. Absent metric in a
    present file → PENDING, not UNRESOLVED as sketched above: the file WAS read, so PENDING matches

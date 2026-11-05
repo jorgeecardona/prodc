@@ -1,6 +1,7 @@
 ---
 title: "Role: roster grouping, orphan report, handoffs, write-back (follow-up to #52)"
-status: open
+status: done
+fixed_in: ed74f50
 scope: "M"
 verify: test
 area: cli
