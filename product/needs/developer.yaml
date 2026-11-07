@@ -1,0 +1,82 @@
+who: developer whose agent keeps the product records
+
+needs:
+
+  - id: PD-1
+    text: >
+      When open decisions exist across a board, the developer can see them all in one list with the
+      options ready, and an agent cannot answer them.
+    sources:
+      - {kind: secondary, date: 2026-11-06, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/113"}
+    must: true
+
+  - id: PD-2
+    text: >
+      When an agent has attested many warrants, the developer can review and approve them in bulk,
+      with each need and its proof side by side.
+    sources:
+      - {kind: secondary, date: 2026-11-06, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/114"}
+
+  - id: PD-3
+    text: >
+      When a board has many old lint warnings, the developer can see only the warnings that are new
+      since a saved baseline.
+    sources:
+      - {kind: secondary, date: 2026-11-06, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/115"}
+
+  - id: PD-4
+    text: >
+      When the schema changes, the developer can run one command that rewrites the mechanical changes
+      and lists what needs a person.
+    sources:
+      - {kind: secondary, date: 2026-11-06, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/116"}
+
+  - id: PD-5
+    text: >
+      When an agent records why a source matters, it can put the reasoning in a field that show prints
+      and that is not evidence.
+    sources:
+      - {kind: secondary, date: 2026-11-06, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/117"}
+
+  - id: PD-6
+    text: >
+      When the developer sets up CI, they can use an official job with a pinned version that also
+      collects test results.
+    sources:
+      - {kind: secondary, date: 2026-11-06, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/118"}
+
+  - id: PD-7
+    text: >
+      When a source locator points at a missing file or a moved anchor, the developer can see a lint
+      warning even without a quote.
+    sources:
+      - {kind: secondary, date: 2026-11-06, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/119"}
+
+  - id: PD-8
+    text: >
+      When the developer reads status --json or portfolio, they can see each need's evidence counts
+      per tier.
+    sources:
+      - {kind: secondary, date: 2026-11-06, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/120"}
+
+  - id: PD-9
+    text: >
+      When a PM records a gap as a tracker ticket, the developer can import it as a need, with the
+      ticket attached as evidence and the need text written as an outcome.
+    sources:
+      - {kind: secondary, date: 2026-10-04, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/37"}
+      - {kind: secondary, date: 2026-10-05, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/50"}
+
+  - id: PD-10
+    text: >
+      When a source points at a GitLab, GitHub or Jira item, the developer can have prodc check it
+      live against the tracker API.
+    sources:
+      - {kind: secondary, date: 2026-10-05, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/38"}
+
+  - id: PD-11
+    text: >
+      When the developer ranks needs, they can order them by an opportunity score from importance and
+      satisfaction.
+    sources:
+      - {kind: secondary, date: 2026-10-04, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/29"}
