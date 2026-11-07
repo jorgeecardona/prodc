@@ -22,6 +22,7 @@ from .commands import (
     cmd_diff,
     cmd_dupes,
     cmd_guide,
+    cmd_inbox,
     cmd_issues,
     cmd_lint,
     cmd_outcome,
@@ -147,6 +148,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     br.add_argument("client", help="the client/variant id to brief, e.g. acme")
     br.set_defaults(func=cmd_brief)
+
+    ib = sub.add_parser(
+        "inbox",
+        parents=[config, json_out],
+        help="open decisions only a person can make, each with its options (#113)",
+    )
+    ib.set_defaults(func=cmd_inbox)
 
     pl = sub.add_parser(
         "plan",

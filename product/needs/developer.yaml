@@ -9,6 +9,9 @@ needs:
     sources:
       - {kind: secondary, date: 2026-11-06, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/113"}
     must: true
+    proofs:
+      - "test:tests/test_inbox.py::test_inbox_lists_must_opinions_and_warrant_concerns"
+      - "test:tests/test_inbox.py::test_inbox_only_lists_and_never_writes"
 
   - id: PD-2
     text: >

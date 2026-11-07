@@ -12,6 +12,7 @@ import shutil
 from collections.abc import Callable
 
 from ..board import path_summary, warrant
+from ..inbox import InboxItem
 from ..model import (
     Decision,
     Goal,
@@ -706,3 +707,17 @@ def render_portfolio(rows: list[RepoRow], totals: PortfolioTotals | None = None)
             f"{totals.delivered}/{totals.total} delivered"
         )
     return "\n".join(out)
+
+
+def render_inbox(items: list[InboxItem]) -> str:
+    """The decision inbox as text: each open item, why it is open, and its options (#113)."""
+    if not items:
+        return "inbox: nothing waits on you"
+    lines = [f"inbox: {len(items)} decision(s) wait on you", ""]
+    for i in items:
+        lines.append(f"  {i.need_id}  {i.reason}")
+        lines.append(f"      {' '.join(i.text.split())}")
+        for o in i.options:
+            lines.append(f"      - {o.label}: {o.command}")
+        lines.append("")
+    return "\n".join(lines).rstrip()

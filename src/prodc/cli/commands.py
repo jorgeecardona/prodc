@@ -27,6 +27,7 @@ from ..dedup import (
     variant_suggestions,
 )
 from ..glossary import glossary_findings
+from ..inbox import inbox
 from ..issues import issue_findings
 from ..loader import LoaderError, load
 from ..model import Decision, Need, NeedResult, NeedState, PrincipleState, Stage, board_needs
@@ -103,6 +104,7 @@ from .render import (
     render_decisions,
     render_goals,
     render_handoffs,
+    render_inbox,
     render_issues,
     render_orphans,
     render_out_of_scope,
@@ -121,6 +123,7 @@ from .serialize import (
     brief_json,
     decision_show_json,
     dup_payload,
+    inbox_json,
     issue_payload,
     plan_json,
     show_json,
@@ -529,6 +532,17 @@ def cmd_brief(args: argparse.Namespace) -> int:
         if args.json
         else render_brief(args.client, results, stale)
     )
+    return 0
+
+
+def cmd_inbox(args: argparse.Namespace) -> int:
+    """List the open decisions only a person can make, with the options ready (#113)."""
+    loaded = load_or_report(args)
+    if loaded is None:
+        return 2
+    _, model = loaded
+    items = inbox(list(model.needs), list(model.decisions))
+    print(inbox_json(items) if args.json else render_inbox(items))
     return 0
 
 

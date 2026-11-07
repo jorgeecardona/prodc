@@ -133,6 +133,18 @@ def _scan_list(lines: list[str], key: str) -> tuple[list[tuple[int, str | None]]
     return starts, i, item_indent
 
 
+def _is_trailer(line: str, max_indent: int) -> bool:
+    """A blank line, or a comment no deeper than ``max_indent``.
+
+    A deeper line that starts with ``#`` is content of a block scalar (``quote: >`` ending in
+    ``#33).``), not a comment, so it stays with its key.
+    """
+    stripped = line.strip()
+    if stripped == "":
+        return True
+    return stripped.startswith("#") and len(line) - len(line.lstrip(" ")) <= max_indent
+
+
 def _block_span(lines: list[str], key: str, item_id: str) -> tuple[int, int, int] | None:
     """Line span [start, end) and item indent of the top-level ``key:`` list item ``item_id``.
 
@@ -150,9 +162,7 @@ def _block_span(lines: list[str], key: str, item_id: str) -> tuple[int, int, int
         if iid != item_id:
             continue
         end = bounds[idx + 1]
-        while end - 1 > start and (
-            lines[end - 1].strip() == "" or lines[end - 1].strip().startswith("#")
-        ):
+        while end - 1 > start and _is_trailer(lines[end - 1], item_indent):
             end -= 1
         return start, end, item_indent
     return None
@@ -291,7 +301,7 @@ def _splice_item_keys(block: list[str], new_item: dict[str, object], indent: int
             out.extend(seg)
             continue
         body, tail = seg, cast("list[str]", [])
-        while len(body) > 1 and (body[-1].strip() == "" or body[-1].strip().startswith("#")):
+        while len(body) > 1 and _is_trailer(body[-1], key_indent):
             body, tail = body[:-1], [body[-1], *tail]
         out.extend(_render_changed_key(key, old, new, body, key_indent))
         out.extend(tail)
@@ -353,9 +363,7 @@ def _render_item_append(old_text: str, doc: dict[str, object], key: str, item_id
     # insert after the last item's content, before any trailing blank/comment lines of the section
     insert_at = region_end
     first_start = starts[0][0]
-    while insert_at - 1 >= first_start and (
-        lines[insert_at - 1].strip() == "" or lines[insert_at - 1].strip().startswith("#")
-    ):
+    while insert_at - 1 >= first_start and _is_trailer(lines[insert_at - 1], item_indent):
         insert_at -= 1
     dumped = yaml.safe_dump([item], sort_keys=False, allow_unicode=True, default_flow_style=False)
     pad = " " * item_indent

@@ -2,6 +2,18 @@
 
 All notable changes are documented here. Versioning is [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- `prodc inbox` lists the decisions only you can make on a board, each with the commands to
+  answer it: must-have opinions and warrant reviews with concerns. It never writes (#113).
+
+### Fixed
+
+- `capture`, `set`, `accept` and `attest` no longer move a quote line that starts with `#` out of
+  its source as a stray line.
+
 ## [0.5.1] - 2026-11-05
 
 The rest of the 0.5 cleanup. It has breaking changes, so read the migrate steps. 0.5.0 was

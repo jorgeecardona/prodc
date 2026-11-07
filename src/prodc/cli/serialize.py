@@ -11,6 +11,7 @@ import json
 
 from ..board import need_payload, warrant
 from ..dedup import DupPair, VariantGroup
+from ..inbox import InboxItem
 from ..model import Decision, Goal, Issue, NeedResult, NeedState, Release, Role
 from ..status import (
     DecisionReadiness,
@@ -286,3 +287,23 @@ def dup_payload(p: DupPair) -> dict[str, object]:
         "a_text": p.a.text,
         "b_text": p.b.text,
     }
+
+
+def inbox_json(items: list[InboxItem]) -> str:
+    """The decision inbox as JSON: one object per open item, with its options (#113)."""
+    return json.dumps(
+        {
+            "items": [
+                {
+                    "need": i.need_id,
+                    "text": i.text,
+                    "kind": i.kind.value,
+                    "reason": i.reason,
+                    "options": [{"label": o.label, "command": o.command} for o in i.options],
+                }
+                for i in items
+            ],
+            "total": len(items),
+        },
+        indent=2,
+    )
