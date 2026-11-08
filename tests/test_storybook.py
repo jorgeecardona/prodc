@@ -221,3 +221,45 @@ def test_suggest_leaves_stories_out_unless_named(
     assert "sb:" not in capsys.readouterr().out
     main(["suggest", "--config", cfg, "--kind", "sb", "--json", "--min-score", "0"])
     assert "sb:components-changelog" in capsys.readouterr().out
+
+
+# --- story links in show and report ---------------------------------------------------------
+
+
+def test_report_lists_story_links_when_url_is_set(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cfg = _board(tmp_path)
+    toml = tmp_path / "prodc.toml"
+    toml.write_text(
+        toml.read_text(encoding="utf-8").replace(
+            'index = "sb/index.json"\n', 'index = "sb/index.json"\nurl = "https://sb.example.com"\n'
+        ),
+        encoding="utf-8",
+    )
+    main(["report", "--config", cfg])
+    out = capsys.readouterr().out
+    assert "## Stories" in out
+    assert (
+        "| D-1 | [components-codeblock--python]"
+        "(https://sb.example.com/?path=/story/components-codeblock--python) |"
+    ) in out
+
+
+def test_report_has_no_stories_section_without_url(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    main(["report", "--config", _board(tmp_path)])
+    assert "## Stories" not in capsys.readouterr().out
+
+
+def test_show_prints_the_story_link(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    cfg = _board(tmp_path)
+    toml = tmp_path / "prodc.toml"
+    toml.write_text(
+        toml.read_text(encoding="utf-8") + 'url = "https://sb.example.com"\n', encoding="utf-8"
+    )
+    main(["show", "D-1", "--config", cfg])
+    assert "https://sb.example.com/?path=/story/components-codeblock--python" in (
+        capsys.readouterr().out
+    )

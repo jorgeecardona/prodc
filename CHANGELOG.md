@@ -9,6 +9,7 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 - A `storybook` proof kind: a need can point at the Storybook stories that show it. prodc
   reads the build's `index.json`; a story there is a declared proof.
 - `[lint].unjustified_stories` reports Storybook components that no need points at.
+- With `url` set on a `storybook` table, `show`, `report` and the HTML report link each story.
 - `prodc inbox` lists the decisions only you can make on a board, each with the commands to
   answer it: must-have opinions and warrant reviews with concerns. It never writes (#113).
 - `[prodc].name` sets the board name that `status`, `portfolio` and `report` show. The default is

@@ -415,7 +415,7 @@ function renderDetail(n) {
   if (n.release) push("release", esc(n.release));
   if (n.claim) push("claim", esc(n.claim));
   if (n.proofs.length) push("proofs", n.proofs.map(p => `<span class="tag">${esc(p)}</span>`).join(" "));
-  if (n.detail.length) push("resolution", n.detail.map(esc).join("<br>"));
+  if (n.detail.length) push("resolution", n.detail.map(d => esc(d).replace(/https?:\/\/[^\s;<]+/g, u => `<a href="${u}">${u}</a>`)).join("<br>"));
   if (n.attestation) { const at = n.attestation; push("attested", `${esc(at.who)} (${esc(at.kind)})${at.date?" · "+esc(at.date):""}${at.verdict?" · "+esc(at.verdict):""}`); }
 
   let srcHtml;

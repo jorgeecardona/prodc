@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 from datetime import date
 
+from .adapters import StorybookAdapter
 from .board import gather, path_summary
 from .config import Config
 from .glossary import collisions
@@ -126,6 +127,30 @@ def _open_questions(results: list[NeedResult], *, hide_empty: bool) -> list[str]
     return out
 
 
+def story_links(cfg: Config, results: list[NeedResult]) -> list[tuple[str, str, str]]:
+    """``(need id, story id, url)`` for every Storybook proof, when its table sets ``url``.
+
+    A component locator links to its first story, the page a reviewer opens first.
+    """
+    books = {n: a for n, a in cfg.adapters.items() if isinstance(a, StorybookAdapter)}
+    out: list[tuple[str, str, str]] = []
+    for r in results:
+        for proof in r.need.proofs:
+            name, _, payload = proof.partition(":")
+            book = books.get(name)
+            if book is None:
+                continue
+            story = (
+                payload
+                if "--" in payload
+                else next((s.id for s in book.load().of_component(payload)), None)
+            )
+            url = book.story_url(story) if story else None
+            if story and url:
+                out.append((r.need.id, story, url))
+    return out
+
+
 def render_markdown(
     cfg: Config,
     model: Model,
@@ -201,6 +226,14 @@ def render_markdown(
                     f"| {r.need.id} | {_LABEL[r.state]}{conf} | {must}{text} | {_warrant(r)} |"
                 )
             out.append("")
+
+    # Stories: the rendered component state behind each Storybook proof, so a reviewer reads
+    # the need and opens what it looks like.
+    links = story_links(cfg, [r for r in results if not r.need.is_withdrawn])
+    if links:
+        out += ["## Stories", "", "| need | story |", "|---|---|"]
+        out += [f"| {nid} | [{sid}]({url}) |" for nid, sid, url in links]
+        out.append("")
 
     # Paths (#99): where a role starts, what done means, the click budget, and the proof state.
     paths = [r for r in results if r.need.path is not None and not r.need.is_withdrawn]
