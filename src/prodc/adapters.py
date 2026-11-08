@@ -136,6 +136,24 @@ class ProofResult:
     detail: str
 
 
+def _read_json(path: Path) -> tuple[object, str | None]:
+    """The parsed JSON in ``path``, or ``(None, why)`` when it is empty or not JSON (#121).
+
+    A report is often read while the tool writing it is still running (a 0-byte file), so an
+    unreadable report is "no results yet", with the reason, never a crash of the whole board.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as e:
+        return None, f"results file {path.name} unreadable: {e}"
+    if not text.strip():
+        return None, f"results file {path.name} is empty"
+    try:
+        return json.loads(text), None
+    except json.JSONDecodeError as e:
+        return None, f"results file {path.name} is not valid JSON: {e}"
+
+
 class Adapter(Protocol):
     def resolve(self, payload: str) -> ProofResult: ...
 
@@ -189,6 +207,7 @@ class GherkinAdapter:
         self._results_path = results
         self._scenarios: list[_Scenario] | None = None
         self._results: dict[str, bool] | None = None
+        self._results_error: str | None = None  # why a present report was unreadable (#121)
 
     def _load(self) -> list[_Scenario]:
         if self._scenarios is not None:
@@ -225,7 +244,7 @@ class GherkinAdapter:
         if self._results_path:
             rp = self._root / self._results_path
             if rp.exists():
-                data: object = json.loads(rp.read_text(encoding="utf-8"))
+                data, self._results_error = _read_json(rp)
                 if isinstance(data, list):
                     for feature in cast("list[object]", data):
                         if not isinstance(feature, dict):
@@ -294,11 +313,12 @@ class GherkinAdapter:
         tags: frozenset[str] = frozenset()
         for s in matches:
             tags |= s.tags
+        why = f" ({self._results_error})" if self._results_error else ""
         if tags & self._delivered:
-            return ProofResult(ProofState.DELIVERED, True, "tagged delivered")
+            return ProofResult(ProofState.DELIVERED, True, f"tagged delivered{why}")
         if tags & self._pending:
-            return ProofResult(ProofState.PENDING, True, "tagged pending")
-        return ProofResult(ProofState.PENDING, True, "found, untagged")
+            return ProofResult(ProofState.PENDING, True, f"tagged pending{why}")
+        return ProofResult(ProofState.PENDING, True, f"found, untagged{why}")
 
 
 PYTEST_PATHS = ("**/test_*.py", "**/*_test.py")
@@ -354,7 +374,7 @@ class PytestAdapter:
         self._root = root
         self._results_path = results
         self._paths = paths
-        self._results: dict[str, bool] | None = None
+        self._report: _JunitReport | None = None
 
     def inventory(self) -> list[str]:
         """Every ``file::test`` and ``file::Class::test`` in the configured test files."""
@@ -368,18 +388,15 @@ class PytestAdapter:
             out += [f"{rel}::{n}" for n in _pytest_names(tree.body)]
         return sorted(out)
 
-    def _load_results(self) -> dict[str, bool]:
-        if self._results is None:
-            self._results = {
-                c.name: c.outcome == "passed"
-                for c in _junit_cases(self._root, self._results_path)
-                if c.name
-            }
-        return self._results
+    def _load_report(self) -> _JunitReport:
+        if self._report is None:
+            self._report = _junit_report(self._root, self._results_path)
+        return self._report
 
     def resolve(self, payload: str) -> ProofResult:
         # Node id: file[::Class[::Nested]]::test_name, each segment may carry [params].
-        parts = [p.split("[")[0] for p in payload.split("::")]
+        raw = payload.split("::")
+        parts = [p.split("[")[0] for p in raw]
         file_part = parts[0]
         node = parts[1:]
         func = node[-1] if node else ""
@@ -393,34 +410,102 @@ class PytestAdapter:
             missing.append(f"def {func}")
         if missing:
             return ProofResult(ProofState.BROKEN, False, f"no {', '.join(missing)} in {file_part}")
-        results = self._load_results()
-        if func in results:
-            ok = results[func]
+        report = self._load_report()
+        if report.cases:
+            dotted = ".".join([file_part.removesuffix(".py").replace("/", "."), *classes])
+            param = raw[-1] if len(raw) > 1 and "[" in raw[-1] else None
+            return _pytest_result(report.cases, dotted, func, param)
+        why = f" ({report.error})" if report.error else ""
+        return ProofResult(ProofState.DELIVERED, True, f"test exists{why}")
+
+
+def _same_module(classname: str, dotted: str) -> bool:
+    """True when a junit ``classname`` names the locator's module path (#122).
+
+    pytest writes ``classname`` relative to its rootdir, which can sit above or below the board's
+    test root, so one path may be a dotted suffix of the other.
+    """
+    return (
+        classname == dotted
+        or classname.endswith(f".{dotted}")
+        or dotted.endswith(f".{classname}")
+    )
+
+
+def _pytest_result(
+    cases: Sequence[_JunitCase], dotted: str, func: str, param: str | None
+) -> ProofResult:
+    """The proof state of one pytest locator against the cases of a present junit report.
+
+    A locator without ``[params]`` claims every parametrised case of its function, and passes
+    only when all of them pass (#122). A test absent from the report did not run: PENDING, not
+    "test exists" (#123). Same-named tests in other files never answer for this one (#122).
+    """
+    rows = [
+        c
+        for c in cases
+        if c.name.split("[")[0] == func
+        and (param is None or c.name == param)
+        and _same_module(c.classname, dotted)
+    ]
+    modules = {c.classname for c in rows}
+    if len(modules) > 1:
+        exact = [c for c in rows if c.classname == dotted]
+        if not exact:
             return ProofResult(
-                ProofState.DELIVERED if ok else ProofState.PENDING,
+                ProofState.PENDING,
                 False,
-                "junit: passed" if ok else "junit: failing",
+                f"junit: ambiguous, '{func}' is in {', '.join(sorted(modules))}",
             )
-        return ProofResult(ProofState.DELIVERED, True, "test exists")
+        rows = exact
+    if not rows:
+        return ProofResult(ProofState.PENDING, False, "junit: configured but test not in report")
+    if any(c.outcome == "failed" for c in rows):
+        return ProofResult(ProofState.PENDING, False, "junit: failing")
+    if any(c.outcome == "skipped" for c in rows):
+        return ProofResult(ProofState.PENDING, True, "junit: skipped")
+    return ProofResult(ProofState.DELIVERED, False, "junit: passed")
 
 
 @dataclass(frozen=True)
 class _JunitCase:
-    """One ``<testcase>`` of a vitest junit report: where it lives, its title path, its outcome."""
+    """One ``<testcase>`` of a junit report: where it lives, its title path, its outcome."""
 
     file: str  # the test file, relative to the vitest root (``classname`` or ``file``)
-    name: str  # the full title path, ``describe > describe > it``
+    name: str  # the full title path, ``describe > describe > it``; pytest: ``test_x[params]``
     outcome: str  # "passed" | "failed" | "skipped"
     project: str | None = None  # the Playwright project (a viewport) the case ran in (#112)
+    classname: str = ""  # the raw ``classname``; pytest: dotted module path [+ class] (#122)
+
+
+@dataclass(frozen=True)
+class _JunitReport:
+    """A junit report as read: its cases, and why it could not be read when it could not (#121)."""
+
+    cases: tuple[_JunitCase, ...] = ()
+    error: str | None = None
 
 
 def _junit_cases(root: Path, results: str | None) -> list[_JunitCase]:
-    """Every ``<testcase>`` of a junit report; empty when no report is configured or written."""
+    """Every ``<testcase>`` of a junit report; empty when no report is configured or readable."""
+    return list(_junit_report(root, results).cases)
+
+
+def _junit_report(root: Path, results: str | None) -> _JunitReport:
+    """The junit report at ``root / results``; no cases when none is configured or written.
+
+    An empty or malformed file (a run still writing it) gives no cases and an ``error``, never
+    an exception (#121).
+    """
     path = root / results if results else None
     if path is None or not path.exists():
-        return []
+        return _JunitReport()
+    try:
+        tree = ET.parse(path)
+    except ET.ParseError as e:
+        return _JunitReport(error=f"results file {path.name} is not valid junit XML: {e}")
     out: list[_JunitCase] = []
-    for suite in ET.parse(path).iter("testsuite"):
+    for suite in tree.iter("testsuite"):
         for case in suite.findall("testcase"):
             if any(c.tag in ("failure", "error") for c in case):
                 outcome = "failed"
@@ -428,9 +513,12 @@ def _junit_cases(root: Path, results: str | None) -> list[_JunitCase]:
                 outcome = "skipped"
             else:
                 outcome = "passed"
-            file = case.get("file") or case.get("classname", "")
-            out.append(_JunitCase(file, case.get("name", ""), outcome, suite.get("hostname")))
-    return out
+            classname = case.get("classname", "")
+            file = case.get("file") or classname
+            out.append(
+                _JunitCase(file, case.get("name", ""), outcome, suite.get("hostname"), classname)
+            )
+    return _JunitReport(tuple(out))
 
 
 class VitestAdapter:
@@ -728,6 +816,7 @@ class FieldAdapter:
 
     def __init__(self, root: Path, schema: str) -> None:
         self._path = root / schema
+        self._error: str | None = None  # why a present file was unreadable (#121)
         self._data: tuple[set[str], set[str]] | None = None
 
     def _load(self) -> tuple[set[str], set[str]]:
@@ -735,7 +824,7 @@ class FieldAdapter:
             surfaced: set[str] = set()
             received: set[str] = set()
             if self._path.exists():
-                raw: object = json.loads(self._path.read_text(encoding="utf-8"))
+                raw, self._error = _read_json(self._path)
                 if isinstance(raw, dict):
                     d = cast("dict[str, object]", raw)
                     s, r = d.get("surfaced"), d.get("received")
@@ -753,6 +842,8 @@ class FieldAdapter:
 
     def resolve(self, payload: str) -> ProofResult:
         surfaced, received = self._load()
+        if self._error:
+            return ProofResult(ProofState.PENDING, True, self._error)
         if payload in surfaced:
             return ProofResult(ProofState.DELIVERED, True, f"'{payload}' present and surfaced")
         if payload in received:
@@ -776,6 +867,7 @@ class OutcomeAdapter:
 
     def __init__(self, root: Path, results: str) -> None:
         self._path = root / results
+        self._error: str | None = None  # why a present file was unreadable (#121)
         self._data: dict[str, bool] | None = None
         self._loaded = False
 
@@ -784,7 +876,7 @@ class OutcomeAdapter:
             self._loaded = True
             if self._path.exists():
                 out: dict[str, bool] = {}
-                raw: object = json.loads(self._path.read_text(encoding="utf-8"))
+                raw, self._error = _read_json(self._path)
                 if isinstance(raw, dict):
                     for key, val in cast("dict[str, object]", raw).items():
                         if isinstance(val, bool):
@@ -803,6 +895,8 @@ class OutcomeAdapter:
         data = self._load()
         if data is None:
             return ProofResult(ProofState.BROKEN, False, f"no results file '{self._path.name}'")
+        if self._error:
+            return ProofResult(ProofState.PENDING, False, self._error)
         if payload not in data:
             return ProofResult(ProofState.PENDING, False, f"outcome '{payload}' not in results")
         if data[payload]:
@@ -840,6 +934,7 @@ class EvalGateAdapter:
 
     def __init__(self, root: Path, results: str) -> None:
         self._path = root / results
+        self._error: str | None = None  # why a present file was unreadable (#121)
         self._data: dict[str, float] | None = None
         self._loaded = False
 
@@ -848,7 +943,7 @@ class EvalGateAdapter:
             self._loaded = True
             if self._path.exists():
                 out: dict[str, float] = {}
-                raw: object = json.loads(self._path.read_text(encoding="utf-8"))
+                raw, self._error = _read_json(self._path)
                 if isinstance(raw, dict):
                     for key, val in cast("dict[str, object]", raw).items():
                         score = _as_score(val)
@@ -882,6 +977,8 @@ class EvalGateAdapter:
         data = self._load()
         if data is None:
             return ProofResult(ProofState.BROKEN, False, f"no results file '{self._path.name}'")
+        if self._error:
+            return ProofResult(ProofState.PENDING, False, self._error)
         if key not in data:
             return ProofResult(ProofState.PENDING, False, f"metric '{key}' not in results")
         score = data[key]

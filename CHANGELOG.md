@@ -8,11 +8,21 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 - `prodc inbox` lists the decisions only you can make on a board, each with the commands to
   answer it: must-have opinions and warrant reviews with concerns. It never writes (#113).
+- `[prodc].name` sets the board name that `status`, `portfolio` and `report` show. The default is
+  still the directory name (#125).
 
 ### Fixed
 
 - `capture`, `set`, `accept` and `attest` no longer move a quote line that starts with `#` out of
   its source as a stray line.
+- `status` no longer crashes when a results report is empty or not valid JSON/XML, for example
+  while the test run is still writing it. The proof detail names the problem (#121).
+- pytest proofs no longer take the result of a same-named test in another file, and a
+  parametrised test is read from the report: all its cases must pass (#122).
+- A pytest proof whose test is missing from the junit report is PENDING ("not in report"), not
+  delivered. Proofs on boards with a partial report may turn PENDING (#123).
+- `root` now works in every proof table: `gherkin`, `coverage`, `field`, `external`, `evalgate`
+  and `views` used to ignore it (#124).
 
 ## [0.5.1] - 2026-11-05
 

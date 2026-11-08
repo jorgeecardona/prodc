@@ -35,8 +35,8 @@ def board_payload(
 
     scope = f": {client}" if client else ""
     return {
-        "title": f"{cfg.root.name}{scope}: product status",
-        "project": cfg.root.name,
+        "title": f"{cfg.board_name}{scope}: product status",
+        "project": cfg.board_name,
         "scope": client,
         "stamp": date.today().isoformat() + (f" · {rev}" if rev else ""),
         "summary": {

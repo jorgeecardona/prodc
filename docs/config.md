@@ -13,6 +13,9 @@ Source-hygiene warnings (about evidence, not phrasing) always run.
 `[prodc].issues` is an optional list of globs for issue files (for example `docs/issues/*.md`).
 See [Issues](model.md#issues). It is off until you set it.
 
+`[prodc].name` is an optional board name. `status`, `portfolio` and `report` show it. The default
+is the name of the directory that holds `prodc.toml` (#125).
+
 ```toml
 [prodc]
 files = ["needs/*.yaml"]
@@ -51,7 +54,7 @@ A proof is `<name>:<payload>`.
 
 | `kind` | payload | DELIVERED when | extra keys |
 |---|---|---|---|
-| `gherkin` | `file.feature#Scenario title` or `tag:@X` | results report passes, else a `delivered` tag | `paths`, `delivered`, `pending`, `results` |
+| `gherkin` | `file.feature#Scenario title` or `tag:@X` | results report passes, else a `delivered` tag | `root`, `paths`, `delivered`, `pending`, `results` |
 | `pytest` | `tests/test_x.py::test_y` | junit passes, else the test exists (declared) | `root`, `results`, `paths` (for `suggest`) |
 | `vitest` | `src/x.test.ts#test title` (or the `describe > it` path) | `vitest --reporter=junit` report passes, else the file and title exist (declared); a failing test is PENDING *not* declared, so a principle it guards reads VIOLATED; skipped/todo stays declared | `root` (the vitest root), `results`, `paths` (for `suggest`) |
 | `playwright` | `tests/Row.visual.tsx#test title` (or `describe > test`); a leading `[project] ` pins one project (viewport) | a Playwright `--reporter=junit` report passes, else the file and title exist (declared); a test failing in any project is PENDING *not* declared, so a guard reads VIOLATED; the detail names the failing projects | `root`, `results`, `paths` (default `**/*.visual.tsx`, `**/*.spec.ts`, `**/*.spec.tsx`) |
@@ -59,15 +62,30 @@ A proof is `<name>:<payload>`.
 | `accept` | `who@date` | always (a human sign-off, declared) | (none) |
 | `prototype` | `ref@who@date` | always (validated with a user, declared) | (none) |
 | `citation` | `ref@author@year` | always (a cited published result, declared); records *what settles it*, vs `accept`'s *who signed off* | (none) |
-| `coverage` | category | category is in `catalog` | `catalog` |
-| `field` | field name | field is `surfaced` in `schema` | `schema` |
-| `external` | observable-outcome key | key recorded passing in `results` (a JSON `{key: bool}`); implementation-independent | `results` |
-| `evalgate` | `metric>=threshold` (`>=`/`<=`/`>`/`<`) | the recorded score meets the gate; score in `results` as `{metric: {score: N}}` or `{metric: N}` | `results` |
+| `coverage` | category | category is in `catalog` | `root`, `catalog` |
+| `field` | field name | field is `surfaced` in `schema` | `root`, `schema` |
+| `external` | observable-outcome key | key recorded passing in `results` (a JSON `{key: bool}`); implementation-independent | `root`, `results` |
+| `evalgate` | `metric>=threshold` (`>=`/`<=`/`>`/`<`) | the recorded score meets the gate; score in `results` as `{metric: {score: N}}` or `{metric: N}` | `root`, `results` |
 | `command` | anything your hook understands | your hook prints `{"state": "delivered"}` | `command`, `timeout` |
-| `views` | `client:id`, for example `web:/roast/sessions/$planId#batches` or `ios:RoastSession` | the view is in an inventory file (declared); a concrete URL such as `web:/roast/sessions/42` claims the `$param` view it fits | `files` |
+| `views` | `client:id`, for example `web:/roast/sessions/$planId#batches` or `ios:RoastSession` | the view is in an inventory file (declared); a concrete URL such as `web:/roast/sessions/42` claims the `$param` view it fits | `root`, `files` |
 | `need` | `other-need-id` or `other-need-id@yes\|no\|inconclusive` | the referenced need is settled (DELIVERED); the `@answer` form also requires its authored `answer` to match | (built in; not configured) |
 
 Any adapter takes `repo = "../sibling"` to resolve against a sibling checkout; absent sibling → UNRESOLVED, not BROKEN. `results` (cucumber-json or junit XML) turns declared states into real ones.
+
+`root` is the directory every path in the table resolves against: test files, `results`,
+`catalog`, `schema` and `files`. It defaults to the directory of `prodc.toml` (#124).
+
+How a `results` report is read:
+
+- No report written yet: the proof falls back to its declared state (the test exists).
+- Report empty or not valid JSON/XML (a run still writing it): the same fallback, and the detail
+  names the problem. `status` does not crash (#121).
+- Report present, but the test is not in it: PENDING, detail
+  `junit: configured but test not in report`. The test did not run (#123).
+- pytest: a case matches when its junit `classname` is the locator's module path (plus the class),
+  so same-named tests in other files never answer for it. A locator without `[params]` claims
+  every parametrised case of its function and passes only when all of them pass. A locator with
+  `[params]` claims only that case (#122).
 
 `need` is a need→need edge for the question→question DAG ("B can't be posed until A settles"): a proof whose payload is another need id. It is resolved by prodc itself, not a configured adapter, so it needs no `[proofs.need]` block (one would be shadowed). Cycles (A→B→A) resolve to BROKEN, not an infinite loop. B does not inherit A's answer. The dependency only requires A settled, optionally in a given direction.
 

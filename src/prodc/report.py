@@ -156,7 +156,7 @@ def render_markdown(
 
     scope = f": {client}" if client else ""
     stamp = date.today().isoformat() + (f" · {rev}" if rev else "")
-    heading = f"# {title or f'{cfg.root.name}{scope}: product status'}"
+    heading = f"# {title or f'{cfg.board_name}{scope}: product status'}"
     out: list[str] = [heading, "", f"_{stamp}_", ""]
     if not only_open:
         out += [

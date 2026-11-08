@@ -414,7 +414,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         )
     else:
         commit = git_rev(cfg.root)
-        print(f"prodc status: {cfg.root.name}{f' @ {commit}' if commit else ''}")
+        print(f"prodc status: {cfg.board_name}{f' @ {commit}' if commit else ''}")
         print(summary_line(summary))
         if draft_count and not args.include_drafts:
             print(f"drafts: {draft_count} staged (hidden; --include-drafts to show) (#60)")
@@ -1106,7 +1106,7 @@ def _repo_row(config_path: str) -> RepoRow:
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
     s = summarize(results)
     return RepoRow(
-        repo=cfg.root.name,
+        repo=cfg.board_name,
         delivered=s.delivered,
         total=s.total,
         must_hole=s.must_hole,
@@ -1222,7 +1222,7 @@ def cmd_report(args: argparse.Namespace) -> int:
         text = render_html(cfg, model, client=args.client, rev=git_rev(cfg.root))
     elif args.format in ("csv", "jira", "confluence"):
         rows = export_rows(gather(cfg, model).results)
-        heading = f"{cfg.root.name}{': ' + args.client if args.client else ''}: product status"
+        heading = f"{cfg.board_name}{': ' + args.client if args.client else ''}: product status"
         if args.format == "csv":
             text = render_csv(rows)
         elif args.format == "jira":

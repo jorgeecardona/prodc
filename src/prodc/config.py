@@ -121,6 +121,10 @@ class _Spec:
 
 
 def _sub_root(spec: _Spec) -> Path:
+    """The directory a proof table's paths resolve against: its ``root``, else the repo (#124).
+
+    Every path-reading adapter uses this, so ``root`` means the same in every ``[proofs.X]``.
+    """
     sub = spec.tbl.get("root", ".")
     return spec.root / (sub if isinstance(sub, str) else ".")
 
@@ -139,7 +143,7 @@ def _str_field(spec: _Spec, key: str, default: str) -> str:
 def _gherkin(c: _Spec) -> Adapter:
     where = f"[proofs.{c.name}]"
     return GherkinAdapter(
-        root=c.root,
+        root=_sub_root(c),
         paths=_as_str_list(c.tbl.get("paths", []), f"{where}.paths"),
         delivered_tags=_as_str_list(c.tbl.get("delivered", []), f"{where}.delivered"),
         pending_tags=_as_str_list(c.tbl.get("pending", []), f"{where}.pending"),
@@ -181,13 +185,13 @@ _PROOF_BUILDERS: dict[str, Callable[[_Spec], Adapter]] = {
     "accept": lambda c: AcceptAdapter(),
     "prototype": lambda c: PrototypeAdapter(),
     "citation": lambda c: CitationAdapter(),
-    "coverage": lambda c: CoverageAdapter(root=c.root, catalog=_str_field(c, "catalog", "")),
-    "field": lambda c: FieldAdapter(root=c.root, schema=_str_field(c, "schema", "")),
-    "external": lambda c: OutcomeAdapter(root=c.root, results=_need_results(c, "external")),
-    "evalgate": lambda c: EvalGateAdapter(root=c.root, results=_need_results(c, "evalgate")),
+    "coverage": lambda c: CoverageAdapter(root=_sub_root(c), catalog=_str_field(c, "catalog", "")),
+    "field": lambda c: FieldAdapter(root=_sub_root(c), schema=_str_field(c, "schema", "")),
+    "external": lambda c: OutcomeAdapter(root=_sub_root(c), results=_need_results(c, "external")),
+    "evalgate": lambda c: EvalGateAdapter(root=_sub_root(c), results=_need_results(c, "evalgate")),
     "command": _command_proof,
     "views": lambda c: ViewsAdapter(
-        root=c.root, files=_as_str_list(c.tbl.get("files", []), f"[proofs.{c.name}].files")
+        root=_sub_root(c), files=_as_str_list(c.tbl.get("files", []), f"[proofs.{c.name}].files")
     ),
 }
 
@@ -242,7 +246,7 @@ _SOURCE_KEYS = frozenset(
 )
 _HOOK_KEYS = frozenset({"on", "command", "timeout", "from", "to"})
 _TABLE_KEYS: dict[str, frozenset[str]] = {
-    "prodc": frozenset({"files", "needs", "issues"}),
+    "prodc": frozenset({"files", "needs", "issues", "name"}),
     "lint": frozenset(
         {
             "duplicate_threshold",
@@ -319,6 +323,12 @@ class Config:
     principle_scopes: tuple[str, ...] = ("product",)  # [principles].scopes: allowed scopes (#88)
     flow_steps: tuple[str, ...] = ()  # [flows].steps: ordered step vocab; () = undeclared (#90)
     notices: tuple[str, ...] = ()  # unknown prodc.toml keys: printed on reads, fail lint
+    name: str = ""  # [prodc].name: the board's name; "" means the directory's name (#125)
+
+    @property
+    def board_name(self) -> str:
+        """The name status, portfolio and reports show: ``[prodc].name``, else the directory (#125)."""
+        return self.name or self.root.name
 
     @property
     def terminal_step(self) -> str | None:
@@ -388,6 +398,9 @@ class Config:
         if not file_globs:
             raise ConfigError("[prodc].files must list at least one glob")
         issue_globs = _as_str_list(prodc_tbl.get("issues", []), "[prodc].issues")
+        board_name = prodc_tbl.get("name", "")
+        if not isinstance(board_name, str):
+            raise ConfigError("[prodc].name must be a string")
 
         adapters: dict[str, Adapter] = {}
         proofs = _as_dict(raw.get("proofs", {}), "[proofs]")
@@ -520,4 +533,5 @@ class Config:
             principle_scopes=principle_scopes,
             flow_steps=flow_steps,
             notices=_unknown_toml_keys(raw),
+            name=board_name.strip(),
         )
