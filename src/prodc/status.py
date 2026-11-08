@@ -25,6 +25,7 @@ from .adapters import (
     PrototypeAdapter,
     PytestAdapter,
     SourceAdapter,
+    StorybookAdapter,
     ViewsAdapter,
     VitestAdapter,
 )
@@ -717,7 +718,8 @@ def proof_suggestions(
     For each leaf need with no proof, compare its text with every enumerable adapter's known
     proof units and return the closest matches as ready-to-paste locators. Read-only: it never
     writes; ``--apply`` and BROKEN-relink are left to the caller/follow-up. A ``views``
-    adapter is left out unless named by ``kind``: a view exists, it does not prove a need (#100).
+    or ``storybook`` adapter is left out unless named by ``kind``: a view or a story exists, it
+    does not prove a need (#100).
     An outcome or evalgate key rarely shares words with the need text, so when one of those is
     named by ``kind`` every key is offered, ranked by text score but not cut by ``min_score`` (#76).
     A need with ``expects`` set looks only in adapters of that proof kind (#78).
@@ -732,7 +734,11 @@ def proof_suggestions(
         )
         for name, ad in adapters.items()
         if isinstance(ad, Inventoried)
-        and (name == kind if kind is not None else not isinstance(ad, ViewsAdapter))
+        and (
+            name == kind
+            if kind is not None
+            else not isinstance(ad, ViewsAdapter | StorybookAdapter)
+        )
     ]
     out: list[ProofSuggestion] = []
     for r in results:

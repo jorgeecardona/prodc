@@ -67,6 +67,7 @@ A proof is `<name>:<payload>`.
 | `external` | observable-outcome key | key recorded passing in `results` (a JSON `{key: bool}`); implementation-independent | `root`, `results` |
 | `evalgate` | `metric>=threshold` (`>=`/`<=`/`>`/`<`) | the recorded score meets the gate; score in `results` as `{metric: {score: N}}` or `{metric: N}` | `root`, `results` |
 | `command` | anything your hook understands | your hook prints `{"state": "delivered"}` | `command`, `timeout` |
+| `storybook` | a Storybook story id, for example `components-button--primary`; a component id such as `components-button` claims every story of that component | the story is in Storybook's `index.json` (declared) | `root`, `index` (default `storybook-static/index.json`), `url`, `results` (reserved) |
 | `views` | `client:id`, for example `web:/roast/sessions/$planId#batches` or `ios:RoastSession` | the view is in an inventory file (declared); a concrete URL such as `web:/roast/sessions/42` claims the `$param` view it fits | `root`, `files` |
 | `need` | `other-need-id` or `other-need-id@yes\|no\|inconclusive` | the referenced need is settled (DELIVERED); the `@answer` form also requires its authored `answer` to match | (built in; not configured) |
 
@@ -161,6 +162,33 @@ A view that exists is a declared DELIVERED (`*`): it proves the view is there, n
 works. A child view and its parent are graded separately. Views appear in `prodc orphans`, and
 `prodc suggest` leaves them out unless you pass `--kind views`. A missing or malformed file
 resolves to UNRESOLVED.
+
+### `storybook`: the story inventory
+
+Use this to point a need at the component states that serve it. `storybook build` writes
+`storybook-static/index.json`, and prodc reads only that file.
+
+```toml
+[proofs.sb]
+kind = "storybook"
+root = "apps/website"
+index = "storybook-static/index.json"  # default
+url = "https://sb.example.com"         # optional: show and report link each story
+```
+
+- A locator is Storybook's own story id, the one in the story URL (`?path=/story/<id>`).
+  `sb:components-button--primary` claims one story. `sb:components-button` claims every story of
+  the component.
+- A story in the index is a declared DELIVERED (`*`): the component renders in that state, which
+  does not prove the need works. A story or component not in the index is BROKEN.
+- A missing, empty or unknown-version index resolves to UNRESOLVED. The detail says when the
+  index was built, so a stale `storybook-static/` is visible.
+- `prodc orphans` and `[lint].unjustified_stories` work per component, not per story.
+- `prodc suggest` leaves stories out unless you pass `--kind sb`.
+- `results` is reserved for test results (a junit report from the Storybook Vitest addon). It is
+  not read yet; see `docs/issues/08-11-2026-storybook-test-results.md`.
+
+See [Storybook](storybook.md) for the how-to.
 
 ## `[sources.<name>]`
 

@@ -30,6 +30,7 @@ from .adapters import (
     PrototypeAdapter,
     PytestAdapter,
     SourceAdapter,
+    StorybookAdapter,
     ViewsAdapter,
     VitestAdapter,
 )
@@ -190,6 +191,11 @@ _PROOF_BUILDERS: dict[str, Callable[[_Spec], Adapter]] = {
     "external": lambda c: OutcomeAdapter(root=_sub_root(c), results=_need_results(c, "external")),
     "evalgate": lambda c: EvalGateAdapter(root=_sub_root(c), results=_need_results(c, "evalgate")),
     "command": _command_proof,
+    "storybook": lambda c: StorybookAdapter(
+        root=_sub_root(c),
+        index=_str_field(c, "index", "storybook-static/index.json"),
+        url=_str_field(c, "url", "") or None,
+    ),
     "views": lambda c: ViewsAdapter(
         root=_sub_root(c), files=_as_str_list(c.tbl.get("files", []), f"[proofs.{c.name}].files")
     ),

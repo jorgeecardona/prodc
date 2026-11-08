@@ -8,6 +8,7 @@ present; otherwise it reports a *declared* state (from tags or existence) and sa
 from __future__ import annotations
 
 import ast
+import datetime as dt
 import json
 import os
 import re
@@ -21,6 +22,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Protocol, cast, runtime_checkable
 
+from . import storybook as _storybook
 from . import views as _views
 from .model import ProofState
 
@@ -426,9 +428,7 @@ def _same_module(classname: str, dotted: str) -> bool:
     test root, so one path may be a dotted suffix of the other.
     """
     return (
-        classname == dotted
-        or classname.endswith(f".{dotted}")
-        or dotted.endswith(f".{classname}")
+        classname == dotted or classname.endswith(f".{dotted}") or dotted.endswith(f".{classname}")
     )
 
 
@@ -772,6 +772,77 @@ class ViewsAdapter:
         if not hits:
             return ProofResult(ProofState.BROKEN, False, f"no view '{payload}' in the inventory")
         return ProofResult(ProofState.DELIVERED, True, f"view {', '.join(hits)} exists")
+
+
+class StorybookAdapter:
+    """Resolves a Storybook story id against the build's ``index.json``.
+
+    The payload is Storybook's own id: ``components-button--primary`` claims that story, and
+    ``components-button`` (no ``--``) claims every story of the component. A story in the index
+    is a *declared* DELIVERED (``*``): the component renders in that state in the catalogue,
+    which says nothing about whether a need works. A story or component not in the index is
+    BROKEN. A missing or unreadable index is UNRESOLVED, never a crash. The inventory is one
+    entry per component, so the orphan report lists components, not every variant.
+    """
+
+    def __init__(self, root: Path, index: str, url: str | None = None) -> None:
+        self._path = root / index
+        self._url = url.rstrip("/") if url else None
+        self._idx: _storybook.StoryIndex | None = None
+        self._error: str | None = None
+
+    def load(self) -> _storybook.StoryIndex:
+        """The story index; empty when the file could not be read (``resolve`` says why)."""
+        if self._idx is None:
+            try:
+                self._idx = _storybook.load(self._path)
+            except _storybook.StoryIndexError as e:
+                self._error = str(e)
+                self._idx = _storybook.StoryIndex(version=0)
+        return self._idx
+
+    def story_url(self, story_id: str) -> str | None:
+        """The link to one story in the published Storybook, when ``url`` is configured."""
+        return f"{self._url}/?path=/story/{story_id}" if self._url else None
+
+    def inventory(self) -> list[str]:
+        """Every component id in the index."""
+        return self.load().components()
+
+    def covers(self, payload: str) -> list[str]:
+        """The component a payload claims, when that story or component is in the index."""
+        idx = self.load()
+        component = payload.split("--", 1)[0]
+        if "--" in payload:
+            return [component] if idx.get(payload) is not None else []
+        return [component] if idx.of_component(component) else []
+
+    def _built(self) -> str:
+        mtime = self._path.stat().st_mtime
+        return dt.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+
+    def resolve(self, payload: str) -> ProofResult:
+        idx = self.load()
+        if self._error is not None:
+            return ProofResult(ProofState.UNRESOLVED, False, self._error)
+        stories = (
+            [s for s in (idx.get(payload),) if s is not None]
+            if "--" in payload
+            else idx.of_component(payload)
+        )
+        if not stories:
+            return ProofResult(
+                ProofState.BROKEN, False, f"no story '{payload}' in {self._path.name}"
+            )
+        what = f"story {payload}" if "--" in payload else f"{len(stories)} stories of {payload}"
+        detail = f"{what} in the index (built {self._built()})"
+        excluded = [s.id for s in stories if not s.testable]
+        if excluded:
+            detail += f"; excluded from test runs: {', '.join(excluded)}"
+        link = self.story_url(stories[0].id)
+        if link:
+            detail += f"; {link}"
+        return ProofResult(ProofState.DELIVERED, True, detail)
 
 
 class CoverageAdapter:

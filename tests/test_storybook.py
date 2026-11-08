@@ -8,6 +8,8 @@ from pathlib import Path
 import pytest
 
 from prodc import storybook
+from prodc.adapters import StorybookAdapter
+from prodc.model import ProofState
 
 FIXTURE = Path(__file__).parent / "fixtures" / "storybook" / "index.json"
 
@@ -79,3 +81,79 @@ def test_unknown_version_is_refused(tmp_path: Path) -> None:
 def test_no_entries_is_refused(tmp_path: Path) -> None:
     with pytest.raises(storybook.StoryIndexError, match="no 'entries'"):
         storybook.load(_write(tmp_path, {"v": 5}))
+
+
+# --- the adapter ---------------------------------------------------------------------------
+
+
+def _adapter(url: str | None = None) -> StorybookAdapter:
+    return StorybookAdapter(root=FIXTURE.parent, index="index.json", url=url)
+
+
+def test_a_story_in_the_index_is_declared_delivered() -> None:
+    r = _adapter().resolve("components-codeblock--python")
+    assert r.state is ProofState.DELIVERED
+    assert r.declared
+    assert "story components-codeblock--python in the index (built " in r.detail
+
+
+def test_a_component_claims_every_story() -> None:
+    r = _adapter().resolve("components-codeblock")
+    assert r.state is ProofState.DELIVERED
+    assert "7 stories of components-codeblock" in r.detail
+
+
+def test_an_unknown_story_is_broken() -> None:
+    assert _adapter().resolve("components-codeblock--rust").state is ProofState.BROKEN
+    assert _adapter().resolve("components-nothing").state is ProofState.BROKEN
+
+
+def test_a_missing_index_is_unresolved(tmp_path: Path) -> None:
+    r = StorybookAdapter(root=tmp_path, index="storybook-static/index.json").resolve("a--b")
+    assert r.state is ProofState.UNRESOLVED
+    assert "storybook build" in r.detail
+
+
+def test_inventory_and_covers_are_per_component() -> None:
+    ad = _adapter()
+    assert ad.inventory() == [
+        "components-capabilities",
+        "components-changelog",
+        "components-codeblock",
+    ]
+    assert ad.covers("components-codeblock--python") == ["components-codeblock"]
+    assert ad.covers("components-codeblock") == ["components-codeblock"]
+    assert ad.covers("components-codeblock--rust") == []
+
+
+def test_the_story_url_is_in_the_detail_when_configured() -> None:
+    r = _adapter(url="https://sb.example.com/").resolve("components-codeblock--python")
+    assert r.detail.endswith("https://sb.example.com/?path=/story/components-codeblock--python")
+    assert "?path=" not in _adapter().resolve("components-codeblock--python").detail
+
+
+def test_a_story_excluded_from_tests_says_so(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        {
+            "v": 5,
+            "entries": {"a--b": {"type": "story", "id": "a--b", "title": "A", "name": "B"}},
+        },
+    )
+    r = StorybookAdapter(root=tmp_path, index="index.json").resolve("a--b")
+    assert "excluded from test runs: a--b" in r.detail
+
+
+def test_config_builds_the_adapter(tmp_path: Path) -> None:
+    from prodc.config import Config
+
+    (tmp_path / "prodc.toml").write_text(
+        '[prodc]\nneeds = ["needs/*.yaml"]\n\n[proofs.sb]\nkind = "storybook"\nroot = "web"\n'
+        'url = "https://sb.example.com"\n',
+        encoding="utf-8",
+    )
+    cfg = Config.load(tmp_path / "prodc.toml")
+    ad = cfg.adapters["sb"]
+    assert isinstance(ad, StorybookAdapter)
+    assert ad.story_url("a--b") == "https://sb.example.com/?path=/story/a--b"
+    assert ad.resolve("a--b").state is ProofState.UNRESOLVED  # web/storybook-static missing
