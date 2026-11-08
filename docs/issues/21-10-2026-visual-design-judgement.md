@@ -82,6 +82,8 @@ screens → regions → elements) when a judge must check it. Not decided.
   (`attest`) by a named judge.
 - How "consistent" is defined: against a design system (tokens, components) the product owns.
 - Whether a visual need is a need flag (`visual: true`) or derived from its flow/role.
+- What the judge looks at: a `storybook` proof gives one stable URL per component state
+  (`?path=/story/<id>`). That is the page a judge screenshots (08-11-2026).
 
 ## Done when
 
