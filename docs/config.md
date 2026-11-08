@@ -216,6 +216,7 @@ See [Storybook](storybook.md) for the how-to.
 | `ai_attestation` | `"counts"` or `"warns"`: with `counts`, a review by an AI no longer warns that it is not a human review | `"warns"` |
 | `draft_max_age_days` | lint warns when a staged draft's `draft_added` is older than this, so a batch is not forgotten (triage with `prodc review`) | off |
 | `unjustified_views` | `"warn"` or `"error"`: lint reports a view no need points at | off |
+| `unjustified_stories` | `"warn"` or `"error"`: lint reports a Storybook component no need points at (any of its stories counts) | off |
 | `link_without_why` | `"warn"` or `"error"`: lint reports a view link with no `why` | off |
 
 ## `[add]`

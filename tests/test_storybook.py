@@ -9,6 +9,7 @@ import pytest
 
 from prodc import storybook
 from prodc.adapters import StorybookAdapter
+from prodc.cli import main
 from prodc.model import ProofState
 
 FIXTURE = Path(__file__).parent / "fixtures" / "storybook" / "index.json"
@@ -157,3 +158,66 @@ def test_config_builds_the_adapter(tmp_path: Path) -> None:
     assert isinstance(ad, StorybookAdapter)
     assert ad.story_url("a--b") == "https://sb.example.com/?path=/story/a--b"
     assert ad.resolve("a--b").state is ProofState.UNRESOLVED  # web/storybook-static missing
+
+
+# --- orphans and the unjustified_stories lint ----------------------------------------------
+
+
+def _board(tmp_path: Path, lint: str = "") -> str:
+    (tmp_path / "sb").mkdir()
+    (tmp_path / "sb" / "index.json").write_text(FIXTURE.read_text(encoding="utf-8"), "utf-8")
+    (tmp_path / "needs").mkdir()
+    (tmp_path / "needs" / "n.yaml").write_text(
+        "needs:\n"
+        "  - id: D-1\n"
+        "    text: When a reader opens a snippet, they can read it highlighted\n"
+        '    proofs: ["sb:components-codeblock--python"]\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "prodc.toml").write_text(
+        '[prodc]\nneeds = ["needs/*.yaml"]\n\n'
+        '[proofs.sb]\nkind = "storybook"\nindex = "sb/index.json"\n' + lint,
+        encoding="utf-8",
+    )
+    return str(tmp_path / "prodc.toml")
+
+
+def test_orphans_lists_components_no_need_points_at(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    main(["status", "--config", _board(tmp_path)])
+    out = capsys.readouterr().out
+    assert "components-capabilities" in out
+    assert "components-changelog" in out
+
+
+def test_unjustified_stories_is_opt_in(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    main(["lint", "--config", _board(tmp_path)])
+    assert "unjustified component" not in capsys.readouterr().out
+
+
+def test_unjustified_stories_warns(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    rc = main(["lint", "--config", _board(tmp_path, '\n[lint]\nunjustified_stories = "warn"\n')])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "sb:components-changelog: unjustified component" in out
+    assert "components-codeblock: unjustified" not in out
+
+
+def test_unjustified_stories_error_fails_lint(tmp_path: Path) -> None:
+    cfg = _board(tmp_path, '\n[lint]\nunjustified_stories = "error"\n')
+    assert main(["lint", "--config", cfg]) == 1
+
+
+def test_suggest_leaves_stories_out_unless_named(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cfg = _board(tmp_path)
+    (tmp_path / "needs" / "h.yaml").write_text(
+        "needs:\n  - id: H-1\n    text: When a reader opens the changelog, they can see changes\n",
+        encoding="utf-8",
+    )
+    main(["suggest", "--config", cfg, "--json"])
+    assert "sb:" not in capsys.readouterr().out
+    main(["suggest", "--config", cfg, "--kind", "sb", "--json", "--min-score", "0"])
+    assert "sb:components-changelog" in capsys.readouterr().out

@@ -245,6 +245,8 @@ _PROOF_KEYS = frozenset(
         "files",
         "command",
         "timeout",
+        "index",
+        "url",
     ]
 )
 _SOURCE_KEYS = frozenset(
@@ -260,6 +262,7 @@ _TABLE_KEYS: dict[str, frozenset[str]] = {
             "importance_revisit_days",
             "draft_max_age_days",
             "unjustified_views",
+            "unjustified_stories",
             "link_without_why",
             "ai_attestation",
         }
@@ -321,6 +324,7 @@ class Config:
     importance_revisit_days: int | None = None  # [lint].importance_revisit_days (#59)
     draft_max_age_days: int | None = None  # [lint].draft_max_age_days: flag stale drafts (#60)
     unjustified_views: str | None = None  # [lint].unjustified_views: "warn" | "error" (#108)
+    unjustified_stories: str | None = None  # [lint].unjustified_stories: "warn" | "error"
     link_without_why: str | None = None  # [lint].link_without_why: "warn" | "error" (#104)
     ai_attestation: str = "warns"  # [lint].ai_attestation: "counts" | "warns" (#87)
     default_draft: bool = False  # [add].default_draft: ``add`` stages as draft by default (#60)
@@ -465,7 +469,7 @@ class Config:
             raise ConfigError("[lint].draft_max_age_days must be a positive integer")
 
         lint_levels: dict[str, str | None] = {}
-        for key in ("unjustified_views", "link_without_why"):
+        for key in ("unjustified_views", "unjustified_stories", "link_without_why"):
             level = lint_tbl.get(key)
             if level is not None and level not in ("warn", "error"):
                 raise ConfigError(f'[lint].{key} must be "warn" or "error"')
@@ -531,6 +535,7 @@ class Config:
             importance_revisit_days=revisit,
             draft_max_age_days=draft_max_age,
             unjustified_views=lint_levels["unjustified_views"],
+            unjustified_stories=lint_levels["unjustified_stories"],
             link_without_why=lint_levels["link_without_why"],
             ai_attestation=ai_attestation,
             default_draft=default_draft,

@@ -55,6 +55,7 @@ from ..status import (
     resolve,
     stale_decisions,
     summarize,
+    unjustified_stories,
     view_entry_warnings,
     view_link_errors,
     view_report,
@@ -303,6 +304,13 @@ def cmd_lint(args: argparse.Namespace) -> int:
                 warnings.append(
                     (row.view.key, f"link to {lk.target} cites unknown need {lk.need} (#104)")
                 )
+    if cfg.unjustified_stories is not None:
+        msg = "unjustified component: no need points at any of its stories"
+        for key in unjustified_stories(needs, cfg.adapters):
+            if cfg.unjustified_stories == "error":
+                errors.append(f"{key}: {msg}")
+            else:
+                warnings.append((key, msg))
     # Issues (#36): the engineering work joined to needs through `needs:` and `sources:`.
     issue_errors, issue_warnings = issue_findings(model.issues, results, cfg.source_adapters)
     errors += issue_errors

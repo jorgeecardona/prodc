@@ -1384,6 +1384,19 @@ def orphans(needs: list[Need], adapters: dict[str, Adapter]) -> dict[str, list[s
     return out
 
 
+def unjustified_stories(needs: list[Need], adapters: dict[str, Adapter]) -> list[str]:
+    """Storybook components no need points at, as ``<adapter>:<component>``.
+
+    Per component, not per story: a component with many variants needs one need, not one per
+    variant. A component counts as pointed at when any of its stories is a proof.
+    """
+    books: dict[str, Adapter] = {
+        n: a for n, a in adapters.items() if isinstance(a, StorybookAdapter)
+    }
+    found = orphans(needs, books)
+    return [f"{name}:{c}" for name, comps in sorted(found.items()) for c in comps]
+
+
 @dataclass(frozen=True)
 class ViewRow:
     """One view in the ``prodc views`` report: the needs that point at it and their state (#102)."""
