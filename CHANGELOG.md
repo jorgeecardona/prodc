@@ -4,6 +4,8 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-09
+
 ### Changed
 
 - `ux-miller` recipe: replaced placeholder with a source-scanning vitest guard that tests
