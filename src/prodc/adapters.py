@@ -580,16 +580,35 @@ class VitestAdapter:
 def _titles_missing(text: str, title: str, sep: str) -> str | None:
     """The first segment of ``title`` that does not appear in a test file's source, else None.
 
-    Each title segment must appear in the source. A quote escaped in the literal is tolerated.
+    Each title segment must appear in the source. A quote escaped in the literal is tolerated. A
+    segment also matches a template-literal title when it is that title with each ``${...}``
+    filled in, as vitest and Playwright render it (``at most ${LIMIT} rows`` matches
+    ``at most 50 rows``).
     """
+    templates = _template_titles(text)
     for seg in (s.strip() for s in title.split(sep)):
         if (
             seg not in text
             and seg.replace("'", "\\'") not in text
             and seg.replace('"', '\\"') not in text
+            and not any(t.fullmatch(seg) for t in templates)
         ):
             return seg
     return None
+
+
+#: A backtick string holding at least one ``${...}`` substitution.
+_TEMPLATE_RE = re.compile(r"`(?P<body>(?:\\.|[^`\\])*\$\{(?:\\.|[^`\\])*)`")
+_SUBST_RE = re.compile(r"\$\{[^}]*\}")
+
+
+def _template_titles(text: str) -> list[re.Pattern[str]]:
+    """A regex per template literal in ``text``: literal parts escaped, each ``${...}`` as ``.+``."""
+    out: list[re.Pattern[str]] = []
+    for m in _TEMPLATE_RE.finditer(text):
+        parts = _SUBST_RE.split(m["body"])
+        out.append(re.compile(".+".join(re.escape(part) for part in parts), re.DOTALL))
+    return out
 
 
 def _js_inventory(root: Path, patterns: Sequence[str], test_re: re.Pattern[str]) -> list[str]:

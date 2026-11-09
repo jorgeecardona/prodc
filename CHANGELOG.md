@@ -4,6 +4,11 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 ## [Unreleased]
 
+### Fixed
+
+- A vitest or Playwright proof now finds a test whose title is a template literal: the locator
+  `at most 50 rows` matches `it(`at most ${LIMIT} rows`)`. Before, the proof was BROKEN.
+
 ## [0.7.1] - 2026-11-09
 
 ### Changed

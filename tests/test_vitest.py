@@ -108,3 +108,25 @@ def test_config_builds_vitest_adapter(tmp_path: Path) -> None:
     )
     cfg = Config.load(tmp_path / "prodc.toml")
     assert isinstance(cfg.adapters["fe"], VitestAdapter)
+
+
+_TEMPLATE_TEST = """import { it } from 'vitest'
+const DESKTOP_LIMIT = 50
+it(`desktop page cap is at most ${DESKTOP_LIMIT} rows`, () => {})
+"""
+
+
+def test_template_literal_title_matches_its_rendered_text(tmp_path: Path) -> None:
+    (tmp_path / "m.test.ts").write_text(_TEMPLATE_TEST, encoding="utf-8")
+    adapter = VitestAdapter(tmp_path, None)
+    assert adapter.resolve("m.test.ts#desktop page cap is at most 50 rows").state is (
+        ProofState.DELIVERED
+    )
+
+
+def test_template_literal_title_does_not_match_other_text(tmp_path: Path) -> None:
+    (tmp_path / "m.test.ts").write_text(_TEMPLATE_TEST, encoding="utf-8")
+    adapter = VitestAdapter(tmp_path, None)
+    assert adapter.resolve("m.test.ts#mobile page cap is at most 50 rows").state is (
+        ProofState.BROKEN
+    )

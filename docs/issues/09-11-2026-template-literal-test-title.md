@@ -1,6 +1,6 @@
 ---
 title: "Lint does not explain a proof locator that misses a template-literal test title"
-status: open
+status: done
 scope: "S"
 verify: test
 area: adapters
@@ -27,3 +27,8 @@ with `${}` are not resolved; use a plain string". Same for the catalog recipes' 
 
 A vitest file with a template-literal title and a locator for its rendered text: lint reports
 BROKEN with the template-literal hint.
+
+## Outcome
+
+Done by matching, not by a hint: a locator segment now also matches a template-literal title with
+each `${...}` filled in (`_template_titles` in `adapters.py`), for the vitest and Playwright kinds.
