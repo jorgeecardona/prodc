@@ -4,6 +4,8 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-09
+
 ### Added
 
 - A `storybook` proof kind: a need can point at the Storybook stories that show it. prodc
@@ -19,6 +21,8 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 - `prodc.catalog.ux` ships 30 UX laws from lawsofux.com as catalog entries (`UX_CATALOG`).
   Five are checkable (ux-fitts, ux-hick, ux-von-restorff, ux-miller, ux-jakob) and carry a
   `Recipe` with a snippet for the guard test. `docs/ux-laws.md` lists all 30.
+  The ux-fitts, ux-hick, and ux-von-restorff recipes now carry real guard code extracted from
+  crm (source-file scanning approach); ux-miller and ux-jakob keep placeholder snippets.
 - `Principle` now supports `withdrawn: {reason, date[, kind]}`, reusing the existing `Withdrawal`
   type. A withdrawn principle is not evaluated by lint. `prodc withdraw principle <id>` and
   `prodc reinstate principle <id>` write the field.

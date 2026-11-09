@@ -63,24 +63,42 @@ _FITTS = CatalogEntry(
     checkable=True,
     recipe=Recipe(
         kind="vitest",
-        summary="Assert computed min-width/min-height on every interactive element.",
-        # TODO: replace with the guard from crm/tyko once it is extracted.
+        summary="Test the pure button-style function: every size variant sets minHeight >= 24px.",
+        # Real guard from crm: apps/website/src/design/fittssLaw.guard.test.ts
+        # jsdom has no layout engine; test the pure style function instead of a rendered bounding box.
         snippet="""\
-// tests/design/tap-targets.test.ts
-import { getAllInteractiveElements } from './helpers'
+// src/design/fittssLaw.guard.test.ts
+import { describe, expect, it } from "vitest";
+import { buttonVisualStyle, type ButtonSize } from "./primitives/Button";
 
-test('every interactive element meets the 24px minimum', () => {
-  const elements = getAllInteractiveElements(document)
-  for (const el of elements) {
-    const style = getComputedStyle(el)
-    const w = parseFloat(style.width)
-    const h = parseFloat(style.height)
-    expect(w, `${el.tagName}#${el.id} width`).toBeGreaterThanOrEqual(24)
-    expect(h, `${el.tagName}#${el.id} height`).toBeGreaterThanOrEqual(24)
-  }
-})
+const SIZES: ButtonSize[] = ["sm", "md", "lg"];
+
+describe("interactive targets meet the 24x24px minimum (WCAG 2.5.8)", () => {
+  it("every size variant sets minHeight >= 24px", () => {
+    for (const size of SIZES) {
+      const style = buttonVisualStyle({ size });
+      expect(
+        style.minHeight,
+        `size "${size}" minHeight ${style.minHeight} is below the 24px WCAG minimum`,
+      ).toBeGreaterThanOrEqual(24);
+    }
+  });
+
+  it("icon-only buttons set minWidth >= 24px (they form a square target)", () => {
+    for (const size of SIZES) {
+      const style = buttonVisualStyle({ size, iconOnly: true });
+      expect(style.minWidth).toBeGreaterThanOrEqual(24);
+    }
+  });
+
+  it("checks a real primitive, not an empty fixture", () => {
+    const style = buttonVisualStyle({ variant: "primary", size: "md" });
+    expect(style.minHeight).toBeDefined();
+    expect(SIZES.length).toBeGreaterThan(0);
+  });
+});
 """,
-        proof_locator_hint="vitest:tests/design/tap-targets.test.ts::every interactive element meets the 24px minimum",
+        proof_locator_hint="vitest:src/design/fittssLaw.guard.test.ts::interactive targets meet the 24x24px minimum (WCAG 2.5.8) > every size variant sets minHeight >= 24px",
     ),
 )
 
@@ -93,22 +111,37 @@ _HICK = CatalogEntry(
     checkable=True,
     recipe=Recipe(
         kind="vitest",
-        summary="Count rendered items in each top-level nav component.",
-        # TODO: replace with the guard from crm/tyko once it is extracted.
+        summary="Count top-level nav items per role; each must stay at or below the threshold set when the principle was written.",
+        # Real guard from crm: apps/website/src/design/hicksLaw.guard.test.ts
+        # Thresholds are the counts at adoption time; the guard prevents growth beyond them.
         snippet="""\
-// tests/design/nav-items.test.ts
-import { render } from '@testing-library/react'
-import { Navigation } from '../src/Navigation'
+// src/design/hicksLaw.guard.test.ts
+import { describe, expect, it } from "vitest";
+import { sectionsForRole } from "../lib/navLens";
 
-const MAX_NAV_ITEMS = {N}
+// Replace MAX_NAV_ITEMS with the current count per role in your app.
+const MAX_NAV_ITEMS = {N};
 
-test('top-level nav has no more than {N} items', () => {
-  const { getAllByRole } = render(<Navigation />)
-  const items = getAllByRole('menuitem')
-  expect(items.length).toBeLessThanOrEqual(MAX_NAV_ITEMS)
-})
+describe("the main nav has at most {N} top-level sections per role", () => {
+  it("primary role sees at most {N} sections", () => {
+    const sections = sectionsForRole("primary");
+    expect(
+      sections.length,
+      `primary role now has ${sections.length} nav sections (threshold {N}) — ` +
+        "update this guard and the principle YAML if the addition is intentional",
+    ).toBeLessThanOrEqual(MAX_NAV_ITEMS);
+  });
+
+  it("watches a real nav lens: sections are non-empty and named", () => {
+    const sections = sectionsForRole("primary");
+    expect(sections.length).toBeGreaterThan(0);
+    for (const s of sections) {
+      expect(s).toMatch(/^\\//);
+    }
+  });
+});
 """,
-        proof_locator_hint="vitest:tests/design/nav-items.test.ts::top-level nav has no more than {N} items",
+        proof_locator_hint="vitest:src/design/hicksLaw.guard.test.ts::the main nav has at most {N} top-level sections per role > primary role sees at most {N} sections",
     ),
 )
 
@@ -123,21 +156,47 @@ _VON_RESTORFF = CatalogEntry(
     ),
     checkable=True,
     recipe=Recipe(
-        kind="playwright",
-        summary="Count primary-action buttons per form/dialog in each component.",
-        # TODO: replace with the guard from crm/tyko once it is extracted.
+        kind="vitest",
+        summary="Grep form/dialog source files for variant=\"primary\"; each file must have at most one.",
+        # Real guard from crm: apps/website/src/design/vonRestorff.guard.test.ts
+        # jsdom has no layout; scan source files statically for variant="primary" in JSX.
         snippet="""\
-// tests/design/primary-buttons.spec.ts
-import { test, expect } from '@playwright/experimental-ct-react'
-import { MyForm } from '../src/MyForm'
+// src/design/vonRestorff.guard.test.ts
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
+import { describe, expect, it } from "vitest";
 
-test('form has at most one primary button', async ({ mount }) => {
-  const component = await mount(<MyForm />)
-  const primaries = component.locator('[data-variant="primary"], .btn-primary')
-  await expect(primaries).toHaveCount(1)
-})
+const SRC = join(import.meta.dirname, "..");
+const FORM_PATTERN = /(?:Form|Dialog|Modal)\\.tsx$/;
+const PRIMARY_BUTTON = /variant="primary"/g;
+
+function formFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) out.push(...formFiles(full));
+    else if (FORM_PATTERN.test(entry)) out.push(full);
+  }
+  return out;
+}
+
+describe("at most one primary button per form or dialog", () => {
+  it("no form or dialog file contains more than one variant=\\"primary\\" button", () => {
+    const offenders: string[] = [];
+    for (const file of formFiles(SRC)) {
+      const src = readFileSync(file, "utf8");
+      const count = (src.match(PRIMARY_BUTTON) ?? []).length;
+      if (count > 1) offenders.push(`${relative(SRC, file)} (${count} primary buttons)`);
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("watches a real tree: at least 10 form/dialog files must exist", () => {
+    expect(formFiles(SRC).length).toBeGreaterThanOrEqual(10);
+  });
+});
 """,
-        proof_locator_hint="playwright:tests/design/primary-buttons.spec.ts::form has at most one primary button",
+        proof_locator_hint="vitest:src/design/vonRestorff.guard.test.ts::at most one primary button per form or dialog > no form or dialog file contains more than one variant=\"primary\" button",
     ),
 )
 
