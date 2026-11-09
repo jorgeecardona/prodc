@@ -33,6 +33,7 @@ nav:
   - Config: config.md
   - Storybook: storybook.md
   - Lifecycle: lifecycle.md
+  - Principles: principles.md
   - Grounding (Torres): grounding-torres.md
 
 markdown_extensions:

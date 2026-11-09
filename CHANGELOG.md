@@ -14,6 +14,8 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
   answer it: must-have opinions and warrant reviews with concerns. It never writes (#113).
 - `[prodc].name` sets the board name that `status`, `portfolio` and `report` show. The default is
   still the directory name (#125).
+- `docs/principles.md` documents how to adopt a UX law as a design principle: concrete rule as
+  `text`, the law page as a `secondary` source, and a guard test as the proof.
 
 ### Fixed
 
