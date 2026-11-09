@@ -265,12 +265,13 @@ _TABLE_KEYS: dict[str, frozenset[str]] = {
             "unjustified_stories",
             "link_without_why",
             "ai_attestation",
+            "missing_catalog_principles",
         }
     ),
     "importance": frozenset({"levels"}),
     "add": frozenset({"default_draft"}),
     "callbacks": frozenset({"state_file", "hooks"}),
-    "principles": frozenset({"scopes"}),
+    "principles": frozenset({"scopes", "packs"}),
     "flows": frozenset({"steps"}),
 }
 _TOP_KEYS = frozenset(_TABLE_KEYS) | {"proofs", "sources"}
@@ -331,6 +332,8 @@ class Config:
     callbacks: tuple[Callback, ...] = ()  # [[callbacks.hooks]]: lifecycle callbacks (#71)
     callback_state_file: str = ".prodc/state.json"  # [callbacks].state_file: the state ledger
     principle_scopes: tuple[str, ...] = ("product",)  # [principles].scopes: allowed scopes (#88)
+    principle_packs: tuple[str, ...] = ()  # [principles].packs: catalog packs to lint against
+    missing_catalog_principles: str = "warn"  # [lint].missing_catalog_principles: warn|error|off
     flow_steps: tuple[str, ...] = ()  # [flows].steps: ordered step vocab; () = undeclared (#90)
     notices: tuple[str, ...] = ()  # unknown prodc.toml keys: printed on reads, fail lint
     name: str = ""  # [prodc].name: the board's name; "" means the directory's name (#125)
@@ -511,6 +514,17 @@ class Config:
             principle_scopes = tuple(scopes)
         else:
             principle_scopes = ("product",)
+        if "packs" in principles_tbl:
+            packs_raw = _as_str_list(principles_tbl["packs"], "[principles].packs")
+            principle_packs = tuple(packs_raw)
+        else:
+            principle_packs = ()
+
+        missing_catalog_level = lint_tbl.get("missing_catalog_principles", "warn")
+        if missing_catalog_level not in ("warn", "error", "off"):
+            raise ConfigError(
+                '[lint].missing_catalog_principles must be "warn", "error", or "off"'
+            )
 
         flows_tbl = _as_dict(raw.get("flows", {}), "[flows]")
         if "steps" in flows_tbl:
@@ -542,6 +556,8 @@ class Config:
             callbacks=callbacks,
             callback_state_file=callback_state_file,
             principle_scopes=principle_scopes,
+            principle_packs=principle_packs,
+            missing_catalog_principles=missing_catalog_level,
             flow_steps=flow_steps,
             notices=_unknown_toml_keys(raw),
             name=board_name.strip(),

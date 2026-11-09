@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import importlib.resources
 import json
+import re
 import sys
 from dataclasses import asdict, replace
 from datetime import date
@@ -346,6 +347,37 @@ def cmd_lint(args: argparse.Namespace) -> int:
     # Flow step hygiene (#90): once [flows].steps declares a vocabulary, grade each journey's
     # shape: never-terminal, out-of-order, mixed bare/stepped. Silent when no vocab is declared.
     warnings += flow_step_warnings(needs, cfg.flow_steps)
+    # Catalog coverage: when [principles].packs declares a pack, every checkable entry in that pack
+    # should either be present (active or withdrawn) or explicitly declined. Missing entries surface
+    # as warn by default; set [lint].missing_catalog_principles = "error" for a CI gate.
+    if cfg.principle_packs and cfg.missing_catalog_principles != "off":
+        present_ids = {p.id for p in model.principles}
+        for entry in UX_CATALOG:
+            if entry.pack not in cfg.principle_packs:
+                continue
+            if not entry.checkable:
+                continue
+            if entry.id not in present_ids:
+                msg = (
+                    f"catalog principle {entry.id!r} ({entry.title}) is not in the board; "
+                    "add it with 'prodc add principle --from-catalog' or "
+                    "'--decline <reason>' to record why it was skipped"
+                )
+                if cfg.missing_catalog_principles == "error":
+                    errors.append(f"{entry.id}: {msg}")
+                else:
+                    warnings.append((entry.id, msg))
+    # Unfilled slots: a principle text that still contains a {slot} pattern was written from a
+    # template and not filled in. Always a warning (a principle with a slot is under-specified).
+    _SLOT_RE = re.compile(r"\{[^}]+\}")
+    for p in model.principles:
+        if p.withdrawn is not None:
+            continue
+        slots = _SLOT_RE.findall(p.text)
+        if slots:
+            warnings.append(
+                (p.id, f"principle text has unfilled slot(s): {', '.join(slots)}")
+            )
     if args.json:
         print(
             json.dumps(

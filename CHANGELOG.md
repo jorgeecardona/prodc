@@ -16,6 +16,19 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
   still the directory name (#125).
 - `docs/principles.md` documents how to adopt a UX law as a design principle: concrete rule as
   `text`, the law page as a `secondary` source, and a guard test as the proof.
+- `prodc.catalog.ux` ships 30 UX laws from lawsofux.com as catalog entries (`UX_CATALOG`).
+  Five are checkable (ux-fitts, ux-hick, ux-von-restorff, ux-miller, ux-jakob) and carry a
+  `Recipe` with a snippet for the guard test. `docs/ux-laws.md` lists all 30.
+- `Principle` now supports `withdrawn: {reason, date[, kind]}`, reusing the existing `Withdrawal`
+  type. A withdrawn principle is not evaluated by lint. `prodc withdraw principle <id>` and
+  `prodc reinstate principle <id>` write the field.
+- `prodc add principle --from-catalog <id>` seeds a principle from the UX catalog: sets the id,
+  scope=design, text from the entry's template, and a secondary source; prints the recipe snippet.
+  `--decline <reason>` additionally marks it withdrawn out_of_scope (a deliberate skip, on record).
+- `[principles].packs = ["ux"]` lists catalog packs the board opts into.
+- `[lint].missing_catalog_principles = "warn"|"error"|"off"` (default `warn`) reports checkable
+  entries in the declared packs that have not been added or declined.
+- `lint` warns when a principle's text still contains a `{slot}` from the template.
 
 ### Fixed
 
