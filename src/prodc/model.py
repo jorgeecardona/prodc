@@ -278,6 +278,7 @@ class Principle:
     proofs: tuple[
         str, ...
     ] = ()  # guard-test locators, resolved by the same adapters as needs (#89)
+    withdrawn: Withdrawal | None = None  # retired / out-of-scope: the record stays as its trace
 
 
 @dataclass(frozen=True)

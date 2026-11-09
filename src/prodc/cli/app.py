@@ -436,7 +436,10 @@ def main(argv: list[str] | None = None) -> int:
         parents=[config, json_out],
         help="record a decision against a need: withdrawn / won't-do (#74)",
     )
-    wd.add_argument("target", help="the need id to withdraw, or 'decision' to withdraw a decision")
+    wd.add_argument(
+        "target",
+        help="the need id to withdraw, 'decision' to withdraw a decision, or 'principle' to withdraw a principle",
+    )
     wd.add_argument(
         "decision_id", nargs="?", default=None, help="the decision id (when target is 'decision')"
     )
@@ -481,7 +484,8 @@ def main(argv: list[str] | None = None) -> int:
         help="remove a need's withdrawal, putting it back on the board (#74)",
     )
     ri.add_argument(
-        "target", help="the need id to reinstate, or 'decision' to reinstate a decision"
+        "target",
+        help="the need id to reinstate, 'decision' to reinstate a decision, or 'principle' to reinstate a principle",
     )
     ri.add_argument(
         "decision_id", nargs="?", default=None, help="the decision id (when target is 'decision')"

@@ -1154,6 +1154,62 @@ def revise_principle(
     return _validated(config, path, old_text, new_text, dry_run)
 
 
+def withdraw_principle(
+    config: Config,
+    principle_id: str,
+    *,
+    reason: str,
+    date: str,
+    kind: str = "wont_do",
+    expect_sha: str | None = None,
+    dry_run: bool,
+) -> Edit:
+    """Mark a principle as withdrawn: sets ``withdrawn: {reason, date[, kind]}`` in its file.
+
+    A withdrawn principle stays on disk as an audit trace; ``prodc lint`` no longer nags about it.
+    ``kind`` defaults to ``wont_do``; pass ``out_of_scope`` when the principle was retired because
+    the product changed scope, not because it was wrong.
+    """
+    path, doc, old_text = _locate_principle(config, principle_id)
+    if expect_sha is not None and _sha256(old_text) != expect_sha:
+        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
+    for raw in cast("list[object]", doc["principles"]):
+        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == principle_id:
+            principle = cast("dict[str, object]", raw)
+            mark: dict[str, object] = {"reason": reason, "date": date}
+            if kind != "wont_do":
+                mark["kind"] = kind
+            principle["withdrawn"] = mark
+            break
+    new_text = _render_item_edit(old_text, doc, "principles", principle_id)
+    return _validated(config, path, old_text, new_text, dry_run)
+
+
+def reinstate_principle(
+    config: Config,
+    principle_id: str,
+    *,
+    expect_sha: str | None = None,
+    dry_run: bool,
+) -> Edit:
+    """Remove the ``withdrawn`` field from a principle, putting it back into active lint coverage.
+
+    Raises :exc:`WriteError` if the principle is not currently withdrawn.
+    """
+    path, doc, old_text = _locate_principle(config, principle_id)
+    if expect_sha is not None and _sha256(old_text) != expect_sha:
+        raise WriteError(f"{path.name} changed since it was read (optimistic lock)")
+    for raw in cast("list[object]", doc["principles"]):
+        if isinstance(raw, dict) and cast("dict[str, object]", raw).get("id") == principle_id:
+            principle = cast("dict[str, object]", raw)
+            if "withdrawn" not in principle:
+                raise WriteError(f"principle {principle_id!r} is not withdrawn")
+            del principle["withdrawn"]
+            break
+    new_text = _render_item_edit(old_text, doc, "principles", principle_id)
+    return _validated(config, path, old_text, new_text, dry_run)
+
+
 def add_decision(
     config: Config,
     decision_id: str,

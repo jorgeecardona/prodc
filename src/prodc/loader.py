@@ -476,6 +476,7 @@ def _principle(raw: object, where: str) -> Principle:
         ),
         implemented_in=_opt_str(tbl.get("implemented_in"), f"{where}.implemented_in"),
         proofs=proofs,
+        withdrawn=_withdrawal(tbl.get("withdrawn"), f"{where}.withdrawn"),
     )
 
 
@@ -563,6 +564,7 @@ _FILE_SHAPE = _shape(
     principles=_shape(
         "id text scope revised_at implemented_in proofs",
         sources=_SOURCE_SHAPE,
+        withdrawn=_WITHDRAWAL_SHAPE,
     ),
     decisions=_shape(
         "id text needs alternatives consequences principles decided_at draft awaits",

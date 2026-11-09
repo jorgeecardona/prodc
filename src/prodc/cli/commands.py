@@ -77,6 +77,7 @@ from ..writer import (
     record_outcome,
     reinstate,
     reinstate_decision,
+    reinstate_principle,
     relink_proof,
     revise_principle,
     set_decision_awaits,
@@ -84,6 +85,7 @@ from ..writer import (
     set_importance,
     withdraw,
     withdraw_decision,
+    withdraw_principle,
 )
 from .common import (
     RepoRow,
@@ -202,6 +204,8 @@ def cmd_lint(args: argparse.Namespace) -> int:
     principle_errors: list[str] = []
     principle_warnings: list[tuple[str, str]] = []
     for rep in principle_report(needs, list(model.principles), cfg.adapters):
+        if rep.principle.withdrawn is not None:
+            continue  # withdrawn principle: guard state is not evaluated
         for n in rep.stale:
             if n.id in by_id and n.withdrawn is not None:
                 by_id[n.id].warnings.append(
@@ -846,6 +850,19 @@ def cmd_withdraw(args: argparse.Namespace) -> int:
                 expect_sha=args.expect_sha,
                 dry_run=args.dry_run,
             )
+        elif args.target == "principle":
+            if not args.decision_id:
+                print("prodc: withdraw principle needs a principle id", file=sys.stderr)
+                return 2
+            edit = withdraw_principle(
+                cfg,
+                args.decision_id,
+                reason=args.reason,
+                date=args.date or date.today().isoformat(),
+                kind=args.kind,
+                expect_sha=args.expect_sha,
+                dry_run=args.dry_run,
+            )
         else:
             edit = withdraw(
                 cfg,
@@ -877,6 +894,16 @@ def cmd_reinstate(args: argparse.Namespace) -> int:
                 print("prodc: reinstate decision needs a decision id", file=sys.stderr)
                 return 2
             edit = reinstate_decision(
+                cfg,
+                args.decision_id,
+                expect_sha=args.expect_sha,
+                dry_run=args.dry_run,
+            )
+        elif args.target == "principle":
+            if not args.decision_id:
+                print("prodc: reinstate principle needs a principle id", file=sys.stderr)
+                return 2
+            edit = reinstate_principle(
                 cfg,
                 args.decision_id,
                 expect_sha=args.expect_sha,
