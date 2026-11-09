@@ -212,24 +212,35 @@ _MILLER = CatalogEntry(
     checkable=True,
     recipe=Recipe(
         kind="vitest",
-        summary="Assert that any list beyond the threshold has pagination or section headers.",
-        # TODO: replace with the guard from crm/tyko once it is extracted.
+        summary="Assert that the page-size constant used by your list components stays at or below the agreed threshold.",
+        # Real guard from crm: apps/website/src/design/millerLaw.guard.test.ts
+        # The guard tests a named constant, not a rendered component; jsdom has no virtual scroll.
+        # Adapt PAGE_SIZE_CONSTANT and the import path for your app.
         snippet="""\
-// tests/design/list-paging.test.ts
-import { render } from '@testing-library/react'
-import { ItemList } from '../src/ItemList'
+// src/design/millerLaw.guard.test.ts
+import { describe, expect, it } from "vitest";
+import { PAGE_SIZE_CONSTANT } from "./primitives/pageSize";
+// Replace PAGE_SIZE_CONSTANT with the constant your list component uses, e.g. DESKTOP_PAGE_SIZE.
 
-const THRESHOLD = {N}
-const items = Array.from({ length: THRESHOLD + 1 }, (_, i) => ({ id: i, label: `Item ${i}` }))
+const LIMIT = {N};
 
-test('long list shows a pager or section headers', () => {
-  const { container } = render(<ItemList items={items} />)
-  const hasPager = container.querySelector('[aria-label="pagination"]') !== null
-  const hasGroups = container.querySelectorAll('[role="group"]').length > 1
-  expect(hasPager || hasGroups).toBe(true)
-})
+describe("Miller's Law: list page cap stays within agreed bounds", () => {
+  it(`page cap is at most ${LIMIT} rows`, () => {
+    expect(
+      PAGE_SIZE_CONSTANT,
+      `PAGE_SIZE_CONSTANT (${PAGE_SIZE_CONSTANT}) exceeds the ${LIMIT}-row cap — ` +
+        "update this guard and the ux-miller principle YAML if the change is intentional",
+    ).toBeLessThanOrEqual(LIMIT);
+  });
+
+  it("watches a real module: PAGE_SIZE_CONSTANT is defined and positive", () => {
+    // Proves the import resolved and the module exports a real value.
+    expect(typeof PAGE_SIZE_CONSTANT).toBe("number");
+    expect(PAGE_SIZE_CONSTANT).toBeGreaterThan(0);
+  });
+});
 """,
-        proof_locator_hint="vitest:tests/design/list-paging.test.ts::long list shows a pager or section headers",
+        proof_locator_hint="vitest:src/design/millerLaw.guard.test.ts::Miller's Law: list page cap stays within agreed bounds > page cap is at most {N} rows",
     ),
 )
 
@@ -244,28 +255,66 @@ _JAKOB = CatalogEntry(
     ),
     checkable=True,
     recipe=Recipe(
-        kind="playwright",
-        summary="Verify Escape closes dialogs, Enter submits forms, and the logo links home.",
-        # TODO: replace with the guard from crm/tyko once it is extracted.
+        kind="vitest",
+        summary="Source-scan every dialog/modal file for Escape handling and check the logo link in the nav component.",
+        # Real guard from crm: apps/website/src/design/jakobLaw.guard.test.ts
+        # jsdom has no global keydown dispatch in this setup; source scanning is the only way
+        # to verify the structural invariants without spinning up a browser.
+        # Adapt DIALOG_HOOK and the logo assertion to your app's conventions.
         snippet="""\
-// tests/design/conventions.spec.ts
-import { test, expect } from '@playwright/test'
+// src/design/jakobLaw.guard.test.ts
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
+import { describe, expect, it } from "vitest";
 
-test('Escape closes the dialog', async ({ page }) => {
-  await page.goto('/')
-  await page.click('[data-testid="open-dialog"]')
-  await expect(page.locator('[role="dialog"]')).toBeVisible()
-  await page.keyboard.press('Escape')
-  await expect(page.locator('[role="dialog"]')).not.toBeVisible()
-})
+const SRC = join(import.meta.dirname, "..");
+const DIALOG_PATTERN = /(?:Dialog|Modal)\\.tsx$/;
 
-test('logo links to home', async ({ page }) => {
-  await page.goto('/about')
-  await page.click('[data-testid="site-logo"]')
-  await expect(page).toHaveURL('/')
-})
+// The shared hook (or keyword) every dialog must use to wire Escape.
+// Adapt to match your app: a hook name, an imported function, or a bare string like "Escape".
+const DIALOG_HOOK = "useDialogFocus";
+
+function dialogFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) out.push(...dialogFiles(full));
+    else if (DIALOG_PATTERN.test(entry)) out.push(full);
+  }
+  return out;
+}
+
+describe("Jakob's Law: app conventions match user expectations", () => {
+  it("every dialog and modal file uses the shared Escape handler", () => {
+    const offenders: string[] = [];
+    for (const file of dialogFiles(SRC)) {
+      const src = readFileSync(file, "utf8");
+      if (!src.includes(DIALOG_HOOK)) offenders.push(relative(SRC, file));
+    }
+    expect(
+      offenders,
+      `These dialogs do not use ${DIALOG_HOOK}; Escape will not close them:\\n  ${offenders.join("\\n  ")}`,
+    ).toEqual([]);
+  });
+
+  it("the logo in Nav.tsx links to the home route", () => {
+    const nav = readFileSync(join(SRC, "components/Nav.tsx"), "utf8");
+    // Adapt the regex to match your logo link. The pattern matches the home
+    // route href within 300 characters before the logo element.
+    expect(nav, "logo in Nav.tsx must link to the home route").toMatch(
+      /to="\\/[^"]*"[\\s\\S]{1,300}<(?:Logo|Wordmark|SiteLogo)/,
+    );
+  });
+
+  it("watches a real tree: at least 4 dialog/modal files must exist", () => {
+    expect(
+      dialogFiles(SRC).length,
+      "fewer than 4 dialog/modal files found — the guard may not be scanning the right directory",
+    ).toBeGreaterThanOrEqual(4);
+  });
+});
 """,
-        proof_locator_hint="playwright:tests/design/conventions.spec.ts::Escape closes the dialog",
+        proof_locator_hint="vitest:src/design/jakobLaw.guard.test.ts::Jakob's Law: app conventions match user expectations > every dialog and modal file uses the shared Escape handler",
     ),
 )
 

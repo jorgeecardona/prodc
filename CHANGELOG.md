@@ -4,6 +4,15 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 ## [Unreleased]
 
+### Changed
+
+- `ux-miller` recipe: replaced placeholder with a source-scanning vitest guard that tests
+  a named page-size constant against the agreed threshold (derived from crm
+  `apps/website/src/design/millerLaw.guard.test.ts`).
+- `ux-jakob` recipe: replaced placeholder playwright test with a source-scanning vitest guard
+  that checks every dialog/modal for the shared Escape hook and verifies the logo link in
+  Nav.tsx (derived from crm `apps/website/src/design/jakobLaw.guard.test.ts`).
+
 ## [0.7.0] - 2026-11-09
 
 ### Added
