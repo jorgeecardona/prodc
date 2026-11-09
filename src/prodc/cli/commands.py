@@ -18,6 +18,7 @@ from typing import cast
 
 from ..board import annotate_need_warnings, gather
 from ..callbacks import advance_ledger, fire, read_ledger, transitions, write_ledger
+from ..catalog import UX_CATALOG
 from ..config import Config, ConfigError
 from ..dedup import (
     VariantGroup,
@@ -30,7 +31,17 @@ from ..glossary import glossary_findings
 from ..inbox import inbox
 from ..issues import issue_findings
 from ..loader import LoaderError, load
-from ..model import Decision, Need, NeedResult, NeedState, PrincipleState, Stage, board_needs
+from ..model import (
+    Decision,
+    Need,
+    NeedResult,
+    NeedState,
+    PrincipleState,
+    Source,
+    SourceKind,
+    Stage,
+    board_needs,
+)
 from ..report import render_markdown
 from ..report_export import export_rows, render_confluence, render_csv, render_jira
 from ..report_html import render_html
@@ -629,6 +640,9 @@ def cmd_add(args: argparse.Namespace) -> int:
     if not cfg_path.exists():
         print(f"prodc: no config at {cfg_path}", file=sys.stderr)
         return 2
+    if args.need_id is None and getattr(args, "from_catalog", None) is None:
+        print("prodc: add requires an id (or --from-catalog for a catalog principle)", file=sys.stderr)
+        return 2
     if args.noun == "role":
         if args.text is None:
             print("prodc: add role requires --text", file=sys.stderr)
@@ -648,6 +662,44 @@ def cmd_add(args: argparse.Namespace) -> int:
             return 2
         return emit_edit(edit, args.dry_run, args.json)
     if args.noun == "principle":
+        from_catalog = getattr(args, "from_catalog", None)
+        decline = getattr(args, "decline", None)
+        if from_catalog is not None:
+            entry = next((e for e in UX_CATALOG if e.id == from_catalog), None)
+            if entry is None:
+                print(f"prodc: catalog entry {from_catalog!r} not found", file=sys.stderr)
+                return 2
+            try:
+                cfg = Config.load(cfg_path)
+                catalog_source = Source(kind=SourceKind.SECONDARY, locator=entry.url)
+                edit = add_principle(
+                    cfg,
+                    entry.id,
+                    entry.text_template,
+                    file=args.file,
+                    revised_at=date.today().isoformat(),
+                    scope="design",
+                    sources=(catalog_source,),
+                    expect_sha=args.expect_sha,
+                    dry_run=args.dry_run,
+                )
+                result = emit_edit(edit, args.dry_run, args.json)
+                if entry.recipe is not None and not args.dry_run:
+                    print(f"\nRecipe ({entry.recipe.kind}): {entry.recipe.summary}")
+                    print(entry.recipe.snippet)
+                if decline is not None and not args.dry_run:
+                    withdraw_principle(
+                        cfg,
+                        entry.id,
+                        reason=decline,
+                        date=date.today().isoformat(),
+                        kind="out_of_scope",
+                        dry_run=False,
+                    )
+            except (ConfigError, LoaderError, WriteError) as exc:
+                print(f"prodc: {exc}", file=sys.stderr)
+                return 2
+            return result
         try:
             cfg = Config.load(cfg_path)
             text, sources = args.text, ()

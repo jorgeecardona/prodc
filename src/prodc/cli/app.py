@@ -203,7 +203,10 @@ def main(argv: list[str] | None = None) -> int:
     ad.add_argument("noun", choices=["need", "role", "principle", "decision"], help="what to add")
     ad.add_argument(
         "need_id",
-        help="the new item's id: need (N-9), role, principle (P-1), or decision (D-1)",
+        nargs="?",
+        default=None,
+        help="the new item's id: need (N-9), role, principle (P-1), or decision (D-1); "
+        "omit only with --from-catalog (the catalog id is used)",
     )
     ad.add_argument(
         "--text",
@@ -217,6 +220,21 @@ def main(argv: list[str] | None = None) -> int:
         metavar="ID",
         help="principle only: promote a need into a principle: copy its text (unless --text "
         "overrides) and its sources as the provenance that surfaced it; the need stays on the board",
+    )
+    ad.add_argument(
+        "--from-catalog",
+        default=None,
+        metavar="CATALOG_ID",
+        dest="from_catalog",
+        help="principle only: seed from a catalog entry (e.g. ux-fitts): writes id=catalog-id, "
+        "scope=design, text from the entry's template, and a secondary source; prints the recipe",
+    )
+    ad.add_argument(
+        "--decline",
+        default=None,
+        metavar="REASON",
+        help="principle only (with --from-catalog): write the principle then immediately mark it "
+        "withdrawn out_of_scope with REASON (records a deliberate decision to skip this law)",
     )
     ad.add_argument(
         "--scope",
