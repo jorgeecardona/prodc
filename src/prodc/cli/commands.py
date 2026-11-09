@@ -679,6 +679,9 @@ def cmd_add(args: argparse.Namespace) -> int:
         if args.text is None:
             print("prodc: add role requires --text", file=sys.stderr)
             return 2
+        if args.need_id is None:
+            print("prodc: add role requires an id", file=sys.stderr)
+            return 2
         try:
             cfg = Config.load(cfg_path)
             edit = add_role(
@@ -751,6 +754,9 @@ def cmd_add(args: argparse.Namespace) -> int:
                     file=sys.stderr,
                 )
                 return 2
+            if args.need_id is None:
+                print("prodc: add principle requires an id", file=sys.stderr)
+                return 2
             edit = add_principle(
                 cfg,
                 args.need_id,
@@ -780,6 +786,9 @@ def cmd_add(args: argparse.Namespace) -> int:
             )
             return 2
         principles = tuple(p.strip() for p in (args.principles or "").split(",") if p.strip())
+        if args.need_id is None:
+            print("prodc: add decision requires an id", file=sys.stderr)
+            return 2
         try:
             cfg = Config.load(cfg_path)
             edit = add_decision(
@@ -823,6 +832,9 @@ def cmd_add(args: argparse.Namespace) -> int:
                     file=sys.stderr,
                 )
                 return 2
+        if args.need_id is None:
+            print("prodc: add need requires an id", file=sys.stderr)
+            return 2
         edit = add_need(
             cfg,
             args.need_id,

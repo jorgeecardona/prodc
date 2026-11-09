@@ -161,7 +161,7 @@ needs:
     (tmp_path / "needs" / "p.yaml").write_text(yaml, encoding="utf-8")
     cfg = Config.load(tmp_path / "prodc.toml")
     model = load(cfg)
-    reports = principle_report(model.needs, list(model.principles), {})
+    reports = principle_report(list(model.needs), list(model.principles), {})
     # P-gone has no proofs and would normally produce a report, but it's withdrawn so
     # the caller skips it; the report itself is still returned (withdrawn is model data)
     gone_rep = next((r for r in reports if r.principle.id == "P-gone"), None)
