@@ -11,6 +11,9 @@ See [model](model.md) for the full noun reference and all fields.
 any of them as a `principle` with `scope: design`. Once listed, the board tracks it. Opt in by
 listing it; nothing is assumed.
 
+See [ux-laws.md](ux-laws.md) for the full catalog, including `prodc add principle --from-catalog`
+usage and the checkable entries that ship with test snippets.
+
 ### How to adopt a law
 
 1. Pick a law from [lawsofux.com](https://lawsofux.com/).
