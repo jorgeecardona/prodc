@@ -43,7 +43,8 @@ from .commands import (
 )
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
+    """Return the full ``prodc`` argument parser. The MCP server builds its argv against it."""
     parser = argparse.ArgumentParser(prog="prodc", description="Product management as code.")
     parser.add_argument("--version", action="version", version=f"prodc {__version__}")
     parser.add_argument(
@@ -784,8 +785,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     df.add_argument("snapshot", help="path to a saved `prodc status --json` file")
     df.set_defaults(func=cmd_diff)
+    return parser
 
-    args = parser.parse_args(argv)
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
     if args.chdir is not None:
         try:
             os.chdir(args.chdir)

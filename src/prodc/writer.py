@@ -66,6 +66,16 @@ class Edit:
     new_text: str
 
     @property
+    def sha_before(self) -> str:
+        """SHA-256 of the file before the edit: the value ``--expect-sha`` compares against."""
+        return _sha256(self.old_text)
+
+    @property
+    def sha_after(self) -> str:
+        """SHA-256 of the file after the edit: pass it as ``--expect-sha`` to the next write."""
+        return _sha256(self.new_text)
+
+    @property
     def diff(self) -> str:
         rel = self.path.name
         return "".join(

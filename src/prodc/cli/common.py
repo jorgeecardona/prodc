@@ -79,7 +79,14 @@ def exit_code(args: argparse.Namespace, summary: Summary, orphan_total: int) -> 
 
 def emit_edit(edit: Edit, dry_run: bool, as_json: bool) -> int:
     if as_json:
-        print(json.dumps({"file": edit.path.name, "dry_run": dry_run, "diff": edit.diff}, indent=2))
+        payload = {
+            "file": edit.path.name,
+            "dry_run": dry_run,
+            "diff": edit.diff,
+            "sha_before": edit.sha_before,
+            "sha_after": edit.sha_after,
+        }
+        print(json.dumps(payload, indent=2))
     else:
         print(f"{'would edit' if dry_run else 'edited'} {edit.path.name}")
         print(edit.diff, end="")
