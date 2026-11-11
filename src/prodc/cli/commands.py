@@ -356,7 +356,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
         for entry in CATALOG:
             if entry.pack not in cfg.principle_packs:
                 continue
-            if not entry.checkable:
+            if not (entry.checkable or entry.sign_off):
                 continue
             if entry.id not in present_ids:
                 msg = (
@@ -376,9 +376,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
             continue
         slots = _SLOT_RE.findall(p.text)
         if slots:
-            warnings.append(
-                (p.id, f"principle text has unfilled slot(s): {', '.join(slots)}")
-            )
+            warnings.append((p.id, f"principle text has unfilled slot(s): {', '.join(slots)}"))
     if args.json:
         print(
             json.dumps(
@@ -674,7 +672,9 @@ def cmd_add(args: argparse.Namespace) -> int:
         print(f"prodc: no config at {cfg_path}", file=sys.stderr)
         return 2
     if args.need_id is None and getattr(args, "from_catalog", None) is None:
-        print("prodc: add requires an id (or --from-catalog for a catalog principle)", file=sys.stderr)
+        print(
+            "prodc: add requires an id (or --from-catalog for a catalog principle)", file=sys.stderr
+        )
         return 2
     if args.noun == "role":
         if args.text is None:
@@ -707,6 +707,13 @@ def cmd_add(args: argparse.Namespace) -> int:
                 return 2
             try:
                 cfg = Config.load(cfg_path)
+                if entry.scope not in cfg.principle_scopes:
+                    print(
+                        f"prodc: {entry.id} has scope {entry.scope!r}; add it to "
+                        f"[principles].scopes in prodc.toml first",
+                        file=sys.stderr,
+                    )
+                    return 2
                 catalog_source = Source(kind=SourceKind.SECONDARY, locator=entry.url)
                 edit = add_principle(
                     cfg,
@@ -723,6 +730,12 @@ def cmd_add(args: argparse.Namespace) -> int:
                 if entry.recipe is not None and not args.dry_run:
                     print(f"\nRecipe ({entry.recipe.kind}): {entry.recipe.summary}")
                     print(entry.recipe.snippet)
+                if entry.sign_off and decline is None and not args.dry_run:
+                    print(
+                        f"\nSign-off: no test can check {entry.id}. Fill the slots, then add "
+                        f"the proof 'accept:<who>@<date>' when the person signs it off. Add their "
+                        f"own words as a primary source by editing the YAML; never via prodc add."
+                    )
                 if decline is not None and not args.dry_run:
                     withdraw_principle(
                         cfg,

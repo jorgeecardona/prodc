@@ -3,15 +3,16 @@
 A pack is a named collection of :class:`CatalogEntry` items. Each entry carries a
 :class:`Recipe` when the rule can be verified by a test. :data:`CATALOG` holds every entry of
 every pack; :func:`find` looks one up by id. An entry id starts with its pack name and a dash
-(``ux-fitts``), so ``ux-`` is reserved for the ux pack.
+(``ux-fitts``, ``visual-contrast-text``), so ``ux-`` and ``visual-`` are reserved.
 """
 
 from __future__ import annotations
 
 from .model import CatalogEntry, Recipe
 from .ux import UX_CATALOG
+from .visual import VISUAL_CATALOG
 
-CATALOG: tuple[CatalogEntry, ...] = UX_CATALOG
+CATALOG: tuple[CatalogEntry, ...] = UX_CATALOG + VISUAL_CATALOG
 """Every catalog entry, all packs."""
 
 PACKS: frozenset[str] = frozenset(e.pack for e in CATALOG)
@@ -31,4 +32,13 @@ def reserved_pack(principle_id: str) -> str | None:
     return head if head in PACKS and principle_id.startswith(f"{head}-") else None
 
 
-__all__ = ["CATALOG", "PACKS", "UX_CATALOG", "CatalogEntry", "Recipe", "find", "reserved_pack"]
+__all__ = [
+    "CATALOG",
+    "PACKS",
+    "UX_CATALOG",
+    "VISUAL_CATALOG",
+    "CatalogEntry",
+    "Recipe",
+    "find",
+    "reserved_pack",
+]
