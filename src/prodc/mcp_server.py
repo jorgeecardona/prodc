@@ -246,6 +246,87 @@ def build_server(root: Path) -> MCPServer:
         _flag(argv, "dry-run", dry_run)
         return call(argv)
 
+    # -- the issue register (docs/issues) --------------------------------------------------
+
+    def _field_args(fields: dict[str, str | list[str]] | None) -> list[str]:
+        out: list[str] = []
+        for key, value in (fields or {}).items():
+            for v in value if isinstance(value, list) else [value]:
+                out += ["--field", f"{key}={v}"]
+        return out
+
+    @server.tool(annotations=_READ)
+    def issue_board(
+        status: str | None = None, area: str | None = None, owner: str | None = None
+    ) -> dict[str, Any]:
+        """Start here for engineering work: issues ready to pick up, and what the rest waits on.
+
+        Any filter (status open/in-progress/blocked/done, area, owner; 'none' for unowned)
+        returns a flat list instead.
+        """
+        argv = ["issue", "board"]
+        _flag(argv, "status", status)
+        _flag(argv, "area", area)
+        _flag(argv, "owner", owner)
+        return call(argv)
+
+    @server.tool(annotations=_READ)
+    def issue_show(name: str) -> dict[str, Any]:
+        """One issue file in full. ``name`` is a filename or an unambiguous part of the slug."""
+        return call(["issue", "show", name])
+
+    @server.tool(annotations=_READ)
+    def issue_check() -> dict[str, Any]:
+        """Grade docs/issues against its config.toml. Exit code 1 means problems were found."""
+        return call(["issue", "check"])
+
+    @server.tool(annotations=_WRITE)
+    def issue_file(
+        title: str,
+        area: str,
+        body: str,
+        blocked_by: list[str] | None = None,
+        fields: dict[str, str | list[str]] | None = None,
+    ) -> dict[str, Any]:
+        """File an issue: work that is known, scoped, and not being done now.
+
+        The body must make sense to a reader with no context: concrete instances, file:line,
+        what was measured vs inferred, and "done" stated as an observation. ``fields`` holds
+        what the folder's config.toml requires (scope, verify, ...); a list field takes a list.
+        """
+        argv = ["issue", "file", "--title", title, "--area", area, "--body", body]
+        for slug in blocked_by or []:
+            argv += ["--blocked-by", slug]
+        return call(argv + _field_args(fields))
+
+    @server.tool(annotations=_WRITE)
+    def issue_update(
+        name: str,
+        title: str | None = None,
+        status: Literal["open", "in-progress", "blocked", "done"] | None = None,
+        area: str | None = None,
+        blocked_by: list[str] | None = None,
+        fields: dict[str, str | list[str]] | None = None,
+    ) -> dict[str, Any]:
+        """Change an issue's front matter; only what you pass changes. ``blocked_by=[]`` clears
+        the blockers; leaving it out keeps them. Close with ``issue_close``, not status=done."""
+        argv = ["issue", "update", name]
+        _flag(argv, "title", title)
+        _flag(argv, "status", status)
+        _flag(argv, "area", area)
+        if blocked_by is not None:
+            if blocked_by:
+                for slug in blocked_by:
+                    argv += ["--blocked-by", slug]
+            else:
+                argv.append("--clear-blocked-by")
+        return call(argv + _field_args(fields))
+
+    @server.tool(annotations=_WRITE)
+    def issue_close(name: str, fixed_in: str) -> dict[str, Any]:
+        """Mark an issue done. The file stays, carrying ``fixed_in``: the sha on the mainline."""
+        return call(["issue", "close", name, "--fixed-in", fixed_in])
+
     # -- the playbook -----------------------------------------------------------------------
 
     def _playbook() -> str:

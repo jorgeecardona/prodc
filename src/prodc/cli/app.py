@@ -41,6 +41,7 @@ from .commands import (
     cmd_views,
     cmd_withdraw,
 )
+from .issue import add_issue_parser
 from .mcp import add_mcp_parser
 
 
@@ -754,6 +755,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sy.set_defaults(func=cmd_sync)
 
+    add_issue_parser(
+        sub.add_parser("issue", help="read and write the issue register (docs/issues)")
+    )
     add_mcp_parser(
         sub.add_parser("mcp", help="run prodc as an MCP server, or register it with a client")
     )

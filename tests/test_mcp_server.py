@@ -43,6 +43,7 @@ async def test_tools_are_the_agent_safe_set(board: Path) -> None:
     assert names == {
         "status", "show", "plan", "lint", "inbox", "brief", "issues", "suggest", "review",
         "dupes", "add_need", "add_decision", "set", "capture", "promote",
+        "issue_board", "issue_show", "issue_check", "issue_file", "issue_update", "issue_close",
     }  # fmt: skip
     for forbidden in ("accept", "attest", "outcome", "withdraw", "sync"):
         assert forbidden not in names
