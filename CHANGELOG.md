@@ -4,6 +4,8 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-11-11
+
 ### Added
 
 - A `visual` catalog pack: `[principles].packs = ["visual"]`. Four entries ship a vitest guard
