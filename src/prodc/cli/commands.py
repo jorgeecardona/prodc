@@ -19,7 +19,8 @@ from typing import cast
 
 from ..board import annotate_need_warnings, gather
 from ..callbacks import advance_ledger, fire, read_ledger, transitions, write_ledger
-from ..catalog import UX_CATALOG
+from ..catalog import CATALOG
+from ..catalog import find as find_catalog_entry
 from ..config import Config, ConfigError
 from ..dedup import (
     VariantGroup,
@@ -352,7 +353,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
     # as warn by default; set [lint].missing_catalog_principles = "error" for a CI gate.
     if cfg.principle_packs and cfg.missing_catalog_principles != "off":
         present_ids = {p.id for p in model.principles}
-        for entry in UX_CATALOG:
+        for entry in CATALOG:
             if entry.pack not in cfg.principle_packs:
                 continue
             if not entry.checkable:
@@ -700,7 +701,7 @@ def cmd_add(args: argparse.Namespace) -> int:
         from_catalog = getattr(args, "from_catalog", None)
         decline = getattr(args, "decline", None)
         if from_catalog is not None:
-            entry = next((e for e in UX_CATALOG if e.id == from_catalog), None)
+            entry = find_catalog_entry(from_catalog)
             if entry is None:
                 print(f"prodc: catalog entry {from_catalog!r} not found", file=sys.stderr)
                 return 2
@@ -713,7 +714,7 @@ def cmd_add(args: argparse.Namespace) -> int:
                     entry.text_template,
                     file=args.file,
                     revised_at=date.today().isoformat(),
-                    scope="design",
+                    scope=entry.scope,
                     sources=(catalog_source,),
                     expect_sha=args.expect_sha,
                     dry_run=args.dry_run,

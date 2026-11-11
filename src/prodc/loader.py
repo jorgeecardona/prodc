@@ -17,7 +17,8 @@ from typing import cast
 
 import yaml
 
-from .catalog import UX_CATALOG
+from .catalog import find as find_catalog_entry
+from .catalog import reserved_pack
 from .config import Config
 from .issues import read_issues
 from .model import (
@@ -456,9 +457,10 @@ def _principle(raw: object, where: str) -> Principle:
     """Parse one ``principles:`` entry: a product commitment with its provenance and guards."""
     tbl = _as_mapping(raw, where)
     pid = _as_str(tbl.get("id"), f"{where}.id")
-    if pid.startswith("ux-") and not any(e.id == pid for e in UX_CATALOG):
+    pack = reserved_pack(pid)
+    if pack is not None and find_catalog_entry(pid) is None:
         raise LoaderError(
-            f"principle {pid!r}: the 'ux-' prefix is reserved for catalog entries; "
+            f"principle {pid!r}: the '{pack}-' prefix is reserved for catalog entries; "
             "use 'prodc add principle --from-catalog' or choose a different id prefix"
         )
     proofs = tuple(

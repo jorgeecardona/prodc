@@ -35,6 +35,7 @@ from .adapters import (
     VitestAdapter,
 )
 from .callbacks import Callback
+from .catalog import PACKS as CATALOG_PACKS
 from .model import NeedState
 
 
@@ -288,6 +289,16 @@ def _unknown_in(tbl: dict[str, object], known: frozenset[str], where: str) -> li
     return out
 
 
+def _unknown_packs(packs: tuple[str, ...]) -> tuple[str, ...]:
+    """The notices for ``[principles].packs`` names no catalog pack has, so a typo is not silent."""
+    known = ", ".join(sorted(CATALOG_PACKS))
+    return tuple(
+        f"[principles].packs: unknown pack {name!r}; known packs: {known}"
+        for name in packs
+        if name not in CATALOG_PACKS
+    )
+
+
 def _unknown_toml_keys(raw: dict[str, object]) -> tuple[str, ...]:
     """The notices for keys prodc does not read, so a dead setting is not silently ignored.
 
@@ -522,9 +533,7 @@ class Config:
 
         missing_catalog_level = lint_tbl.get("missing_catalog_principles", "warn")
         if missing_catalog_level not in ("warn", "error", "off"):
-            raise ConfigError(
-                '[lint].missing_catalog_principles must be "warn", "error", or "off"'
-            )
+            raise ConfigError('[lint].missing_catalog_principles must be "warn", "error", or "off"')
 
         flows_tbl = _as_dict(raw.get("flows", {}), "[flows]")
         if "steps" in flows_tbl:
@@ -559,6 +568,6 @@ class Config:
             principle_packs=principle_packs,
             missing_catalog_principles=missing_catalog_level,
             flow_steps=flow_steps,
-            notices=_unknown_toml_keys(raw),
+            notices=_unknown_toml_keys(raw) + _unknown_packs(principle_packs),
             name=board_name.strip(),
         )

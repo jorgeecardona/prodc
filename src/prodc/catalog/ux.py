@@ -11,49 +11,14 @@ rendered text, a secondary source pointing at the law page, and prints the recip
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Literal
-
-
-@dataclass(frozen=True)
-class Recipe:
-    """A placeholder test recipe for a checkable UX-law principle.
-
-    ``kind`` names the test framework. ``snippet`` is a placeholder to replace with a real
-    guard from the consumer repo (e.g. from crm or tyko). ``proof_locator_hint`` suggests
-    the locator prefix and path to put under ``proofs:`` in the principle YAML.
-    """
-
-    kind: Literal["vitest", "playwright", "pytest"]
-    summary: str
-    snippet: str
-    proof_locator_hint: str
-
-
-@dataclass(frozen=True)
-class CatalogEntry:
-    """One principle template from a named pack.
-
-    ``id`` is globally unique across all packs and is the id written to the YAML when the
-    team adopts the entry. ``text_template`` uses ``{slot}`` placeholders for values the team
-    fills in (e.g. ``{N}`` for a numeric threshold). ``checkable`` is True when the rule can
-    be verified by a test; a checkable entry must carry a ``recipe``.
-    """
-
-    id: str
-    pack: str
-    title: str
-    url: str
-    text_template: str
-    checkable: bool
-    recipe: Recipe | None
-
+from .model import CatalogEntry, Recipe
 
 # -- checkable entries -------------------------------------------------------
 
 _FITTS = CatalogEntry(
     id="ux-fitts",
     pack="ux",
+    scope="design",
     title="Fitts's Law",
     url="https://lawsofux.com/fittss-law/",
     text_template=(
@@ -105,6 +70,7 @@ describe("interactive targets meet the 24x24px minimum (WCAG 2.5.8)", () => {
 _HICK = CatalogEntry(
     id="ux-hick",
     pack="ux",
+    scope="design",
     title="Hick's Law",
     url="https://lawsofux.com/hicks-law/",
     text_template="No top-level navigation menu shows more than {N} items at once.",
@@ -148,6 +114,7 @@ describe("the main nav has at most {N} top-level sections per role", () => {
 _VON_RESTORFF = CatalogEntry(
     id="ux-von-restorff",
     pack="ux",
+    scope="design",
     title="Von Restorff Effect",
     url="https://lawsofux.com/von-restorff-effect/",
     text_template=(
@@ -157,7 +124,7 @@ _VON_RESTORFF = CatalogEntry(
     checkable=True,
     recipe=Recipe(
         kind="vitest",
-        summary="Grep form/dialog source files for variant=\"primary\"; each file must have at most one.",
+        summary='Grep form/dialog source files for variant="primary"; each file must have at most one.',
         # Real guard from crm: apps/website/src/design/vonRestorff.guard.test.ts
         # jsdom has no layout; scan source files statically for variant="primary" in JSX.
         snippet="""\
@@ -196,13 +163,14 @@ describe("at most one primary button per form or dialog", () => {
   });
 });
 """,
-        proof_locator_hint="vitest:src/design/vonRestorff.guard.test.ts::at most one primary button per form or dialog > no form or dialog file contains more than one variant=\"primary\" button",
+        proof_locator_hint='vitest:src/design/vonRestorff.guard.test.ts::at most one primary button per form or dialog > no form or dialog file contains more than one variant="primary" button',
     ),
 )
 
 _MILLER = CatalogEntry(
     id="ux-miller",
     pack="ux",
+    scope="design",
     title="Miller's Law",
     url="https://lawsofux.com/millers-law/",
     text_template=(
@@ -247,6 +215,7 @@ describe("Miller's Law: list page cap stays within agreed bounds", () => {
 _JAKOB = CatalogEntry(
     id="ux-jakob",
     pack="ux",
+    scope="design",
     title="Jakob's Law",
     url="https://lawsofux.com/jakobs-law/",
     text_template=(
@@ -320,11 +289,13 @@ describe("Jakob's Law: app conventions match user expectations", () => {
 
 # -- non-checkable entries ---------------------------------------------------
 
+
 def _nc(id: str, title: str, url: str, text_template: str) -> CatalogEntry:
     """Build a non-checkable catalog entry (no recipe)."""
     return CatalogEntry(
         id=id,
         pack="ux",
+        scope="design",
         title=title,
         url=url,
         text_template=text_template,
