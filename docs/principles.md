@@ -12,7 +12,7 @@ any of them as a `principle` with `scope: design`. Once listed, the board tracks
 listing it; nothing is assumed.
 
 See [ux-laws.md](ux-laws.md) for the full catalog, including `prodc add principle --from-catalog`
-usage and the checkable entries that ship with test snippets.
+usage and the checkable entries that ship with test snippets. See [visual.md](visual.md) for the visual pack (contrast, colour roles, palette sign-off).
 
 ### How to adopt a law
 

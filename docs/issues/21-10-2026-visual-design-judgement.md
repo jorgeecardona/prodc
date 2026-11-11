@@ -85,6 +85,21 @@ screens → regions → elements) when a judge must check it. Not decided.
 - What the judge looks at: a `storybook` proof gives one stable URL per component state
   (`?path=/story/<id>`). That is the page a judge screenshots (08-11-2026).
 
+## Colour rules shipped (11-11-2026)
+
+The rule layer for colour shipped as the `visual` catalog pack ([docs/visual.md](../visual.md)):
+contrast (SC 1.4.3, 1.4.11), not colour alone (SC 1.4.1), colour roles, and a palette picked by a
+person and signed off with an `accept:` proof. That answers two Open items for colour: the judge
+is a mix (rule-based guard plus a human pick), and "consistent" means "against the product's
+tokens".
+
+Still open: a verdict on a visual need (not a principle) against a screenshot or wireframe, the
+`status` listing, and spacing, visual order and element consistency.
+
+Parked from the pack: an even scale of colour steps (Radix defines 12 steps with one use each,
+not "even OKLCH"), and dark surfaces ("lighter with elevation" is Material 2 wording; no
+threshold for "desaturated").
+
 ## Done when
 
 A visual need on a real board can be closed only by a recorded verdict from a non-Claude judge,

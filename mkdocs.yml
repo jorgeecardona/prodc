@@ -35,6 +35,7 @@ nav:
   - Lifecycle: lifecycle.md
   - Principles: principles.md
   - UX Laws: ux-laws.md
+  - Visual rules: visual.md
   - Grounding (Torres): grounding-torres.md
 
 markdown_extensions:

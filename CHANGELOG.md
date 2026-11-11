@@ -4,6 +4,19 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 ## [Unreleased]
 
+### Added
+
+- A `visual` catalog pack: `[principles].packs = ["visual"]`. Four entries ship a vitest guard
+  (text contrast, UI contrast, status not shown by colour alone, no colour literal outside the
+  token files). `visual-palette-chosen` is signed off by a person with an `accept:` proof. See
+  [docs/visual.md](docs/visual.md).
+- `prodc lint` reports an unknown name in `[principles].packs` (lint exits 1).
+
+### Changed
+
+- `prodc add principle --from-catalog` stops with a clear message when the entry's scope is not in
+  `[principles].scopes`.
+
 ## [0.7.2] - 2026-11-09
 
 ### Fixed
