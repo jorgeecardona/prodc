@@ -4,6 +4,17 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-11
+
+### Added
+
+- `prodc mcp serve`: prodc as an MCP server, with the optional extra `pip install 'prodc[mcp]'`.
+  10 read tools and 5 write tools. `capture` and `add_need` refuse `primary`. `accept`,
+  `outcome`, `attest`, `withdraw` and `sync` are not exposed. See [docs/mcp.md](docs/mcp.md).
+- `prodc mcp install` writes the server into `.mcp.json` (or `--client cursor|vscode`). It changes
+  only the `prodc` entry and refuses a file it cannot parse. `prodc mcp uninstall` removes it.
+- A write's `--json` output has `sha_before` and `sha_after`, to pass as `--expect-sha`.
+
 ## [0.7.4] - 2026-11-11
 
 ### Added

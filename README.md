@@ -168,6 +168,9 @@ The Python modules are not a public API. Use the CLI, `--json` and the YAML file
 - `prodc agent >> AGENTS.md` adds instructions for a coding agent to act as the project's product
   manager. An agent may record `assumption` or `secondary` sources; `primary` is only for a real
   user's own words. `prodc guide` is a short guide for people.
+- `prodc mcp install` registers prodc as an MCP server, so an agent in Claude Code, Cursor, or VS
+  Code uses it through tools. Install with `pip install 'prodc[mcp]'`. See
+  [MCP server](https://cardona-oss.gitlab.io/prodc/mcp/).
 
 prodc also has goals, releases, roles, principles, and decisions
 ([model docs](https://cardona-oss.gitlab.io/prodc/model/)), and the commands `dupes`,

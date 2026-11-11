@@ -29,6 +29,7 @@ nav:
   - Home: index.md
   - Quickstart: quickstart.md
   - Commands: commands.md
+  - MCP server: mcp.md
   - Model: model.md
   - Config: config.md
   - Storybook: storybook.md

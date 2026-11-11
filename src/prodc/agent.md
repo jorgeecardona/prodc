@@ -132,6 +132,13 @@ boards under), and `prodc diff <snapshot.json>` (what changed since a
 saved `status --json`). `prodc status` also takes `--goal <id>`, `--columns id,state,text,warrant`,
 `--wide`, `--include-drafts`, and `--stale <days>`.
 
+## As MCP tools
+
+If your client has the prodc MCP server (`prodc mcp install`), the same commands are tools:
+`status`, `show`, `plan`, `lint`, `capture`, `set`, `add_need`, and others. The rules above
+still hold. `capture` and `add_need` accept only `secondary` and `assumption`. Chain writes by
+passing the last `sha_after` as `expect_sha`.
+
 ## Running non-interactively (CI, or no human in the loop)
 
 - **Exit codes are the contract, not the stdout.** `0` = clean; `1` = a gate failed (a BROKEN

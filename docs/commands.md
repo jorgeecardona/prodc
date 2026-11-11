@@ -63,3 +63,13 @@ Each rewrites one YAML file, re-loads the whole model as validation, reverts on 
 | `add decision <id> --text T --needs IDS --file F` | the solution chosen for a need (OST); `--alternative` (repeatable, the rejected options), `--consequences`, `--principles`, `--date` | `prodc add decision D-1 --text "store as FLAC" --needs N-1 --alternative WAV --file needs/decisions.yaml` |
 
 `set` fields: `text description who role must importance claim goal release variant_of client product draft`; lists: `proofs children contradicts tags`. On a decision, `set D-1 awaits+=Q-1@yes` adds research it waits on and `awaits-=Q-1@yes` drops it.
+
+## MCP
+
+| Command | Does |
+|---|---|
+| `mcp serve` | run the MCP server on stdio (needs `prodc[mcp]`) |
+| `mcp install [--client claude\|cursor\|vscode\|codex] [--scope project\|user] [--command CMD] [--dry-run]` | add the `prodc` entry to the client's project config |
+| `mcp uninstall [--client ...] [--dry-run]` | remove the `prodc` entry |
+
+See [mcp.md](mcp.md).
