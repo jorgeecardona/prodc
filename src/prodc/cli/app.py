@@ -41,6 +41,7 @@ from .commands import (
     cmd_views,
     cmd_withdraw,
 )
+from .mcp import add_mcp_parser
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -752,6 +753,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="show which transitions would fire callbacks; don't run them or write the ledger",
     )
     sy.set_defaults(func=cmd_sync)
+
+    add_mcp_parser(
+        sub.add_parser("mcp", help="run prodc as an MCP server, or register it with a client")
+    )
 
     ag = sub.add_parser(
         "agent",

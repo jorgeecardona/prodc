@@ -31,6 +31,8 @@ dependencies = ["pyyaml>=6"]
 prodc = "prodc.cli:main"
 
 [project.optional-dependencies]
+# mcp: the optional MCP server (`prodc mcp serve`). v2 moved the server import, so pin the major.
+mcp = ["mcp>=2,<3"]
 # docs are an *extra* (not a uv dependency-group): CI's `pages` job and moon's `docs` task
 # install them with `--extra docs` to build the GitLab Pages site
 docs = [
@@ -68,7 +70,7 @@ include = ["src", "tests", "examples", "README.md", "CHANGELOG.md", "LICENSE"]
 
 [dependency-groups]
 # musil is a dev-only model checker (tests/test_models.py); prodc's runtime stays pyyaml-only.
-dev = ["ruff>=0.6", "pyright[nodejs]>=1.1.390", "pytest>=8", "types-pyyaml>=6", "musil>=0.35"]
+dev = ["ruff>=0.6", "pyright[nodejs]>=1.1.390", "pytest>=8", "types-pyyaml>=6", "musil>=0.35", "mcp>=2,<3"]
 
 [tool.ruff]
 line-length = 100
