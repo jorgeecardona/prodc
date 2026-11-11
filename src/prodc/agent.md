@@ -44,9 +44,10 @@ Decide where a thing goes before you write it.
 |---|---|---|
 | something a person wants | a need, with a source | `When an invited user opens the invite link, they can set a password` |
 | a rule that decides between wants | a principle | `We do not build per-client forks` |
-| engineering work or a bug | an issue in your tracker, not prodc | `the view generator drops links from shared components` |
+| engineering work or a bug | an issue: `prodc issue file` in `docs/issues/`, or your tracker | `the view generator drops links from shared components` |
 
-- prodc never calls a tracker. Engineering work and bugs are issues there.
+- prodc never calls a tracker. Engineering work and bugs are issues: in `docs/issues/` with
+  `prodc issue file`, or in your tracker.
 - A bug that breaks a delivered need shows up on its own: the proof turns PENDING or BROKEN. Fix
   the code. Do not edit the need.
 - A bug that shows users cannot do something at all is a missing want. Write that as a need.

@@ -64,6 +64,21 @@ Each rewrites one YAML file, re-loads the whole model as validation, reverts on 
 
 `set` fields: `text description who role must importance claim goal release variant_of client product draft`; lists: `proofs children contradicts tags`. On a decision, `set D-1 awaits+=Q-1@yes` adds research it waits on and `awaits-=Q-1@yes` drops it.
 
+## Issues
+
+The issue register is `docs/issues/*.md`, one file per issue, graded by the folder's
+`config.toml`. All take `--json`.
+
+| Command | Does |
+|---|---|
+| `issue board [--status S] [--area A] [--owner O]` | issues ready to pick up and what the rest waits on; a filter gives a flat list |
+| `issue show <name>` | print one issue (a filename or part of its slug) |
+| `issue file --title T --area A --body B [--blocked-by SLUG] [--field K=V]` | file a new issue (`--body -` reads stdin) |
+| `issue update <name> [--title] [--status] [--area] [--blocked-by SLUG \| --clear-blocked-by] [--field K=V]` | change only what you pass |
+| `issue close <name> --fixed-in SHA` | mark done; the file stays, carrying the sha |
+| `issue check` | grade the folder against its `config.toml`; exit 1 on problems |
+| `issue reindex` | rewrite the README index table |
+
 ## MCP
 
 | Command | Does |

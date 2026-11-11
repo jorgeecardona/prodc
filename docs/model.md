@@ -117,7 +117,8 @@ needs:
 
 An issue is engineering work. prodc holds product needs and principles; an issue is a markdown file
 with YAML front matter (the format cabildo's issue tools write and check). Set
-`[prodc].issues = ["docs/issues/*.md"]` and prodc reads them. It never writes one.
+`[prodc].issues = ["docs/issues/*.md"]` and prodc reads them. `prodc issue` files, updates and
+closes them (see [commands](commands.md#issues)).
 
 ```yaml
 ---

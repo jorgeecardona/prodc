@@ -524,7 +524,7 @@ def test_agent_playbook_says_where_bugs_journeys_and_entries_go(
     assert main(["agent"]) == 0
     out = capsys.readouterr().out
     assert "## What goes in prodc, and what does not" in out
-    assert "engineering work or a bug" in out and "an issue in your tracker, not prodc" in out
+    assert "engineering work or a bug" in out and "`prodc issue file`" in out
     assert "product: false" not in out.split("## What goes in prodc")[1].split("## The loop")[0]
     assert "An issue with no need behind it is a smell" in out
     assert "A navigation journey is a `path:` on the need" in out

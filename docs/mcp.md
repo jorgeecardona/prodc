@@ -72,6 +72,19 @@ Write tools:
 | `capture` | `prodc capture` (`kind`: `secondary` or `assumption` only) |
 | `promote` | `prodc review --promote` |
 
+Issue register tools (`docs/issues`):
+
+| Tool | CLI |
+|---|---|
+| `issue_board` | `prodc issue board` (read) |
+| `issue_show` | `prodc issue show` (read) |
+| `issue_check` | `prodc issue check` (read) |
+| `issue_file` | `prodc issue file` |
+| `issue_update` | `prodc issue update` |
+| `issue_close` | `prodc issue close` |
+
+Claiming an issue is not here. A claim is a lease between running agents, which cabildo keeps.
+
 Every tool returns `{exit_code, data, notices}`. `data` is the command's `--json` output.
 `notices` is stderr. Exit 1 (a gate failed) is a normal result. Exit 2 is a tool error.
 

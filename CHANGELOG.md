@@ -4,6 +4,15 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-12
+
+### Added
+
+- `prodc issue board|show|file|update|close|check|reindex` reads and writes the issue register
+  (`docs/issues/*.md`). The store moved here from cabildo, same file format.
+- MCP tools `issue_board`, `issue_show`, `issue_check`, `issue_file`, `issue_update`,
+  `issue_close`.
+
 ## [0.8.0] - 2026-11-11
 
 ### Added

@@ -7,7 +7,8 @@ files and joins them to the board through two front matter keys:
 - ``needs``: the need ids the issue serves. An issue with none has no want behind it.
 - ``sources``: pointers into other systems, ``<source adapter>:<payload>`` (``gitlab:#123``).
 
-prodc never writes an issue and never computes its state: ``status`` is whatever the file says.
+This reader never writes an issue and never computes its state: ``status`` is whatever the file
+says. Writes go through :mod:`prodc.issue_store` (``prodc issue``).
 """
 
 from __future__ import annotations
