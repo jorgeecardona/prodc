@@ -386,17 +386,58 @@ _KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$")
 _ITEM_RE = re.compile(r"^\s+-\s*(.*)$")
 
 
+#: Plain scalars that YAML 1.1 (PyYAML's ``safe_load``) reads as a bool, null, int, or float.
+#: The store reads them as strings, so ``render`` quotes them to keep both readers in agreement.
+_YAML_TYPED = re.compile(
+    r"""^(?:
+      y|Y|yes|Yes|YES|n|N|no|No|NO|true|True|TRUE|false|False|FALSE|on|On|ON|off|Off|OFF
+    | ~|null|Null|NULL
+    | [-+]?0b[0-1_]+ | [-+]?0[0-7_]+ | [-+]?(?:0|[1-9][0-9_]*) | [-+]?0x[0-9a-fA-F_]+
+    | [-+]?[1-9][0-9_]*(?::[0-5]?[0-9])+
+    | [-+]?(?:[0-9][0-9_]*)\.[0-9_]*(?:[eE][-+][0-9]+)? | \.[0-9_]+(?:[eE][-+][0-9]+)?
+    | [-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\.[0-9_]* | [-+]?\.(?:inf|Inf|INF) | \.(?:nan|NaN|NAN)
+    | <<
+    )$""",
+    re.VERBOSE,
+)
+#: A plain scalar may not start with one of these YAML indicators.
+_INDICATORS = "-?:,[]{}#&*!|>'\"%@`"
+_ESCAPES = {"\\": "\\\\", '"': '\\"', "\n": "\\n", "\t": "\\t", "\r": "\\r"}
+_UNESCAPES = {"\\": "\\", '"': '"', "n": "\n", "t": "\t", "r": "\r", "/": "/", "0": "\0"}
+
+
 def _unquote(raw: str) -> str | None:
+    """One scalar as a string, or None for an empty or null value.
+
+    A double-quoted value has its backslash escapes undone. A single-quoted value has ``''``
+    read as one ``'``. Both follow YAML, so ``yaml.safe_load`` reads the same string.
+    """
     v = raw.strip()
     if v in ("null", "~", ""):
         return None
-    if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
-        return v[1:-1]
+    if len(v) >= 2 and v[0] == v[-1] == '"':
+        return re.sub(r"\\(.)", lambda m: _UNESCAPES.get(m.group(1), m.group(0)), v[1:-1])
+    if len(v) >= 2 and v[0] == v[-1] == "'":
+        return v[1:-1].replace("''", "'")
     return v
 
 
+def _needs_quotes(value: str) -> bool:
+    """True when a plain scalar would not read back as this same string."""
+    return (
+        not value
+        or value != value.strip()
+        or value[0] in _INDICATORS
+        or re.search(r"[:#\"\\]|[\x00-\x1f]", value) is not None
+        or _YAML_TYPED.match(value) is not None
+    )
+
+
 def _quote(value: str) -> str:
-    return f'"{value}"' if re.search(r'[:#"]', value) else value
+    """A scalar as YAML text: plain when that reads back unchanged, else double-quoted."""
+    if not _needs_quotes(value):
+        return value
+    return '"' + "".join(_ESCAPES.get(c, c) for c in value) + '"'
 
 
 def _split_front(text: str, path: pathlib.Path) -> tuple[str, str]:
@@ -530,14 +571,14 @@ def render(issue: Issue, config: Config = DEFAULT_CONFIG) -> str:
             "---",
             f"title: {_quote(issue.title)}",
             f"status: {issue.status}",
-            f"area: {issue.area}",
-            f"owner: {issue.owner or 'null'}",
+            f"area: {_quote(issue.area)}",
+            f"owner: {_quote(issue.owner) if issue.owner else 'null'}",
             f"filed: {issue.filed}",
         ]
         if issue.blocked_by:
             lines += _render_value("blocked_by", issue.blocked_by)
         if issue.fixed_in:
-            lines.append(f"fixed_in: {issue.fixed_in}")
+            lines.append(f"fixed_in: {_quote(issue.fixed_in)}")
         for key, value in issue.extra.items():
             lines += _render_value(key, value)
         lines.append("---")
