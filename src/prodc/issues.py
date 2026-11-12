@@ -1,84 +1,46 @@
-"""Issues: the engineering work behind needs, read from a ``docs/issues/`` folder (#36).
+"""Issues: the engineering work behind needs, joined to the board (#36).
 
 prodc holds product needs and principles. Engineering work is an issue, kept as a markdown file
-with YAML front matter (the format cabildo's issue tools write and check). prodc reads those
-files and joins them to the board through two front matter keys:
+with front matter in a ``docs/issues/`` register. :mod:`prodc.issue_store` reads and writes those
+files; this module loads them for the board and lints them against it through two keys:
 
 - ``needs``: the need ids the issue serves. An issue with none has no want behind it.
 - ``sources``: pointers into other systems, ``<source adapter>:<payload>`` (``gitlab:#123``).
-
-This reader never writes an issue and never computes its state: ``status`` is whatever the file
-says. Writes go through :mod:`prodc.issue_store` (``prodc issue``).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
 
-import yaml
-
+from . import issue_store as store
 from .adapters import SourceAdapter
 from .model import Issue, NeedResult, NeedState
 
 
 @dataclass(frozen=True)
 class IssueFolder:
-    """The issues read from the configured globs, plus the files that were not issues."""
+    """The issues that loaded, plus one message per file that did not."""
 
     issues: tuple[Issue, ...] = ()
-    skipped: tuple[str, ...] = ()  # paths with no front matter: not readable as issues
-
-
-def _strings(value: object) -> tuple[str, ...]:
-    """A front matter list of strings; a bare string is a list of one; anything else is empty."""
-    if isinstance(value, str):
-        return (value,)
-    if isinstance(value, list):
-        items = cast("list[object]", value)
-        return tuple(str(v) for v in items if isinstance(v, str | int | float))
-    return ()
-
-
-def _opt(value: object) -> str | None:
-    return str(value) if isinstance(value, str | int | float) and str(value) else None
-
-
-def parse_issue(path: Path, root: Path) -> Issue | None:
-    """Read one issue file, or None when it has no readable front matter."""
-    text = path.read_text(encoding="utf-8")
-    if not text.startswith("---"):
-        return None
-    head, sep, _ = text[3:].partition("\n---")
-    if not sep:
-        return None
-    try:
-        data: object = yaml.safe_load(head)
-    except yaml.YAMLError:
-        return None
-    if not isinstance(data, dict):
-        return None
-    fm = {str(k): v for k, v in cast("dict[object, object]", data).items()}
-    return Issue(
-        id=path.stem,
-        title=_opt(fm.get("title")) or path.stem,
-        status=_opt(fm.get("status")) or "open",
-        needs=_strings(fm.get("needs")),
-        sources=_strings(fm.get("sources")),
-        area=_opt(fm.get("area")),
-        fixed_in=_opt(fm.get("fixed_in")),
-        path=str(path.relative_to(root)),
-    )
+    skipped: tuple[str, ...] = ()  # "<file>: <why>", for files the store could not read
 
 
 def read_issues(root: Path, globs: list[str]) -> IssueFolder:
     """Every issue matched by ``globs`` (relative to ``root``), each file once, sorted by name.
 
-    ``README.md`` and non-markdown files are not issues. A markdown file with no front matter is
-    listed in ``skipped``, not read: run ``cabildo issues check`` to fix it.
+    With no globs, the register is the one :func:`prodc.issue_store.find_folder` finds from
+    ``root``; with none found, the result is empty. ``README.md`` and non-markdown files are not
+    issues. A file the store cannot parse is listed in ``skipped`` with the reason.
     """
+    if not globs:
+        folder = store.find_folder(root)
+        if folder is None:
+            return IssueFolder()
+        found, problems = store.load_all(folder)
+        return IssueFolder(found, tuple(str(p) for p in problems))
     seen: set[Path] = set()
+    configs: dict[Path, store.Config] = {}
     issues: list[Issue] = []
     skipped: list[str] = []
     for pattern in globs:
@@ -86,11 +48,12 @@ def read_issues(root: Path, globs: list[str]) -> IssueFolder:
             if path in seen or path.suffix != ".md" or path.name.lower() == "readme.md":
                 continue
             seen.add(path)
-            issue = parse_issue(path, root)
-            if issue is None:
-                skipped.append(str(path.relative_to(root)))
-            else:
-                issues.append(issue)
+            try:
+                if path.parent not in configs:
+                    configs[path.parent] = store.load_config(path.parent)
+                issues.append(store.load(path, configs[path.parent]))
+            except (store.IssueFormatError, OSError) as exc:
+                skipped.append(str(exc) if path.name in str(exc) else f"{path.name}: {exc}")
     return IssueFolder(tuple(issues), tuple(skipped))
 
 

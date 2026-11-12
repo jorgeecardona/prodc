@@ -10,8 +10,12 @@ Everything else is a field: a flow is a Need with children, a question is a Need
 
 from __future__ import annotations
 
+import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
+from pathlib import Path
+from types import MappingProxyType
 
 
 class SourceKind(StrEnum):
@@ -554,27 +558,66 @@ def board_needs(needs: list[Need], *, include_drafts: bool) -> list[Need]:
     return kept if include_drafts else [n for n in kept if n.stage is Stage.COMMITTED]
 
 
-#: ``status`` values that mean the work is finished. Anything else counts as open.
-CLOSED_STATUSES = frozenset({"done", "closed", "resolved"})
+class IssueStatus(StrEnum):
+    """Where an issue's work stands, as its ``status:`` line records it."""
+
+    OPEN = "open"
+    IN_PROGRESS = "in-progress"
+    BLOCKED = "blocked"  # waiting on a decision, a credential, or another issue
+    DONE = "done"  # keeps the file; requires fixed_in
+
+
+def _freeze(fields: Mapping[str, str | tuple[str, ...]]) -> Mapping[str, str | tuple[str, ...]]:
+    return MappingProxyType(dict(fields))
 
 
 @dataclass(frozen=True)
 class Issue:
-    """One issue file: what it serves, where else it lives, and what the file says its state is."""
+    """One issue file in a ``docs/issues/`` register: the engineering work behind needs (#36).
 
-    id: str  # the file name without ``.md``
+    :mod:`prodc.issue_store` is the only reader and writer. ``needs`` names the need ids the issue
+    serves; ``sources`` holds pointers into other systems (``gitlab:#123``). ``extra`` holds the
+    other front matter keys in file order, read-only, and is written back unchanged.
+    """
+
+    path: Path
     title: str
-    status: str  # as recorded: open, in-progress, blocked, done...
-    needs: tuple[str, ...]
-    sources: tuple[str, ...]
-    area: str | None
-    fixed_in: str | None
-    path: str  # relative to the project root
+    status: IssueStatus
+    area: str
+    filed: str
+    owner: str | None = None
+    blocked_by: tuple[str, ...] = ()
+    fixed_in: str | None = None
+    extra: Mapping[str, str | tuple[str, ...]] = field(default_factory=lambda: _freeze({}))
+    body: str = ""
+    #: the front matter keys in the order the file had them; empty for an issue built in memory.
+    order: tuple[str, ...] = ()
+    needs: tuple[str, ...] = ()
+    sources: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.extra, MappingProxyType):
+            object.__setattr__(self, "extra", _freeze(self.extra))
+
+    @property
+    def id(self) -> str:
+        """The file name without ``.md``."""
+        return self.path.stem
+
+    @property
+    def slug(self) -> str:
+        """The file name without ``.md`` and without its leading date (either date style)."""
+        return re.sub(r"^(\d{2}-\d{2}-\d{4}|\d{4}-\d{2}-\d{2})-", "", self.path.stem)
+
+    @property
+    def open(self) -> bool:
+        """True until the status is ``done``."""
+        return self.status is not IssueStatus.DONE
 
     @property
     def is_closed(self) -> bool:
-        """True when the recorded status is one of :data:`CLOSED_STATUSES`."""
-        return self.status.strip().lower() in CLOSED_STATUSES
+        """True when the status is ``done``."""
+        return not self.open
 
 
 @dataclass(frozen=True)
@@ -614,7 +657,7 @@ class Model:
     decisions: tuple[Decision, ...] = ()  # the solutions chosen for needs (OST), with alternatives
     glossary: tuple[Term, ...] = ()  # what each term means, globally or per client (#72)
     issues: tuple[Issue, ...] = ()  # the engineering work behind needs, from [prodc].issues (#36)
-    issues_skipped: tuple[str, ...] = ()  # issue files with no front matter: not readable
+    issues_skipped: tuple[str, ...] = ()  # "<file>: <why>" per issue file the store could not read
     # Removed keys (0.3 `label:`, `argument:`) found and ignored. `lint` fails on any (#96).
     notices: tuple[str, ...] = ()
 

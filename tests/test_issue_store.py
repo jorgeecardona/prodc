@@ -815,3 +815,25 @@ def test_newly_ready_lists_what_a_close_unblocks(agenda: pathlib.Path) -> None:
     assert issues.newly_ready(agenda, "blocker") == []  # blocker still open -> nothing freed
     write(agenda, "03-08-2026-blocker.md", "title: B\nstatus: done\narea: x\ntier: NOW")
     assert [i.slug for i in issues.newly_ready(agenda, "blocker")] == ["dep"]
+
+
+def test_needs_and_sources_are_core_and_extra_is_read_only(folder: pathlib.Path) -> None:
+    p = write(
+        folder,
+        "03-08-2026-a.md",
+        "title: A\nstatus: open\narea: ci\nscope: S\nneeds: N-1\nsources:\n  - gitlab:#7",
+    )
+    issue = issues.load(p, issues.load_config(folder))
+    assert (issue.needs, issue.sources) == (("N-1",), ("gitlab:#7",))
+    assert "needs" not in issue.extra and "scope" in issue.extra
+    with pytest.raises(TypeError):
+        issue.extra["scope"] = "M"  # type: ignore[index]
+    got = issues.update(folder, "a", extra={"needs": ("N-1", "N-2")})
+    assert got.needs == ("N-1", "N-2") and "needs" not in got.extra
+    assert issues.load(p, issues.load_config(folder)).needs == ("N-1", "N-2")
+
+
+def test_a_foreign_closed_status_names_done(folder: pathlib.Path) -> None:
+    write(folder, "03-08-2026-a.md", "title: A\nstatus: resolved\narea: ci\nscope: S")
+    problems = issues.check(folder)
+    assert any("status 'resolved' is not a status here" in p.message for p in problems)

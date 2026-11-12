@@ -30,13 +30,13 @@ def issue_payload(i: Issue) -> dict[str, object]:
     return {
         "id": i.id,
         "title": i.title,
-        "status": i.status,
+        "status": i.status.value,
         "closed": i.is_closed,
         "needs": list(i.needs),
         "sources": list(i.sources),
         "area": i.area,
         "fixed_in": i.fixed_in,
-        "path": i.path,
+        "path": str(i.path),
     }
 
 

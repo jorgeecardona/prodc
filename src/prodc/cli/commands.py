@@ -17,6 +17,7 @@ from datetime import date
 from pathlib import Path
 from typing import cast
 
+from .. import issue_store
 from ..board import annotate_need_warnings, gather
 from ..callbacks import advance_ledger, fire, read_ledger, transitions, write_ledger
 from ..catalog import CATALOG
@@ -336,10 +337,11 @@ def cmd_lint(args: argparse.Namespace) -> int:
         warnings.append(
             (
                 "issues",
-                f"{len(model.issues_skipped)} issue file(s) have no front matter and were skipped: "
-                "run cabildo issues check (#36)",
+                f"{len(model.issues_skipped)} issue file(s) have no front matter or break the issue "
+                "format and were skipped: run prodc issue check (#36)",
             )
         )
+        warnings += [("issues", why) for why in model.issues_skipped]
     # Glossary (#72): every listed term is defined for the need's client, and a term does not mean
     # two things between its global and a client definition.
     term_errors, term_warnings = glossary_findings(model.glossary, needs)
@@ -1504,9 +1506,10 @@ def cmd_issues(args: argparse.Namespace) -> int:
     if loaded is None:
         return 2
     cfg, model = loaded
-    if not cfg.issue_globs:
+    if not cfg.issue_globs and issue_store.find_folder(cfg.root) is None:
         print(
-            "prodc: no [prodc].issues globs in the config (for example docs/issues/*.md)",
+            "prodc: no issue register: set [prodc].issues (for example docs/issues/*.md) "
+            "or create docs/issues/",
             file=sys.stderr,
         )
         return 2

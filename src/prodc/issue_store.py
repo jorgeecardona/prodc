@@ -49,7 +49,6 @@ from __future__ import annotations
 import contextlib
 import dataclasses
 import datetime as _dt
-import enum
 import os
 import pathlib
 import re
@@ -58,6 +57,8 @@ import subprocess
 import tomllib
 from collections.abc import Callable, Iterable, Mapping
 from typing import TypedDict, cast
+
+from .model import Issue, IssueStatus
 
 #: Where a register may live, in the order it is looked for. `docs/issues` is the convention and
 #: stays first; the others exist because a repo does not always get to choose. One project keeps
@@ -75,15 +76,24 @@ class IssueFormatError(ValueError):
     """A file in docs/issues/ does not obey the contract its config states."""
 
 
-class Status(enum.StrEnum):
-    OPEN = "open"
-    IN_PROGRESS = "in-progress"
-    BLOCKED = "blocked"  # waiting on a decision, a credential, or another issue
-    DONE = "done"  # keeps the file; requires fixed_in
+#: The issue statuses. Kept under this name for callers of the store.
+Status = IssueStatus
 
+#: Statuses other tools use for finished work. The store refuses them and names ``done``.
+FOREIGN_CLOSED = ("closed", "resolved")
 
 #: Core front matter, in render order. Extras follow, in the order the file had them.
-CORE_ORDER = ("title", "status", "area", "owner", "filed", "blocked_by", "fixed_in")
+CORE_ORDER = (
+    "title",
+    "status",
+    "area",
+    "owner",
+    "filed",
+    "blocked_by",
+    "fixed_in",
+    "needs",
+    "sources",
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -337,35 +347,6 @@ def load_config(folder: pathlib.Path) -> Config:
 # An issue
 # --------------------------------------------------------------------------- #
 @dataclasses.dataclass(frozen=True)
-class Issue:
-    path: pathlib.Path
-    title: str
-    status: Status
-    area: str
-    filed: str
-    owner: str | None = None
-    blocked_by: tuple[str, ...] = ()
-    fixed_in: str | None = None
-    #: everything this folder declares beyond the core, in file order. Preserved verbatim on write.
-    extra: Mapping[str, str | tuple[str, ...]] = dataclasses.field(
-        default_factory=lambda: cast(dict[str, str | tuple[str, ...]], {})
-    )
-    body: str = ""
-    #: the front-matter keys as they actually appeared, so `check` can grade the order. Set on read;
-    #: empty for an issue built in memory, which has no file order to be wrong about yet.
-    order: tuple[str, ...] = ()
-
-    @property
-    def slug(self) -> str:
-        # Independent of date_style: strip a leading date of either shape, keep the rest.
-        return re.sub(r"^(\d{2}-\d{2}-\d{4}|\d{4}-\d{2}-\d{2})-", "", self.path.stem)
-
-    @property
-    def open(self) -> bool:
-        return self.status is not Status.DONE
-
-
-@dataclasses.dataclass(frozen=True)
 class Problem:
     path: pathlib.Path
     message: str
@@ -478,6 +459,15 @@ def _parse_front(front: str, path: pathlib.Path) -> dict[str, str | tuple[str, .
     return fields
 
 
+def _as_list(value: str | tuple[str, ...] | None) -> tuple[str, ...]:
+    """A list field: a bare scalar is a list of one, and empty items are dropped."""
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        return (value,)
+    return tuple(v for v in value if v)
+
+
 def parse(text: str, path: pathlib.Path, config: Config = DEFAULT_CONFIG) -> Issue:
     front, body = _split_front(text, path)
     fields = _parse_front(front, path)
@@ -489,6 +479,11 @@ def parse(text: str, path: pathlib.Path, config: Config = DEFAULT_CONFIG) -> Iss
         return value
 
     raw_status = required("status")
+    if raw_status in FOREIGN_CLOSED:
+        raise IssueFormatError(
+            f"{path.name}: status {raw_status!r} is not a status here; finished work is `done` "
+            "with `fixed_in` (prodc issue close <name> --fixed-in <sha>)"
+        )
     if raw_status not in tuple(Status):
         raise IssueFormatError(
             f"{path.name}: unknown status {raw_status!r} — one of {', '.join(Status)}"
@@ -509,6 +504,8 @@ def parse(text: str, path: pathlib.Path, config: Config = DEFAULT_CONFIG) -> Iss
 
     fixed_in = fields.get("fixed_in")
     owner = fields.get("owner")
+    needs = _as_list(fields.get("needs"))
+    sources = _as_list(fields.get("sources"))
     extra: dict[str, str | tuple[str, ...]] = {
         k: v for k, v in fields.items() if k not in CORE_ORDER and v is not None
     }
@@ -524,6 +521,8 @@ def parse(text: str, path: pathlib.Path, config: Config = DEFAULT_CONFIG) -> Iss
         extra=extra,
         body=body,
         order=tuple(fields),
+        needs=needs,
+        sources=sources,
     )
 
 
@@ -542,6 +541,8 @@ def _core_values(issue: Issue) -> dict[str, str | tuple[str, ...] | None]:
         "filed": issue.filed,
         "blocked_by": issue.blocked_by or None,
         "fixed_in": issue.fixed_in,
+        "needs": issue.needs or None,
+        "sources": issue.sources or None,
     }
 
 
@@ -556,7 +557,12 @@ def render(issue: Issue, config: Config = DEFAULT_CONFIG) -> str:
     if config.field_order:
         values = dict(_core_values(issue)) | dict(issue.extra)
         lines = ["---"]
-        for key in config.field_order:
+        # needs and sources are never dropped: with strict_fields, check reports them instead.
+        keys = (
+            *config.field_order,
+            *(k for k in ("needs", "sources") if k not in config.field_order),
+        )
+        for key in keys:
             value = values.get(key)
             if value is None or value == ():
                 continue
@@ -579,6 +585,10 @@ def render(issue: Issue, config: Config = DEFAULT_CONFIG) -> str:
             lines += _render_value("blocked_by", issue.blocked_by)
         if issue.fixed_in:
             lines.append(f"fixed_in: {_quote(issue.fixed_in)}")
+        if issue.needs:
+            lines += _render_value("needs", issue.needs)
+        if issue.sources:
+            lines += _render_value("sources", issue.sources)
         for key, value in issue.extra.items():
             lines += _render_value(key, value)
         lines.append("---")
@@ -1211,7 +1221,13 @@ def file_issue(
     extra: Mapping[str, str | tuple[str, ...]] | None = None,
     today: str | None = None,
     config: Config | None = None,
+    needs: Iterable[str] = (),
+    sources: Iterable[str] = (),
 ) -> pathlib.Path:
+    """Write a new issue file and return its path.
+
+    ``needs`` and ``sources`` given inside ``extra`` are moved to their own fields.
+    """
     config = load_config(folder) if config is None else config
     if config.areas and area not in config.areas:
         raise IssueFormatError(f"unknown area {area!r} — one of {', '.join(config.areas)}")
@@ -1227,8 +1243,10 @@ def file_issue(
         filed=filed,
         owner=owner,
         blocked_by=tuple(blocked_by),
-        extra=dict(extra or {}),
+        extra={k: v for k, v in (extra or {}).items() if k not in ("needs", "sources")},
         body=body if body.startswith("\n") else "\n" + body,
+        needs=tuple(needs) or _as_list((extra or {}).get("needs")),
+        sources=tuple(sources) or _as_list((extra or {}).get("sources")),
     )
     missing = [m for f in config.fields.values() for m in f.problems(issue.extra.get(f.name))]
     if missing:
@@ -1253,6 +1271,9 @@ def update(
         else {}
     )
     extra = dict(issue.extra) | dict(extra_patch)
+    for key in ("needs", "sources"):
+        if key in extra:
+            changes.setdefault(key, _as_list(extra.pop(key)))
     updated = dataclasses.replace(issue, extra=extra, **changes)
     save(updated, config)
     _touch_index(folder, config)

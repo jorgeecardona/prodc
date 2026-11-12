@@ -32,7 +32,9 @@ needs:
 
 
 def _issue(title: str, **fm: str) -> str:
-    head = "\n".join(f"{k}: {v}" for k, v in {"title": f'"{title}"', **fm}.items())
+    """An issue file; ``status`` and ``area`` default to what the store requires."""
+    fields = {"title": f'"{title}"', "status": "open", "area": "cli", **fm}
+    head = "\n".join(f"{k}: {v}" for k, v in fields.items())
     return f"---\n{head}\n---\n\nbody\n"
 
 
@@ -53,6 +55,7 @@ def test_read_issues_parses_front_matter_and_skips_the_rest(tmp_path: Path) -> N
             "01-01-2026-a.md": _issue("A", status="done", needs="[N-1]", area="cli"),
             "02-01-2026-b.md": _issue("B", needs="N-2", sources='["gitlab:#7"]'),
             "03-01-2026-bare.md": "no front matter here\n",
+            "04-01-2026-old.md": _issue("Old", status="closed"),
             "README.md": "# index\n",
             "config.toml": "x = 1\n",
         },
@@ -68,7 +71,9 @@ def test_read_issues_parses_front_matter_and_skips_the_rest(tmp_path: Path) -> N
         True,
     )
     assert (b.status, b.needs, b.sources, b.is_closed) == ("open", ("N-2",), ("gitlab:#7",), False)
-    assert folder.skipped == ("docs/issues/03-01-2026-bare.md",)
+    bare, old = folder.skipped
+    assert bare.startswith("03-01-2026-bare.md: no YAML front matter")
+    assert "status 'closed' is not a status here" in old and "`done`" in old
 
 
 def test_issues_command_lists_issues_with_need_state(
@@ -93,11 +98,24 @@ def test_issues_command_needs_the_config_key(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     cfg = _project(tmp_path, {})
+    (tmp_path / "docs" / "issues").rmdir()
+    (tmp_path / "docs").rmdir()
     (tmp_path / "prodc.toml").write_text(
         _TOML.replace('issues = ["docs/issues/*.md"]\n', ""), "utf-8"
     )
     assert main(["issues", "--config", cfg]) == 2
-    assert "no [prodc].issues globs" in capsys.readouterr().err
+    assert "no issue register" in capsys.readouterr().err
+
+
+def test_without_globs_the_register_is_found_from_the_root(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cfg = _project(tmp_path, {"01-01-2026-a.md": _issue("A", needs="[N-2]")})
+    (tmp_path / "prodc.toml").write_text(
+        _TOML.replace('issues = ["docs/issues/*.md"]\n', ""), "utf-8"
+    )
+    assert main(["issues", "--config", cfg, "--json"]) == 0
+    assert [i["id"] for i in json.loads(capsys.readouterr().out)] == ["01-01-2026-a"]
 
 
 def _lint(cfg: str, capsys: pytest.CaptureFixture[str]) -> tuple[int, str]:
