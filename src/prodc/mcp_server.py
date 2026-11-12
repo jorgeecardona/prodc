@@ -271,6 +271,17 @@ def build_server(root: Path) -> MCPServer:
         return call(argv)
 
     @server.tool(annotations=_READ)
+    def issue_next(owner: str | None = None, limit: int = 5) -> dict[str, Any]:
+        """The ready issue to work on next: walked from the top of the current release.
+
+        ``pick`` is the issue to take; ``skip`` says why there is none (no-board, no-register,
+        no-releases, all-delivered, no-linked-issue). ``owner`` also counts issues it holds.
+        """
+        argv = ["issue", "next", "--limit", str(limit)]
+        _flag(argv, "owner", owner)
+        return call(argv)
+
+    @server.tool(annotations=_READ)
     def issue_list(need: str | None = None) -> dict[str, Any]:
         """Every issue with the needs it serves and each need's state; ``need`` filters."""
         argv = ["issue", "list"]
