@@ -12,6 +12,7 @@ needs:
     proofs:
       - "test:tests/test_inbox.py::test_inbox_lists_must_opinions_and_warrant_concerns"
       - "test:tests/test_inbox.py::test_inbox_only_lists_and_never_writes"
+    goal: G-1
 
   - id: PD-2
     text: >
@@ -19,6 +20,7 @@ needs:
       with each need and its proof side by side.
     sources:
       - {kind: secondary, date: 2026-11-06, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/114"}
+    goal: G-1
 
   - id: PD-3
     text: >
@@ -26,6 +28,8 @@ needs:
       since a saved baseline.
     sources:
       - {kind: secondary, date: 2026-11-06, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/115"}
+    goal: G-2
+    release: R-2
 
   - id: PD-4
     text: >
@@ -33,6 +37,7 @@ needs:
       and lists what needs a person.
     sources:
       - {kind: secondary, date: 2026-11-06, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/116"}
+    goal: G-2
 
   - id: PD-5
     text: >
@@ -40,6 +45,7 @@ needs:
       and that is not evidence.
     sources:
       - {kind: secondary, date: 2026-11-06, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/117"}
+    goal: G-1
 
   - id: PD-6
     text: >
@@ -47,6 +53,7 @@ needs:
       collects test results.
     sources:
       - {kind: secondary, date: 2026-11-06, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/118"}
+    goal: G-2
 
   - id: PD-7
     text: >
@@ -54,6 +61,8 @@ needs:
       warning even without a quote.
     sources:
       - {kind: secondary, date: 2026-11-06, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/119"}
+    goal: G-2
+    release: R-2
 
   - id: PD-8
     text: >
@@ -61,6 +70,7 @@ needs:
       per tier.
     sources:
       - {kind: secondary, date: 2026-11-06, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/120"}
+    goal: G-2
 
   - id: PD-9
     text: >
@@ -69,6 +79,7 @@ needs:
     sources:
       - {kind: secondary, date: 2026-10-04, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/37"}
       - {kind: secondary, date: 2026-10-05, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/50"}
+    goal: G-1
 
   - id: PD-10
     text: >
@@ -76,6 +87,7 @@ needs:
       live against the tracker API.
     sources:
       - {kind: secondary, date: 2026-10-05, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/38"}
+    goal: G-2
 
   - id: PD-11
     text: >
@@ -83,6 +95,7 @@ needs:
       satisfaction.
     sources:
       - {kind: secondary, date: 2026-10-04, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/29"}
+    goal: G-1
   - id: PD-12
     text: When a source has a date but no observed_at, the developer can still see how
       old the need's evidence is, instead of an unknown age.
@@ -95,6 +108,8 @@ needs:
       observed_at: '2026-11-12'
     draft: false
     draft_added: '2026-11-12'
+    goal: G-2
+    release: R-2
   - id: PD-15
     text: When a need is proved by a Storybook story, the developer can see it DELIVERED
       only when the story's test passed, not when the story merely exists.
@@ -107,6 +122,8 @@ needs:
       observed_at: '2026-11-12'
     draft: false
     draft_added: '2026-11-12'
+    goal: G-2
+    release: R-2
   - id: PD-16
     text: When the developer has an idea for the product and does not yet know which need
       it serves, they can record it so it is not lost, and it does not count as a need
@@ -125,6 +142,8 @@ needs:
       observed_at: '2026-11-12'
     draft: false
     draft_added: '2026-11-12'
+    goal: G-1
+    release: R-1
   - id: PD-17
     text: When a need is about how the product looks (visual order, spacing, consistent
       elements, colour), the developer can see whether a judge other than the coding agent
@@ -144,3 +163,17 @@ needs:
     draft: false
     draft_added: '2026-11-12'
     must: true
+    goal: G-1
+    release: R-1
+  - id: PD-19
+    text: >
+      When an agent picks the next piece of work, it can take an issue linked to the most
+      important open need of the current release, and skip the run when none is linked.
+    sources:
+    - kind: secondary
+      who: cabildo agent mighty-golem-c399b, relaying Jorge
+      date: '2026-11-12'
+      quote: "prodc should hold goals, meaning which needs matter now. Cabildo's autopilot currently takes any ready issue, and the result is busy work with no direction."
+      locator: cabildo message 6579
+    goal: G-1
+    release: R-1

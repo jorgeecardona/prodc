@@ -1,0 +1,14 @@
+# Where prodc is going: goals (why) and releases (what first, in ship order).
+# The first release with an open need is the current release; `prodc issue next` picks from it.
+
+goals:
+  - id: G-1
+    text: A coding agent can do a project's PM work with prodc.
+  - id: G-2
+    text: A project's needs and proofs stay correct without a person checking them by hand.
+
+releases:
+  - id: R-1
+    text: The agent picks work with direction.
+  - id: R-2
+    text: Evidence you can trust.
