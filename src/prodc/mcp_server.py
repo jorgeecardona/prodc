@@ -287,16 +287,20 @@ def build_server(root: Path) -> MCPServer:
         body: str,
         blocked_by: list[str] | None = None,
         fields: dict[str, str | list[str]] | None = None,
+        needs: list[str] | None = None,
     ) -> dict[str, Any]:
         """File an issue: work that is known, scoped, and not being done now.
 
         The body must make sense to a reader with no context: concrete instances, file:line,
         what was measured vs inferred, and "done" stated as an observation. ``fields`` holds
         what the folder's config.toml requires (scope, verify, ...); a list field takes a list.
+        ``needs`` names the need ids the issue serves; an unknown id is refused.
         """
         argv = ["issue", "file", "--title", title, "--area", area, "--body", body]
         for slug in blocked_by or []:
             argv += ["--blocked-by", slug]
+        for need in needs or []:
+            argv += ["--need", need]
         return call(argv + _field_args(fields))
 
     @server.tool(annotations=_WRITE)
@@ -307,13 +311,16 @@ def build_server(root: Path) -> MCPServer:
         area: str | None = None,
         blocked_by: list[str] | None = None,
         fields: dict[str, str | list[str]] | None = None,
+        owner: str | None = None,
     ) -> dict[str, Any]:
         """Change an issue's front matter; only what you pass changes. ``blocked_by=[]`` clears
-        the blockers; leaving it out keeps them. Close with ``issue_close``, not status=done."""
+        the blockers; leaving it out keeps them. ``owner='none'`` clears the owner; in-progress
+        needs one. Close with ``issue_close``, not status=done."""
         argv = ["issue", "update", name]
         _flag(argv, "title", title)
         _flag(argv, "status", status)
         _flag(argv, "area", area)
+        _flag(argv, "owner", owner)
         if blocked_by is not None:
             if blocked_by:
                 for slug in blocked_by:

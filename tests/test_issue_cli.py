@@ -81,3 +81,76 @@ def test_no_register_is_exit_2(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     monkeypatch.chdir(tmp_path)
     assert main(["issue", "board"]) == 2
+
+
+_TOML = """
+[prodc]
+needs = ["needs/*.yaml"]
+[proofs.acc]
+kind = "accept"
+"""
+
+_NEEDS = """
+needs:
+  - id: N-1
+    text: a delivered want
+    proofs: ["acc:signed"]
+  - id: N-2
+    text: a want with no proof yet
+"""
+
+
+@pytest.fixture
+def board(repo: Path) -> Path:
+    (repo / "needs").mkdir()
+    (repo / "prodc.toml").write_text(_TOML, encoding="utf-8")
+    (repo / "needs" / "a.yaml").write_text(_NEEDS, encoding="utf-8")
+    return repo
+
+
+def _file(*extra: str) -> int:
+    return main(["issue", "file", "--title", "Work", "--area", "cli", "--body", "b", *extra])
+
+
+def test_file_with_needs_records_them(board: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert _file("--need", "N-1", "--need", "N-2", "--json") == 0
+    out = capsys.readouterr()
+    assert json.loads(out.out)["needs"] == ["N-1", "N-2"]
+    assert "serves no need" not in out.err
+    (path,) = (board / "docs" / "issues").glob("*-work.md")
+    assert "needs:\n  - N-1\n  - N-2\n" in path.read_text()
+
+
+def test_file_refuses_an_unknown_need(board: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert _file("--need", "N-99") == 2
+    assert "no such need: N-99" in capsys.readouterr().err
+    assert not list((board / "docs" / "issues").glob("*.md"))
+
+
+def test_file_without_a_need_warns_but_files(
+    board: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert _file() == 0
+    assert "issue serves no need" in capsys.readouterr().err
+    assert list((board / "docs" / "issues").glob("*-work.md"))
+
+
+def test_close_reports_need_states_and_warns_when_unproven(
+    board: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert _file("--need", "N-1", "--need", "N-2") == 0
+    capsys.readouterr()
+    assert main(["issue", "close", "work", "--fixed-in", "abc1234"]) == 0
+    out = capsys.readouterr()
+    assert "serves N-1: DELIVERED" in out.out and "serves N-2: HOLE" in out.out
+    assert "closed but unproven: N-2 is HOLE" in out.err
+    assert "N-1 is" not in out.err
+
+
+def test_update_sets_and_clears_the_owner(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert _file() == 0
+    assert main(["issue", "update", "work", "--status", "in-progress", "--owner", "ana"]) == 0
+    assert main(["issue", "check"]) == 0
+    capsys.readouterr()
+    assert main(["issue", "update", "work", "--owner", "none", "--json"]) == 0
+    assert _json(capsys)["owner"] is None
