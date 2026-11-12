@@ -44,7 +44,8 @@ import tomllib
 from collections.abc import Callable, Iterable, Mapping
 from typing import TypedDict, cast
 
-from .model import Issue, IssueStatus
+from .model import Issue as Issue  # re-exported: consumers import issue_store.Issue
+from .model import IssueStatus
 
 #: Where a register may live, in the order it is looked for. ``docs/issues`` is the convention.
 #: The others are for repos that keep ``docs/`` out of git or have no ``docs/`` at all.
