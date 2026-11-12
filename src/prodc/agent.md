@@ -47,7 +47,10 @@ Decide where a thing goes before you write it.
 | engineering work or a bug | an issue: `prodc issue file` in `docs/issues/`, or your tracker | `the view generator drops links from shared components` |
 
 - prodc never calls a tracker. Engineering work and bugs are issues: in `docs/issues/` with
-  `prodc issue file`, or in your tracker.
+  `prodc issue file --need <id>`, or in your tracker.
+- `prodc issue list` shows each issue with the needs it serves and their state.
+- `prodc issue close` warns "closed but unproven" when a linked need is not DELIVERED. Add or
+  fix the proof; closing the issue does not deliver the need.
 - A bug that breaks a delivered need shows up on its own: the proof turns PENDING or BROKEN. Fix
   the code. Do not edit the need.
 - A bug that shows users cannot do something at all is a missing want. Write that as a need.

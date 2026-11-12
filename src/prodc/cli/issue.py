@@ -17,10 +17,12 @@ from ..config import Config, ConfigError
 from ..loader import LoaderError, load
 from ..model import NeedState
 from ..status import resolve as resolve_needs
+from .render import render_issues
+from .serialize import issue_payload
 
 
 def add_issue_parser(ip: argparse.ArgumentParser) -> None:
-    """Fill ``prodc issue {board,show,file,update,close,check,reindex}``."""
+    """Fill ``prodc issue {board,list,show,file,update,close,check,reindex}``."""
 
     def bare(_args: argparse.Namespace) -> int:
         ip.print_help(sys.stderr)
@@ -39,6 +41,11 @@ def add_issue_parser(ip: argparse.ArgumentParser) -> None:
     bd.add_argument("--area", default=None, help="flat list filtered by area")
     bd.add_argument("--owner", default=None, help="flat list filtered by owner ('none': unowned)")
     bd.set_defaults(func=cmd_issue_board)
+
+    ls = sub("list", "every issue with the needs it serves and their state")
+    ls.add_argument("--need", default=None, metavar="ID", help="only issues serving this need")
+    ls.add_argument("--config", default=None, help="path to prodc.toml (default: found upward)")
+    ls.set_defaults(func=cmd_issue_list)
 
     sh = sub("show", "print one issue file")
     sh.add_argument("name", help="a filename or an unambiguous part of the slug")
@@ -209,6 +216,41 @@ def cmd_issue_board(args: argparse.Namespace) -> int:
     lines += [f"WAITING ({len(b.waiting)}):", *(f"  {w.issue.slug}: {w.reason}" for w in b.waiting)]
     lines.append(f"{b.done} done")
     _emit(args.json, data, "\n".join(lines))
+    return 0
+
+
+def cmd_issue_list(args: argparse.Namespace) -> int:
+    """List the issues with the state of each need they serve (#36).
+
+    The issues come from ``[prodc].issues`` globs when set, else from the register
+    :func:`prodc.issue_store.find_folder` finds. Exit 2 when there is no board or no register.
+    """
+    try:
+        cfg = Config.load(Path(args.config)) if args.config else _board_config()
+        if cfg is None:
+            raise store.IssueFormatError("no prodc.toml at or above this directory")
+        model = load(cfg)
+    except (ConfigError, LoaderError, store.IssueFormatError, OSError) as exc:
+        print(f"prodc: {exc}", file=sys.stderr)
+        return 2
+    if not cfg.issue_globs and store.find_folder(cfg.root) is None:
+        print(
+            "prodc: no issue register: set [prodc].issues (for example docs/issues/*.md) "
+            "or create docs/issues/",
+            file=sys.stderr,
+        )
+        return 2
+    results = resolve_needs(list(model.needs), cfg.adapters, cfg.source_adapters)
+    by_state = {r.need.id: r.state.value.upper() for r in results}
+    issues = [i for i in model.issues if args.need is None or args.need in i.needs]
+    if args.json:
+        rows = [
+            {**issue_payload(i), "need_states": {n: by_state.get(n, "UNKNOWN") for n in i.needs}}
+            for i in issues
+        ]
+        print(json.dumps(rows, indent=2))
+    else:
+        print(render_issues(issues, by_state))
     return 0
 
 

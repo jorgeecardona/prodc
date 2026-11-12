@@ -57,7 +57,7 @@ Read tools (marked read-only for the client):
 | `lint` | `prodc lint` |
 | `inbox` | `prodc inbox` |
 | `brief` | `prodc brief <client>` |
-| `issues` | `prodc issues` |
+| `issues` | `prodc issues` (deprecated: use `issue_list`) |
 | `suggest` | `prodc suggest` (never applies) |
 | `review` | `prodc review` (lists drafts) |
 | `dupes` | `prodc dupes` |
@@ -77,11 +77,12 @@ Issue register tools (`docs/issues`):
 | Tool | CLI |
 |---|---|
 | `issue_board` | `prodc issue board` (read) |
+| `issue_list` | `prodc issue list` (read): each issue with its needs and their state |
 | `issue_show` | `prodc issue show` (read) |
 | `issue_check` | `prodc issue check` (read) |
-| `issue_file` | `prodc issue file` |
-| `issue_update` | `prodc issue update` |
-| `issue_close` | `prodc issue close` |
+| `issue_file` | `prodc issue file` (`needs`: the need ids it serves; an unknown id is refused) |
+| `issue_update` | `prodc issue update` (`owner`: an in-progress issue needs one; `none` clears it) |
+| `issue_close` | `prodc issue close` (warns when a linked need is not DELIVERED) |
 
 Claiming an issue is not here. A claim is a lease between running agents, which cabildo keeps.
 

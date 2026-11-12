@@ -17,7 +17,6 @@ from datetime import date
 from pathlib import Path
 from typing import cast
 
-from .. import issue_store
 from ..board import annotate_need_warnings, gather
 from ..callbacks import advance_ledger, fire, read_ledger, transitions, write_ledger
 from ..catalog import CATALOG
@@ -110,6 +109,7 @@ from .common import (
     load_or_report,
     portfolio_totals,
 )
+from .issue import cmd_issue_list
 from .render import (
     COLUMNS,
     provenance_counts,
@@ -122,7 +122,6 @@ from .render import (
     render_goals,
     render_handoffs,
     render_inbox,
-    render_issues,
     render_orphans,
     render_out_of_scope,
     render_plan,
@@ -141,7 +140,6 @@ from .serialize import (
     decision_show_json,
     dup_payload,
     inbox_json,
-    issue_payload,
     plan_json,
     show_json,
     to_json,
@@ -1501,26 +1499,9 @@ def cmd_guide(args: argparse.Namespace) -> int:
 
 
 def cmd_issues(args: argparse.Namespace) -> int:
-    """List the issues read from ``[prodc].issues``, with the state of the needs they serve (#36)."""
-    loaded = load_or_report(args)
-    if loaded is None:
-        return 2
-    cfg, model = loaded
-    if not cfg.issue_globs and issue_store.find_folder(cfg.root) is None:
-        print(
-            "prodc: no issue register: set [prodc].issues (for example docs/issues/*.md) "
-            "or create docs/issues/",
-            file=sys.stderr,
-        )
-        return 2
-    results = resolve(list(model.needs), cfg.adapters, cfg.source_adapters)
-    by_state = {r.need.id: r.state.value.upper() for r in results}
-    issues = [i for i in model.issues if args.need is None or args.need in i.needs]
-    if args.json:
-        print(json.dumps([issue_payload(i) for i in issues], indent=2))
-    else:
-        print(render_issues(issues, by_state))
-    return 0
+    """Deprecated alias of ``prodc issue list``: prints a notice to stderr, then runs it."""
+    print("prodc: `prodc issues` is deprecated; use `prodc issue list`", file=sys.stderr)
+    return cmd_issue_list(args)
 
 
 def cmd_views(args: argparse.Namespace) -> int:

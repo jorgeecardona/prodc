@@ -43,7 +43,7 @@ async def test_tools_are_the_agent_safe_set(board: Path) -> None:
     assert names == {
         "status", "show", "plan", "lint", "inbox", "brief", "issues", "suggest", "review",
         "dupes", "add_need", "add_decision", "set", "capture", "promote",
-        "issue_board", "issue_show", "issue_check", "issue_file", "issue_update", "issue_close",
+        "issue_board", "issue_list", "issue_show", "issue_check", "issue_file", "issue_update", "issue_close",
     }  # fmt: skip
     for forbidden in ("accept", "attest", "outcome", "withdraw", "sync"):
         assert forbidden not in names
@@ -108,6 +108,7 @@ def test_every_tool_argv_parses_with_the_real_parser() -> None:
         ["issue", "file", "--title", "t", "--area", "a", "--body", "b", "--need", "N-1",
          "--need", "N-2"],
         ["issue", "update", "x", "--owner", "me"],
+        ["issue", "list", "--need", "N-1"],
         ["suggest", "N-1", "--relink"],
         ["review", "--promote", "D-1", "--dry-run"],
         ["add", "need", "N-9", "--text", "t", "--file", "f.yaml", "--who", "w", "--kind",

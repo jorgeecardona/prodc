@@ -146,7 +146,7 @@ def build_server(root: Path) -> MCPServer:
 
     @server.tool(annotations=_READ)
     def issues(need: str | None = None) -> dict[str, Any]:
-        """The issue files ([prodc].issues) against the needs they serve."""
+        """Deprecated: use ``issue_list``. The issues against the needs they serve."""
         argv = ["issues"]
         _flag(argv, "need", need)
         return call(argv)
@@ -268,6 +268,13 @@ def build_server(root: Path) -> MCPServer:
         _flag(argv, "status", status)
         _flag(argv, "area", area)
         _flag(argv, "owner", owner)
+        return call(argv)
+
+    @server.tool(annotations=_READ)
+    def issue_list(need: str | None = None) -> dict[str, Any]:
+        """Every issue with the needs it serves and each need's state; ``need`` filters."""
+        argv = ["issue", "list"]
+        _flag(argv, "need", need)
         return call(argv)
 
     @server.tool(annotations=_READ)

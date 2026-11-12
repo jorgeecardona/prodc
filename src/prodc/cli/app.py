@@ -685,7 +685,7 @@ def build_parser() -> argparse.ArgumentParser:
     isp = sub.add_parser(
         "issues",
         parents=[config, json_out],
-        help="list the issue files ([prodc].issues) with the needs they serve (#36)",
+        help="deprecated: use `prodc issue list`",
     )
     isp.add_argument("--need", default=None, metavar="ID", help="only issues serving this need")
     isp.set_defaults(func=cmd_issues)

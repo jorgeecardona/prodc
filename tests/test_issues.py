@@ -161,3 +161,18 @@ def test_show_lists_the_issues_serving_a_need(
     assert "- a [in-progress] Do the thing" in capsys.readouterr().out
     assert main(["show", "N-2", "--config", cfg, "--json"]) == 0
     assert json.loads(capsys.readouterr().out)["issues"][0]["id"] == "a"
+
+
+def test_issue_list_shows_need_state_and_issues_is_a_deprecated_alias(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cfg = _project(tmp_path, {"a.md": _issue("Do the thing", needs="[N-1, N-2]")})
+    assert main(["issue", "list", "--config", cfg, "--json"]) == 0
+    (row,) = json.loads(capsys.readouterr().out)
+    assert row["need_states"] == {"N-1": "DELIVERED", "N-2": "HOLE"}
+    assert main(["issue", "list", "--config", cfg, "--need", "N-9"]) == 0
+    assert "issues: 0" in capsys.readouterr().out
+    assert main(["issues", "--config", cfg]) == 0
+    out = capsys.readouterr()
+    assert "N-1:DELIVERED" in out.out
+    assert "deprecated; use `prodc issue list`" in out.err

@@ -16,7 +16,7 @@ Commands take `--config prodc.toml` (default) and `--json`, except: `report` and
 | `diff <snapshot>` | State changes since a saved `status --json` | `prodc diff last.json` |
 | `portfolio <path>…` | Many boards, one scoreboard (+ totals footer); a path is a prodc.toml or a dir to discover boards under (prunes VCS/vendor/hidden dirs, `--max-depth` default 4) | `prodc portfolio projects/` |
 | `dupes` | Candidate duplicate need pairs by text similarity; `--threshold` overrides `[lint].duplicate_threshold` | `prodc dupes --threshold 0.7` |
-| `issues` | The issue files read from `[prodc].issues`, with the state of the needs each one serves. `--need ID` shows one need's issues, `--json` for tools. Needs `[prodc].issues` in the config. See Issues in model.md | `prodc issues --need N-3` |
+| `issues` | Deprecated: use `prodc issue list`. Prints a notice to stderr, then runs it | `prodc issue list --need N-3` |
 | `views` | Each client's views as a tree (children under their parent), with the needs that point at each view (a `views:` proof or a `path` start or outcome) and their state. Flags `unjustified` (no need points at the view or any child, and `needless_ok` is false), `untyped` (`kind` is null) and `orphan` (no inbound link). The `in/out` column counts links; `--json` lists them with their `why`. `--links` prints each view's outgoing links and reasons. `--graph mermaid` prints one Mermaid flowchart per client (`-o PATH` writes it to a file). The last lines give `unreachable from an entry view` (views no entry view leads to (an entry is a view a need's `path.start` names)). `--client web` shows one client; `--json` for tools that draw the graph. See `[proofs.views]` in config.md | `prodc views --client web` |
 | `recurrence` | Baselines shared across clients; `--suggest` proposes unlinked cross-client needs that could share one (set `variant_of` or `not_variant_of`); `--suggest --apply --baseline-id ID --file F` creates a shared baseline for the top group and links its members (`--dry-run` to preview); `--threshold` overrides `[lint].duplicate_threshold` | `prodc recurrence --suggest --apply --baseline-id B-1 --file needs/base.yaml` |
 | `suggest [id]` | Candidate proof locators for HOLE needs, ranked by text similarity to adapter inventories; `--min-score --top --kind` (with `--kind` naming an `external` or `evalgate` proof, every recorded key is offered, ranked by score and not cut by `--min-score`; an evalgate suggestion is `metric>=current score`, so raise the threshold to the real bar); `--apply` writes the best per need as a proof (`--dry-run` to preview) | `prodc suggest H-1 --min-score 0.4 --apply` |
@@ -67,15 +67,17 @@ Each rewrites one YAML file, re-loads the whole model as validation, reverts on 
 ## Issues
 
 The issue register is `docs/issues/*.md`, one file per issue, graded by the folder's
-`config.toml`. All take `--json`.
+`config.toml`. All take `--json`. prodc reads the files matched by `[prodc].issues`, or the
+register it finds from the project root when that key is not set.
 
 | Command | Does |
 |---|---|
 | `issue board [--status S] [--area A] [--owner O]` | issues ready to pick up and what the rest waits on; a filter gives a flat list |
+| `issue list [--need ID] [--config F]` | each issue, the needs it serves, and each need's state; `--need` keeps one need's issues |
 | `issue show <name>` | print one issue (a filename or part of its slug) |
-| `issue file --title T --area A --body B [--blocked-by SLUG] [--field K=V]` | file a new issue (`--body -` reads stdin) |
-| `issue update <name> [--title] [--status] [--area] [--blocked-by SLUG \| --clear-blocked-by] [--field K=V]` | change only what you pass |
-| `issue close <name> --fixed-in SHA` | mark done; the file stays, carrying the sha |
+| `issue file --title T --area A --body B [--need ID] [--blocked-by SLUG] [--field K=V]` | file a new issue (`--body -` reads stdin). `--need` (repeatable) names a need it serves; an unknown id is refused (exit 2). With no `--need` it files and warns "issue serves no need" |
+| `issue update <name> [--title] [--status] [--area] [--owner NAME] [--blocked-by SLUG \| --clear-blocked-by] [--field K=V]` | change only what you pass. An in-progress issue needs an owner; `--owner none` clears it |
+| `issue close <name> --fixed-in SHA` | mark done; the file stays, carrying the sha. Prints each linked need's state and warns "closed but unproven" when one is not DELIVERED (exit 0) |
 | `issue check` | grade the folder against its `config.toml`; exit 1 on problems |
 | `issue reindex` | rewrite the README index table |
 
