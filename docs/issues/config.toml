@@ -5,7 +5,7 @@
 # this folder should follow this one schema, so the register and its checks agree.
 
 date_style = "DMY"          # 03-08-2026-short-kebab-summary.md
-index = true                # the generated table in README.md
+index = false               # no generated README table: `prodc issue board` is the index
 index_fields = ["scope", "verify"]
 
 # The one vocabulary that cannot be guessed from outside this repo.

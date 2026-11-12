@@ -1,6 +1,7 @@
 ---
 title: "Lint does not explain a proof locator that misses a template-literal test title"
 status: done
+fixed_in: 47313c2
 scope: "S"
 verify: test
 area: adapters

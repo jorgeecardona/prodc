@@ -2,6 +2,7 @@
 
 [prodc]
 needs = ["product/needs/*.yaml"]
+issues = ["docs/issues/*.md"]
 
 [proofs.test]
 kind = "pytest"

@@ -36,6 +36,11 @@ tasks:
     inputs: ['docs/**/*', 'mkdocs.yml', 'src/**/*.py']
     outputs: ['site']
 
+  # The issue register in docs/issues must pass its own config.toml.
+  issues:
+    command: 'uv run prodc issue check'
+    inputs: ['docs/issues/**/*', 'src/**/*.py']
+
   # CI-side enforcement of "a src/ change carries a version bump" (the non-bypassable
   # counterpart to the pre-commit auto-bump). Reads the diff base from CI env, so it is
   # git-state dependent, not file-input dependent -> not cacheable.
@@ -57,6 +62,7 @@ tasks:
       - '~:test'
       - '~:build'
       - '~:docs'
+      - '~:issues'
       - '~:version-guard'
 
   # Mint a PyPI OIDC token and upload dist/*. Invoked by release (or by hand).
