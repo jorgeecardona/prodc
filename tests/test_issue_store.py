@@ -258,7 +258,7 @@ def test_a_list_field_says_it_wants_a_list(folder: pathlib.Path) -> None:
         "title: A\nstatus: open\narea: ci\nscope: S\ntags: one, two, three",
     )
     messages = " ".join(p.message for p in issues.check(folder))
-    assert "`tags` is a list — pass a list of values" in messages
+    assert "`tags` is a list: pass a list of values" in messages
     assert "one, two, three" in messages  # quote what they sent, so it is recognisable
 
 
@@ -837,3 +837,28 @@ def test_a_foreign_closed_status_names_done(folder: pathlib.Path) -> None:
     write(folder, "03-08-2026-a.md", "title: A\nstatus: resolved\narea: ci\nscope: S")
     problems = issues.check(folder)
     assert any("status 'resolved' is not a status here" in p.message for p in problems)
+
+
+def test_prodc_issues_dir_wins_over_the_cabildo_one(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    (repo / "a").mkdir()
+    (repo / "b").mkdir()
+    monkeypatch.setenv("CABILDO_ISSUES_DIR", "a")
+    assert issues.find_folder(repo) == repo / "a"
+    monkeypatch.setenv("PRODC_ISSUES_DIR", "b")
+    assert issues.find_folder(repo) == repo / "b"
+
+
+def test_the_legacy_index_marker_is_read_and_replaced(folder: pathlib.Path) -> None:
+    write(folder, "03-08-2026-a.md", "title: A\nstatus: open\narea: ci\nscope: S")
+    readme = folder / issues.README_NAME
+    readme.write_text(f"# Issues\n\n{issues.LEGACY_INDEX_BEGIN}\nold\n{issues.INDEX_END}\n")
+    issues.reindex(folder)
+    text = readme.read_text()
+    assert issues.INDEX_BEGIN in text and issues.LEGACY_INDEX_BEGIN not in text
+    assert issues.check(folder) == []
+    readme.write_text(text.replace(issues.INDEX_BEGIN, issues.LEGACY_INDEX_BEGIN))
+    assert issues.check(folder) == []  # an up-to-date index under the old marker is not stale

@@ -1,47 +1,33 @@
-"""prodc's issue store — the tool layer behind a repo's `docs/issues/`.
+"""The issue register in ``docs/issues/``: read, write, and check its files.
 
-Moved from cabildo. prodc owns the file format and the store logic. cabildo will import
-from here. prodc's own reader (`src/prodc/issues.py`) is separate for now.
+One markdown file per piece of work that is known, scoped, and not being done right now. The
+files are the store: there is no database, cache, or second copy. Everything derived (the README
+index above all) is generated from the files and is never the source of truth. ``git`` and an
+editor work on the register without this module.
 
-One file per piece of work that is known, scoped, and not being done right now. Without a home,
-that residue lives in a chat log nobody re-reads and "we should fix X" decays into nobody having
-ever owned X.
+Prior art. Beads (``bd``) has the ``blocked_by`` dependency graph used here, because "what can I
+pick up now" needs it; its database store is not used. Backlog.md and ditz keep one file per
+issue, as here. git-bug keeps issues as git objects, which need the tool to read.
 
-**The files are the store.** No database, no cache, no second copy — an issue is markdown with YAML
-front matter, tracked in git, readable and editable by hand. Everything derived (the README index
-above all) is *generated from* the files and is never authoritative. If this module is broken or
-missing, `git` and an editor still work.
+Front matter has a small core that every folder enforces::
 
-Prior art, and what was taken from it. Beads (`bd`) is the closest thing to this and the deepest
-thinking about the agent case; its dependency DAG is stolen wholesale as `blocked_by`, because
-"what can I pick up cold right now" is not answerable without it. Its storage choice is rejected on
-purpose: Beads keeps a Dolt database and exports JSONL that is explicitly not the source of truth.
-Backlog.md and ditz got file-per-issue right and are the shape here. git-bug stores issues as git
-objects, which makes them unreadable without the tool — the opposite of the goal.
+    title  status  area  owner  filed  blocked_by  fixed_in  needs  sources
 
-## Core plus per-project config
+``needs`` names the prodc needs an issue serves; ``sources`` holds pointers into other systems.
+Each folder declares the rest in ``docs/issues/config.toml``: its ``areas`` vocabulary and any
+extra fields. ``prodc issue init`` style adoption (:func:`infer_config`) writes that config from
+the files already there, so adopting the register does not invalidate old issues. Unknown fields
+are kept unchanged on every write.
 
-Real repos disagree about front matter, and pretending otherwise just means the tool is wrong
-somewhere. A small core is enforced everywhere:
+Status::
 
-    title  status  area  owner  filed  blocked_by  fixed_in
+    open -> in-progress -> done,  with blocked to the side
 
-and each folder declares the rest in `docs/issues/config.toml` — its own `areas` vocabulary (which
-is *necessarily* per-project: one repo's "networking" is another's "roast-live") plus whatever extra
-fields it requires. The init command writes that config by reading the folder that already exists,
-so adopting this never invalidates issues written before it.
+``done`` keeps the file and requires ``fixed_in``: the sha that was pushed to the mainline.
+``closed`` and ``resolved`` are refused with a message that names ``done``.
 
-Unknown fields are preserved verbatim on every write. A tool that silently drops the field it did
-not recognise is worse than one that refuses to run.
-
-## Status, and what closing means
-
-    open -> in-progress -> done,  with blocked off to the side
-
-`done` keeps the file and requires `fixed_in` — the sha that pushed on the mainline, so the folder
-carries a greppable record of what was fixed by what. (Note for the paas repo: its README says to
-close by deleting the file. That is a deliberate reversal, not an oversight; that line needs
-updating if paas adopts this.)
+cabildo imports this module as ``from prodc import issue_store as issues``. Keep the public names
+and signatures stable.
 """
 
 from __future__ import annotations
@@ -60,15 +46,16 @@ from typing import TypedDict, cast
 
 from .model import Issue, IssueStatus
 
-#: Where a register may live, in the order it is looked for. `docs/issues` is the convention and
-#: stays first; the others exist because a repo does not always get to choose. One project keeps
-#: `docs/` out of git wholesale, and a small library often has no `docs/` at all — neither is a
-#: reason to be unable to keep a register. `CABILDO_ISSUES_DIR` overrides all of it.
+#: Where a register may live, in the order it is looked for. ``docs/issues`` is the convention.
+#: The others are for repos that keep ``docs/`` out of git or have no ``docs/`` at all.
+#: ``PRODC_ISSUES_DIR`` (or the older ``CABILDO_ISSUES_DIR``) overrides the search.
 FOLDER_CANDIDATES = (("docs", "issues"), ("issues",), (".issues",))
 CONFIG_NAME = "config.toml"
 README_NAME = "README.md"
 
-INDEX_BEGIN = "<!-- BEGIN GENERATED INDEX — `cabildo issues reindex` -->"
+INDEX_BEGIN = "<!-- BEGIN GENERATED INDEX: `prodc issue reindex` -->"
+#: The marker cabildo wrote. Still read; a reindex replaces it with :data:`INDEX_BEGIN`.
+LEGACY_INDEX_BEGIN = "<!-- BEGIN GENERATED INDEX \u2014 `cabildo issues reindex` -->"
 INDEX_END = "<!-- END GENERATED INDEX -->"
 
 
@@ -115,12 +102,12 @@ class Field:
     required: bool = False
     values: tuple[str, ...] = ()  # empty means free text
     is_list: bool = False  # a YAML block list rather than a scalar
-    #: a file, relative to the issue folder, this field's value must appear in — and which must
+    #: a file, relative to the issue folder, this field's value must appear in, and which must
     #: link back to the issue. One direction is not enough: a register that names a gap but does
     #: not point at the task is how the same gap gets found four times and fixed zero.
     crossref: str = ""
     #: `kebab`, `sha`, `slug`, or a regex. For fields whose shape matters but whose values cannot be
-    #: enumerated — a tag vocabulary grows, but `Roast Detect` and `roast-detect` must not both
+    #: enumerated: a tag vocabulary grows, but `Roast Detect` and `roast-detect` must not both
     #: exist, because then neither groups with the other.
     pattern: str = ""
 
@@ -139,16 +126,16 @@ class Field:
         if self.is_list and not isinstance(value, tuple):
             # Say what is actually wrong. An agent given only "does not match kebab" here spent
             # four attempts trying comma, comma-space and space as separators, then gave up and
-            # filed with one tag instead of the four it meant — because nothing told it that a
+            # filed with one tag instead of the four it meant, because nothing told it that a
             # delimited string was never going to be the answer.
             return [
-                f"`{self.name}` is a list — pass a list of values, not the delimited "
+                f"`{self.name}` is a list: pass a list of values, not the delimited "
                 f"string {value!r}"
             ]
         out: list[str] = []
         if self.values:
             out += [
-                f"unknown {self.name} {v!r} — one of {', '.join(self.values)}"
+                f"unknown {self.name} {v!r}: one of {', '.join(self.values)}"
                 for v in got
                 if v not in self.values
             ]
@@ -175,23 +162,23 @@ class Config:
     index: bool = True
     date_style: str = "DMY"  # DMY → 03-08-2026-slug.md; YMD → 2026-08-03-slug.md
     #: groups where at least one member must be present. For "name the register entry, or say why
-    #: there is none" — an either/or that `required` cannot express, and where the point is that
+    #: there is none": an either/or that `required` cannot express, and where the point is that
     #: silence is not an allowed answer.
     require_one_of: tuple[tuple[str, ...], ...] = ()
     #: project fields to add as columns in the generated index. The index is for scanning, and what
-    #: is worth scanning is exactly what the folder chose to track — scope and verify in one repo,
+    #: is worth scanning is exactly what the folder chose to track: scope and verify in one repo,
     #: priority in another. Core columns are always there.
     index_fields: tuple[str, ...] = ()
     #: The front matter, in the order it must appear. When set it does three jobs at once: `check`
-    #: enforces the order, `render` writes exactly these keys (so a field the folder does not want —
-    #: `filed`, say, which the filename already carries — is never added behind its back), and with
+    #: enforces the order, `render` writes exactly these keys (so a field the folder does not want,
+    #: `filed`, say, which the filename already carries, is never added behind its back), and with
     #: `strict_fields` it is the allowed set. Front matter is then a schema rather than a bag.
     field_order: tuple[str, ...] = ()
     #: Reject any front-matter key not in `field_order`. Off by default: preserving a key you do not
     #: recognise is the safer failure. On, when a folder wants its schema closed.
     strict_fields: bool = False
     #: `fixed_in` must name a commit reachable from this branch. The sha that matters is the one
-    #: that PUSHED — a worktree sha resolves until that worktree is pruned, and then the register
+    #: that PUSHED: a worktree sha resolves until that worktree is pruned, and then the register
     #: points at nothing.
     fixed_in_on_branch: str = ""
     #: Headings (regexes, matched at the start of a `## ` heading) every issue body must carry.
@@ -200,7 +187,7 @@ class Config:
     require_sections: tuple[str, ...] = ()
     #: What is exempt from `require_sections`, as "field=value" (e.g. "type=handoff"). A hand-off
     #: records tree state and resume order for work already in flight, so it carries no acceptance
-    #: criteria of its own — it points at the issues that do.
+    #: criteria of its own: it points at the issues that do.
     sections_exempt: str = ""
     #: Check that short shas cited in issue bodies are still reachable from some branch. An issue
     #: whose evidence is a commit that no longer exists is worse than one with no evidence: it reads
@@ -219,7 +206,7 @@ class Config:
     #: naming the sha that pushed it. A register that is not tracking code (a personal agenda, say)
     #: turns this off, so `done` is just done with no sha to cite.
     closed_needs_fixed_in: bool = True
-    #: Fields of which at most one issue in the register may carry a value — an exclusive flag such
+    #: Fields of which at most one issue in the register may carry a value: an exclusive flag such
     #: as a single "focus of the day". A second one set is a `check` error naming the conflict.
     singleton_fields: tuple[str, ...] = ()
 
@@ -229,7 +216,7 @@ class Config:
 
         `rank_by` names it; with nothing named, a field literally called `priority` that declares
         its values is used, because that is what every one of these folders called it without being
-        asked. Declaration order IS the ranking — `values = ["P0", "P1", "P2"]` says P0 first — so
+        asked. Declaration order IS the ranking: `values = ["P0", "P1", "P2"]` says P0 first, so
         there is no second place to keep the order in and no way for the two to disagree.
         """
         name = self.rank_by or "priority"
@@ -318,7 +305,7 @@ def load_config(folder: pathlib.Path) -> Config:
     missing = [k for k in ("title", "status", "area") if order and k not in order]
     if missing:
         raise IssueFormatError(
-            f"{path}: field_order omits {', '.join(missing)} — those are core and every issue "
+            f"{path}: field_order omits {', '.join(missing)}: those are core and every issue "
             f"must carry them, so leaving them out would make every file invalid"
         )
     sections = _toml_dict(raw, "sections")
@@ -356,7 +343,7 @@ class Problem:
 
 
 # --------------------------------------------------------------------------- #
-# Front matter — a small, deliberate YAML subset
+# Front matter: a small, deliberate YAML subset
 # --------------------------------------------------------------------------- #
 # Flat `key: value` scalars plus single-level block lists. That covers every issue in the repos this
 # was built from and nothing more, which is why this module has no third-party dependency and stays
@@ -423,9 +410,7 @@ def _quote(value: str) -> str:
 
 def _split_front(text: str, path: pathlib.Path) -> tuple[str, str]:
     if not text.startswith("---\n"):
-        raise IssueFormatError(
-            f"{path.name}: no YAML front matter — the file must start with `---`"
-        )
+        raise IssueFormatError(f"{path.name}: no YAML front matter: the file must start with `---`")
     parts = text.split("---\n", 2)
     if len(parts) != 3:
         raise IssueFormatError(f"{path.name}: unterminated front matter")
@@ -441,14 +426,14 @@ def _parse_front(front: str, path: pathlib.Path) -> dict[str, str | tuple[str, .
         item = _ITEM_RE.match(line)
         if item is not None:
             if key is None:
-                raise IssueFormatError(f"{path.name}: list item with no key — {line!r}")
+                raise IssueFormatError(f"{path.name}: list item with no key: {line!r}")
             current = fields.get(key)
             got = current if isinstance(current, tuple) else ()
             fields[key] = (*got, _unquote(item.group(1)) or "")
             continue
         m = _KEY_RE.match(line)
         if not m:
-            raise IssueFormatError(f"{path.name}: front matter line is not `key: value` — {line!r}")
+            raise IssueFormatError(f"{path.name}: front matter line is not `key: value`: {line!r}")
         key = str(m.group(1))
         inline = m.group(2).strip()
         if inline.startswith("[") and inline.endswith("]"):
@@ -486,7 +471,7 @@ def parse(text: str, path: pathlib.Path, config: Config = DEFAULT_CONFIG) -> Iss
         )
     if raw_status not in tuple(Status):
         raise IssueFormatError(
-            f"{path.name}: unknown status {raw_status!r} — one of {', '.join(Status)}"
+            f"{path.name}: unknown status {raw_status!r}: one of {', '.join(Status)}"
         )
 
     # `filed` is a fact the filename already carries, so a file that omits it is not malformed.
@@ -551,7 +536,7 @@ def render(issue: Issue, config: Config = DEFAULT_CONFIG) -> str:
 
     With `field_order` set, exactly those keys are written, in that order, and an empty one is
     omitted rather than written as null. That is what lets a folder keep a closed schema: a tool
-    that adds `filed:` on every save — a key the filename already carries — would make every write
+    that adds `filed:` on every save (a key the filename already carries) would make every write
     fail a strict check, and the agent would have no idea why.
     """
     if config.field_order:
@@ -638,7 +623,7 @@ class Waiting:
 
 @dataclasses.dataclass(frozen=True)
 class Board:
-    """The answer to "what should I be working on" — and, just as importantly, why not the rest.
+    """What is ready to pick up, and why each other open issue is not.
 
     A list of everything is not an answer; it is the thing that made the question hard. `ready` is
     work whose blockers are all closed and which nobody has taken. `waiting` says what each of the
@@ -655,7 +640,7 @@ def newly_ready(
     folder: pathlib.Path, closed_slug: str, config: Config | None = None
 ) -> list[Issue]:
     """Open issues that named `closed_slug` as a blocker and now have no open blocker
-    left — the work that just became pickup-able because it closed. Empty when nothing
+    left: the work that just became pickup-able because it closed. Empty when nothing
     was waiting on it.
     """
     config = load_config(folder) if config is None else config
@@ -689,7 +674,7 @@ def board(folder: pathlib.Path, config: Config | None = None, *, owner: str | No
             waiting.append(Waiting(issue, blockers, f"blocked by {titles}"))
         elif issue.status is Status.BLOCKED:
             who = f"@{issue.owner}" if issue.owner else "nobody named"
-            waiting.append(Waiting(issue, (), f"blocked on a decision — {who} can unblock it"))
+            waiting.append(Waiting(issue, (), f"blocked on a decision: {who} can unblock it"))
         elif issue.owner:
             waiting.append(Waiting(issue, (), f"taken by @{issue.owner}"))
         else:
@@ -714,10 +699,10 @@ _BODY_SHA_RE = re.compile(r"`([0-9a-f]{8,40})`")
 
 
 # --------------------------------------------------------------------------- #
-# Asking git — the checks a file alone cannot make
+# Asking git: the checks a file alone cannot make
 # --------------------------------------------------------------------------- #
 # A register's claims point outward: `fixed_in` names a commit, and bodies cite shas as evidence.
-# Neither can be graded by reading the folder, and both fail in the same quiet way — the sha is
+# Neither can be graded by reading the folder, and both fail in the same quiet way: the sha is
 # there, it looks right, and it resolves to nothing. Every helper degrades to "no opinion" when git
 # is missing or the folder is not in a repo, because a guard that cannot run must not invent a
 # verdict.
@@ -732,7 +717,7 @@ class _Git:
     """Git questions about one repo, asked at most once each.
 
     `check` runs in a pre-commit hook over every issue in the folder, and issue bodies cite the same
-    commits repeatedly — without the cache a 40-issue register would fork git a few hundred times on
+    commits repeatedly: without the cache a 40-issue register would fork git a few hundred times on
     every commit.
     """
 
@@ -784,7 +769,7 @@ class _Git:
 def check(folder: pathlib.Path, config: Config | None = None) -> list[Problem]:
     """Every rule this folder's config states, enforced. Returns [] when the folder is honest.
 
-    A declared invariant that nothing enforces reads as verified to anyone skimming it — which is
+    A declared invariant that nothing enforces reads as verified to anyone skimming it, which is
     precisely how an index drifts from its own folder for weeks without anybody noticing.
     """
     config = load_config(folder) if config is None else config
@@ -802,19 +787,19 @@ def check(folder: pathlib.Path, config: Config | None = None) -> list[Problem]:
             problems.append(Problem(p, f"filename must be `{shape}-short-kebab-summary.md`"))
         first = seen.get(issue.slug)
         if first is not None:
-            problems.append(Problem(p, f"duplicate slug — {first.name} covers the same thing"))
+            problems.append(Problem(p, f"duplicate slug: {first.name} covers the same thing"))
         else:
             seen[issue.slug] = p
 
         if config.areas and issue.area not in config.areas:
             problems.append(
-                Problem(p, f"unknown area {issue.area!r} — one of {', '.join(config.areas)}")
+                Problem(p, f"unknown area {issue.area!r}: one of {', '.join(config.areas)}")
             )
         if config.closed_needs_fixed_in and issue.status is Status.DONE and not issue.fixed_in:
             problems.append(
                 Problem(
                     p,
-                    "status is `done` with no `fixed_in` — name the sha that pushed on the "
+                    "status is `done` with no `fixed_in`: name the sha that pushed on the "
                     "mainline, or the folder stops being evidence of anything",
                 )
             )
@@ -822,7 +807,7 @@ def check(folder: pathlib.Path, config: Config | None = None) -> list[Problem]:
             problems.append(
                 Problem(
                     p,
-                    f"`fixed_in: {issue.fixed_in}` on an issue that is `{issue.status}` — "
+                    f"`fixed_in: {issue.fixed_in}` on an issue that is `{issue.status}`: "
                     f"either it pushed and this is done, or the sha does not belong here",
                 )
             )
@@ -843,12 +828,12 @@ def check(folder: pathlib.Path, config: Config | None = None) -> list[Problem]:
                     if key not in config.field_order:
                         problems.append(Problem(p, f"unknown field {key!r}"))
         if issue.status is Status.IN_PROGRESS and not issue.owner:
-            problems.append(Problem(p, "in-progress with no owner — say who is doing it"))
+            problems.append(Problem(p, "in-progress with no owner: say who is doing it"))
         if issue.status is Status.BLOCKED and not issue.owner and not issue.blocked_by:
             problems.append(
                 Problem(
                     p,
-                    "blocked with neither an owner nor a `blocked_by` — name who can "
+                    "blocked with neither an owner nor a `blocked_by`: name who can "
                     "unblock it or which issue it waits on. Silence reads as an oversight",
                 )
             )
@@ -869,7 +854,7 @@ def check(folder: pathlib.Path, config: Config | None = None) -> list[Problem]:
                 problems.append(
                     Problem(
                         p,
-                        f"none of {', '.join('`' + k + '`' for k in group)} is set — say which one "
+                        f"none of {', '.join('`' + k + '`' for k in group)} is set: say which one "
                         f"applies, or why none does. Silence reads as an oversight and gets "
                         f"re-litigated",
                     )
@@ -935,7 +920,7 @@ def _crossrefs(folder: pathlib.Path, issues: tuple[Issue, ...], config: Config) 
                 out.append(
                     Problem(
                         issue.path,
-                        f"{target.name} does not link back to this file — without the back-link the "
+                        f"{target.name} does not link back to this file: without the back-link the "
                         f"task is invisible from the register that is supposed to track it",
                     )
                 )
@@ -947,7 +932,7 @@ def _fixed_in_problems(issue: Issue, config: Config, git: _Git) -> list[Problem]
 
     `fixed_in` is the whole reason closing keeps the file: it is the answer to "was this fixed, and
     by what?". A sha that does not resolve, or that only resolves inside the worktree it was written
-    in, answers that question wrongly and confidently — which is worse than not answering it.
+    in, answers that question wrongly and confidently: which is worse than not answering it.
     """
     branch = config.fixed_in_on_branch
     if not issue.fixed_in or not branch or not git.usable:
@@ -958,12 +943,12 @@ def _fixed_in_problems(issue: Issue, config: Config, git: _Git) -> list[Problem]
     if not git.is_commit(sha):
         return [Problem(issue.path, f"fixed_in {sha} is not a commit in this repo")]
     if not git.has_ref(branch):
-        return []  # no such branch here (a fresh clone, a fork) — no opinion
+        return []  # no such branch here (a fresh clone, a fork): no opinion
     if not git.is_ancestor(sha, branch):
         return [
             Problem(
                 issue.path,
-                f"fixed_in {sha} is not on {branch} — record the sha that PUSHED, not the worktree "
+                f"fixed_in {sha} is not on {branch}: record the sha that PUSHED, not the worktree "
                 f"one; the push path re-commits, and a worktree sha resolves only until it is pruned",
             )
         ]
@@ -974,7 +959,7 @@ def _section_problems(issue: Issue, config: Config) -> list[Problem]:
     """ "Define done" is a rule every one of these folders states. This is the enforced version.
 
     The exemption is real work, not a loophole: a hand-off records tree state and resume order for
-    work already in flight, so it has no acceptance criteria of its own — it points at the issues
+    work already in flight, so it has no acceptance criteria of its own: it points at the issues
     that do.
     """
     if not config.require_sections:
@@ -988,7 +973,7 @@ def _section_problems(issue: Issue, config: Config) -> list[Problem]:
     for wanted in config.require_sections:
         rx = re.compile(wanted)
         if not any(rx.match(h.strip()) for h in headings):
-            out.append(Problem(issue.path, f"no '## {wanted}' section — say how this gets closed"))
+            out.append(Problem(issue.path, f"no '## {wanted}' section: say how this gets closed"))
     return out
 
 
@@ -1004,7 +989,7 @@ def _body_sha_problems(issue: Issue, config: Config, git: _Git) -> list[Problem]
             out.append(
                 Problem(
                     issue.path,
-                    f"cites {sha}, which is on no branch — it dies at the next gc, and until then it "
+                    f"cites {sha}, which is on no branch: it dies at the next gc, and until then it "
                     f"reads as evidence",
                 )
             )
@@ -1026,7 +1011,7 @@ def _cycles(issues: Iterable[Issue]) -> list[Problem]:
         if state.get(node) == 1:
             loop = " → ".join((*trail[trail.index(node) :], node))
             out.append(
-                Problem(paths[node], f"blocked_by cycle: {loop} — nothing in it can be ready")
+                Problem(paths[node], f"blocked_by cycle: {loop}: nothing in it can be ready")
             )
             return
         state[node] = 1
@@ -1059,14 +1044,15 @@ def _index_problems(
     if not config.index or not readme.exists():
         return []
     text = readme.read_text()
-    if INDEX_BEGIN not in text or INDEX_END not in text:
+    if not _has_region(text):
         return [Problem(readme, f"README has no generated-index region ({INDEX_BEGIN})")]
-    if _replace_region(text, _index_table(issues, config)) != text:
+    fresh = _replace_region(text, _index_table(issues, config))
+    if fresh != text.replace(LEGACY_INDEX_BEGIN, INDEX_BEGIN, 1):
         return [
             Problem(
                 readme,
-                "the generated index is stale — run `cabildo issues reindex`. A "
-                "follow-up nobody can see is what this folder exists to prevent",
+                "the generated index is stale: run `prodc issue reindex`. A follow-up that "
+                "nobody can see is the failure this folder exists to prevent",
             )
         ]
     return []
@@ -1129,7 +1115,7 @@ def _index_table(issues: tuple[Issue, ...], config: Config = DEFAULT_CONFIG) -> 
         if any(i.status is s for i in live)
     )
     tail = f"{len(live)} open — {counts}" + (f"; {len(done)} done" if done else "")
-    rows += ["", f"_{tail}. Generated; edit the files, then `cabildo issues reindex`._"]
+    rows += ["", f"_{tail}. Generated; edit the files, then `prodc issue reindex`._"]
     return "\n".join(rows)
 
 
@@ -1162,7 +1148,14 @@ def render_index(folder: pathlib.Path, config: Config | None = None) -> str:
     return _index_table(issues, config)
 
 
+def _has_region(text: str) -> bool:
+    """True when the text has a begin marker (new or legacy) and the end marker."""
+    return (INDEX_BEGIN in text or LEGACY_INDEX_BEGIN in text) and INDEX_END in text
+
+
 def _replace_region(text: str, table: str) -> str:
+    """The text with the index region set to ``table`` and a legacy marker made current."""
+    text = text.replace(LEGACY_INDEX_BEGIN, INDEX_BEGIN, 1)
     start = text.index(INDEX_BEGIN) + len(INDEX_BEGIN)
     end = text.index(INDEX_END)
     return text[:start] + "\n" + table + "\n" + text[end:]
@@ -1174,14 +1167,14 @@ def reindex(folder: pathlib.Path, config: Config | None = None) -> None:
     if not config.index or not readme.exists():
         return
     text = readme.read_text()
-    if INDEX_BEGIN not in text or INDEX_END not in text:
+    if not _has_region(text):
         raise IssueFormatError(f"{readme.name}: no generated-index region to rewrite")
     readme.write_text(_replace_region(text, render_index(folder, config)))
 
 
 def _touch_index(folder: pathlib.Path, config: Config) -> None:
-    """Keep the index true after any write. Never let a failure here lose the write itself — the
-    file is the store, and the index is a convenience generated from it.
+    """Regenerate the index after a write. A failure here is ignored so the write still stands:
+    the file is the store, and the index is generated from it.
     """
     with contextlib.suppress(IssueFormatError, OSError):
         reindex(folder, config)
@@ -1230,11 +1223,11 @@ def file_issue(
     """
     config = load_config(folder) if config is None else config
     if config.areas and area not in config.areas:
-        raise IssueFormatError(f"unknown area {area!r} — one of {', '.join(config.areas)}")
+        raise IssueFormatError(f"unknown area {area!r}: one of {', '.join(config.areas)}")
     filed = today or _dt.date.today().isoformat()
     path = folder / config.filename(filed, slugify(title))
     if path.exists():
-        raise IssueFormatError(f"{path.name} already exists — edit it, or pick a distinct title")
+        raise IssueFormatError(f"{path.name} already exists: edit it, or pick a distinct title")
     issue = Issue(
         path=path,
         title=title,
@@ -1295,7 +1288,7 @@ def claim(
     issue = load(resolve(folder, name), config)
     if issue.owner and issue.owner != owner and not force:
         raise IssueFormatError(
-            f"{issue.path.name} is already owned by @{issue.owner} — pass force to take it"
+            f"{issue.path.name} is already owned by @{issue.owner}: pass force to take it"
         )
     status = Status.IN_PROGRESS if issue.status is Status.OPEN else issue.status
     updated = dataclasses.replace(issue, owner=owner, status=status)
@@ -1305,7 +1298,7 @@ def claim(
 
 
 def release(folder: pathlib.Path, name: str, config: Config | None = None) -> Issue:
-    """Drop the owner and put it back on the board — the honest move when you stop, so it does not
+    """Drop the owner and put it back on the board: the honest move when you stop, so it does not
     look taken forever.
     """
     config = load_config(folder) if config is None else config
@@ -1319,12 +1312,12 @@ def release(folder: pathlib.Path, name: str, config: Config | None = None) -> Is
 
 def close(folder: pathlib.Path, name: str, *, fixed_in: str, config: Config | None = None) -> Issue:
     """Mark it done. `fixed_in` is required because closing without naming what fixed it is how a
-    register stops being evidence — and it must be the sha that pushed on the mainline, not the one
+    register stops being evidence, and it must be the sha that pushed on the mainline, not the one
     from a worktree that will be pruned.
     """
     config = load_config(folder) if config is None else config
     if not fixed_in.strip():
-        raise IssueFormatError("fixed_in is required — name the commit that pushed the fix")
+        raise IssueFormatError("fixed_in is required: name the commit that pushed the fix")
     issue = load(resolve(folder, name), config)
     updated = dataclasses.replace(issue, status=Status.DONE, fixed_in=fixed_in.strip())
     save(updated, config)
@@ -1336,17 +1329,14 @@ def close(folder: pathlib.Path, name: str, *, fixed_in: str, config: Config | No
 # Adoption: describe the folder that already exists
 # --------------------------------------------------------------------------- #
 STARTER_README = """\
-# docs/issues — follow-ups with an owner-shaped edge
+# docs/issues: follow-ups with an owner
 
 One file per follow-up, self-contained, with YAML front matter. This folder is for work that is
-**known, scoped, and not being done right now** — the residue a session leaves behind when it pushes
-its main change. Without a home, that residue lives in a chat log nobody re-reads, and "we should
-fix X" decays into nobody having ever owned X.
+**known, scoped, and not being done right now**: what a session leaves behind when it pushes its
+main change. Without a file, that work stays in a chat log nobody reads again, and nobody owns it.
 
-**The files are the store.** No database, no second copy — an issue is markdown in git, readable and
-editable by hand. Everything derived (the index below above all) is *generated from* the files and
-is never authoritative. A duplicate store is a fault dimension; the way to avoid one is not to
-create it.
+**The files are the store.** No database, no second copy: an issue is markdown in git, readable and
+editable by hand. The index below is generated from the files and is never the source of truth.
 
 ## The rules that make one worth writing
 
@@ -1355,7 +1345,7 @@ create it.
 2. **Say what is MEASURED and what is INFERRED.** Separately, and in those words. An issue that
    states an inference as a finding sends the next person to fix the wrong thing, and they will
    believe you because you wrote it down.
-3. **Define done.** Not "improve X" — the specific observation that will be true afterwards, and
+3. **Define done.** Not "improve X", but the specific observation that will be true afterwards, and
    how to make it. `verify:` says which kind of evidence closes it, because they are different
    claims: `test` (a red-then-green test is enough), `probe` (only sensing the real thing counts),
    `inspect` (the artifact itself is the evidence).
@@ -1368,35 +1358,35 @@ create it.
 
 ```yaml
 ---
-title: One line — the finding, not the fix
+title: One line, the finding, not the fix
 status: open          # open | in-progress (name an owner) | blocked | done (needs fixed_in)
 scope: M              # XS | S | M | L | ?
 owner: null           # a handle, or null when unowned
 filed: {today}     # when it was filed; it never changes
 area: {area}
-verify: probe         # test | probe | inspect — see rule 3
+verify: probe         # test | probe | inspect (see rule 3)
 blocked_by: null      # slug(s) of issues that must close first
 fixed_in: null        # the sha on the mainline; required once status is done
+needs: [N-1]          # the prodc need ids this work serves
 ---
 ```
 
-**`blocked_by` is what makes the board honest.** `status: blocked` names a *person* who can unblock
-something; `blocked_by` names the *work* it waits on. Only the second can be computed, which is why
-"what can I pick up cold right now" is answerable at all.
+**`blocked_by`** names the work an issue waits on; `status: blocked` names a person who can
+unblock it. The board computes what is ready from `blocked_by`.
 
-**Naming:** `DD-MM-YYYY-short-kebab-summary.md` — the date it was filed, then a slug.
+**Naming:** `DD-MM-YYYY-short-kebab-summary.md`: the date it was filed, then a slug.
 
-## Tooling — the folder checks itself
+## Tooling
 
-Managed by `cabildo issues`. The CLI, the `issues` MCP server, and any pre-commit gate are one
-module, so the tool an agent calls and the gate that grades it cannot disagree.
-`docs/issues/config.toml` holds this folder's specifics.
+`prodc issue` reads and writes this folder. The CLI, the prodc MCP tools, and any pre-commit gate
+use one module, so they apply the same rules. `docs/issues/config.toml` holds this folder's
+specifics.
 
 ```bash
-cabildo issues                # what's ready, what's yours, what everything else waits on
-cabildo issues check          # the invariants; non-zero on problems
-cabildo issues reindex        # regenerate the index below
-cabildo issues show <slug>
+prodc issue board             # what is ready, and what the rest waits on
+prodc issue check             # the rules; exit 1 on problems
+prodc issue reindex           # regenerate the index below
+prodc issue show <slug>
 ```
 
 ## Open now
@@ -1417,13 +1407,13 @@ def starter_config(areas: Iterable[str] = ()) -> str:
     listed = (
         "areas = [" + ", ".join(f'"{a}"' for a in names) + "]"
         if names
-        else '# areas = ["backend", "frontend", "ci"]   # REQUIRED — until set, any area is accepted'
+        else '# areas = ["backend", "frontend", "ci"]   # REQUIRED: until set, any area is accepted'
     )
     return f"""\
-# docs/issues/config.toml — what this folder's issues must say.
+# docs/issues/config.toml: what this folder's issues must say.
 #
-# Read by `cabildo issues`: the CLI, the `issues` MCP server, and any pre-commit gate are one
-# module, so the tool an agent calls and the gate that grades it cannot disagree.
+# Read by `prodc issue`: the CLI, the prodc MCP tools, and any pre-commit gate use one module,
+# so they apply the same rules.
 
 date_style = "DMY"          # 03-08-2026-short-kebab-summary.md
 index = true                # the generated table in README.md
@@ -1449,7 +1439,7 @@ def scaffold(
 ) -> list[pathlib.Path]:
     """Start a register in an empty folder: a config and a README with an index region.
 
-    Writes only what is missing. A folder that already has a README keeps it — the marker can be
+    Writes only what is missing. A folder that already has a README keeps it: the marker can be
     pasted in by hand, and silently rewriting somebody's documentation to install a tool is not a
     trade anyone agreed to.
     """
@@ -1511,12 +1501,12 @@ def infer_config(folder: pathlib.Path) -> str:
     # its own summary another way is not broken, and `check` demanding a marker nobody put there is
     # the tool inventing work on first contact.
     readme = folder / README_NAME
-    has_region = readme.exists() and INDEX_BEGIN in readme.read_text()
+    has_region = readme.exists() and _has_region(readme.read_text())
 
     lines = [
-        "# docs/issues/config.toml — what this folder's issues must say.",
+        "# docs/issues/config.toml: what this folder's issues must say.",
         "#",
-        "# Written by `cabildo issues init` from the files that were already here, so `check`",
+        "# Written by infer_config from the files that were already here, so `check`",
         "# passes today. Tighten it deliberately: flip a field to required, or pin its values.",
         "",
         f'date_style = "{style}"',
@@ -1547,18 +1537,20 @@ def infer_config(folder: pathlib.Path) -> str:
 
 
 def find_folder(start: pathlib.Path) -> pathlib.Path | None:
-    """This project's register, searching upward from `start` — so the server works from any
-    subdirectory of the repo, which is where sessions actually run.
+    """This project's register, searching upward from ``start``, or None when there is none.
 
-    `CABILDO_ISSUES_DIR` wins outright when set (absolute, or relative to each level searched):
-    a project whose layout the conventions don't fit should be able to say so once, rather than be
-    told its register is in the wrong place.
+    The search starts at ``start`` so a command run from a subdirectory finds the register.
+    ``PRODC_ISSUES_DIR`` replaces the search when set (absolute, or relative to each level
+    searched); ``CABILDO_ISSUES_DIR`` is read when it is not. An absolute path that is not a
+    directory gives None.
 
-    The walk stops at the repo root. A register belongs to a project, and silently adopting an
-    ancestor's — a monorepo's, or in one real case a journal repo that a project happens to sit
-    inside — would file this repo's work in somebody else's queue.
+    The search stops at the repo root (the first ``.git``). Taking a register from an enclosing
+    repo would file this repo's work in another project's queue.
     """
-    override = os.environ.get("CABILDO_ISSUES_DIR", "").strip()
+    override = (
+        os.environ.get("PRODC_ISSUES_DIR", "").strip()
+        or os.environ.get("CABILDO_ISSUES_DIR", "").strip()
+    )
     if override:
         direct = pathlib.Path(override).expanduser()
         if direct.is_absolute():

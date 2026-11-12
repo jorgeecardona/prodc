@@ -4,6 +4,33 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-12
+
+### Added
+
+- `prodc issue file --need ID` links an issue to the needs it serves. An unknown need is refused.
+  With no need, the issue is filed with the warning "issue serves no need".
+- `prodc issue close` prints the state of each linked need and warns "closed but unproven" when
+  one is not DELIVERED.
+- `prodc issue update --owner NAME` sets who is doing the work (`--owner none` clears it).
+- `prodc issue list [--need ID]` lists each issue with its needs and their state. MCP tool
+  `issue_list`; `issue_file` takes `needs`, `issue_update` takes `owner`.
+- `PRODC_ISSUES_DIR` names the issue folder. `CABILDO_ISSUES_DIR` is still read.
+
+### Changed
+
+- `prodc issues` and the MCP tool `issues` are deprecated: use `prodc issue list`.
+- `status`, `lint` and `prodc issue list` read issues with the same parser as `prodc issue`.
+  Without `[prodc].issues`, prodc uses the `docs/issues/` register it finds.
+- A status of `closed` or `resolved` is reported by `check` and `lint`: use `done` with
+  `fixed_in`.
+- The README index marker now names `prodc issue reindex`. The old cabildo marker is still read.
+
+### Fixed
+
+- Titles and values with quotes, backslashes, `yes`/`no` or leading-zero numbers are written so
+  any YAML reader reads the same string back.
+
 ## [0.9.0] - 2026-11-12
 
 ### Added

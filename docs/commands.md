@@ -68,7 +68,8 @@ Each rewrites one YAML file, re-loads the whole model as validation, reverts on 
 
 The issue register is `docs/issues/*.md`, one file per issue, graded by the folder's
 `config.toml`. All take `--json`. prodc reads the files matched by `[prodc].issues`, or the
-register it finds from the project root when that key is not set.
+register it finds from the project root when that key is not set. Set `PRODC_ISSUES_DIR` to
+name the folder when it is somewhere else (`CABILDO_ISSUES_DIR` is still read).
 
 | Command | Does |
 |---|---|

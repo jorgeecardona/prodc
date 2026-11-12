@@ -1,7 +1,7 @@
 """``prodc issue``: read and write the issue register (``docs/issues/*.md``).
 
 The store is :mod:`prodc.issue_store`. Claiming an issue is not here: a claim is a lease between
-running agents, which cabildo's bus owns. ``update --status in-progress`` records the state.
+running agents, which the cabildo message bus records. ``update --status in-progress`` records the state.
 """
 
 from __future__ import annotations
