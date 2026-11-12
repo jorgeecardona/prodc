@@ -667,16 +667,25 @@ def _importance_cell(need: Need) -> str:
 
 
 def render_plan(
-    results: list[NeedResult], recurrence_counts: dict[str, int], *, revisit: bool = False
+    results: list[NeedResult],
+    recurrence_counts: dict[str, int],
+    *,
+    revisit: bool = False,
+    now: frozenset[str] = frozenset(),
+    current: Release | None = None,
 ) -> str:
-    ranked = rank(results, recurrence_counts)
+    ranked = rank(results, recurrence_counts, now)
     header = (
         f"plan: revisit: {len(ranked)} need(s) with undated or stale importance (#59)"
         if revisit
         else "plan: ranked backlog (must + state + evidence + recurrence, importance refines)"
     )
     out = [header]
+    if current is not None:
+        out.append(f"  now: release {current.id} ({current.text})")
     for i, r in enumerate(ranked, 1):
+        if now and i > 1 and ranked[i - 2].need.id in now and r.need.id not in now:
+            out.append("  ---- later " + "-" * 40)
         bang = "!!" if r.need.must else "  "
         imp = _importance_cell(r.need)
         out.append(

@@ -31,7 +31,7 @@ from ..dedup import (
 )
 from ..glossary import glossary_findings
 from ..inbox import inbox
-from ..issues import issue_findings
+from ..issues import issue_findings, ready_by_need
 from ..loader import LoaderError, load
 from ..model import (
     Decision,
@@ -55,11 +55,13 @@ from ..status import (
     applicable_needs,
     awaits_warnings,
     contradictions,
+    current_release,
     decision_readiness,
     decisions_for,
     evidence_age_days,
     flow_step_warnings,
     importance_revisit_due,
+    now_ids,
     orphaned_decisions,
     principle_report,
     proof_suggestions,
@@ -609,15 +611,22 @@ def cmd_plan(args: argparse.Namespace) -> int:
     needs = board_needs(list(model.needs), include_drafts=args.include_drafts)  # drafts off (#60)
     results = resolve(needs, cfg.adapters, cfg.source_adapters)
     recurrence_counts = {rec.baseline.id: rec.count for rec in recurrence(needs)}
+    releases = list(model.releases)
+    current = current_release(results, releases)  # from the whole board, before --revisit
+    now = now_ids(results, releases)
     revisit = args.revisit is not None
     if revisit:
         today = date.today()
         results = [r for r in results if importance_revisit_due(r.need, today, args.revisit)]
-    print(
-        plan_json(results, recurrence_counts, revisit=revisit)
-        if args.json
-        else render_plan(results, recurrence_counts, revisit=revisit)
-    )
+    if args.json:
+        cited = {n: tuple(i.slug for i in found) for n, found in ready_by_need(cfg.root).items()}
+        print(
+            plan_json(
+                results, recurrence_counts, revisit=revisit, now=now, current=current, issues=cited
+            )
+        )
+    else:
+        print(render_plan(results, recurrence_counts, revisit=revisit, now=now, current=current))
     return 0
 
 

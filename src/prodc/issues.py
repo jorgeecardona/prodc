@@ -113,3 +113,35 @@ def issue_findings(
                 if not res.ok:
                     warnings.append((issue.id, f"BROKEN source '{src}' ({res.detail})"))
     return errors, warnings
+
+
+def ready_by_need(root: Path, *, owner: str | None = None) -> dict[str, tuple[Issue, ...]]:
+    """The ready issues of the register at or above ``root``, keyed by each need they cite.
+
+    Ready is :func:`prodc.issue_store.board` ``ready``, in the store's rank order. With ``owner``,
+    an issue that ``owner`` holds counts as ready too, when nothing blocks it. Empty when there
+    is no register.
+    """
+    folder = store.find_folder(root)
+    if folder is None:
+        return {}
+    out: dict[str, list[Issue]] = {}
+    for issue in _ready(folder, owner):
+        for need in issue.needs:
+            out.setdefault(need, []).append(issue)
+    return {k: tuple(v) for k, v in out.items()}
+
+
+def _ready(folder: Path, owner: str | None) -> tuple[Issue, ...]:
+    """Ready issues in store rank order; with ``owner``, unowned or held by ``owner``."""
+    config = store.load_config(folder)
+    b = store.board(folder, config, owner=owner)
+    if owner is None:
+        return b.ready
+    open_slugs = {i.slug for i in store.load_all(folder, config)[0] if i.open}
+    mine = [
+        i
+        for i in b.mine
+        if i.status is not store.Status.BLOCKED and not any(s in open_slugs for s in i.blocked_by)
+    ]
+    return tuple(sorted((*b.ready, *mine), key=config.rank_key))

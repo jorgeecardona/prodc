@@ -839,9 +839,13 @@ def state_priority(r: NeedResult) -> int:
     return _STATE_RANK[r.state]
 
 
-def _rank_key(r: NeedResult, recurrence_counts: dict[str, int]) -> tuple[int, int, int, int, str]:
+def _rank_key(
+    r: NeedResult, recurrence_counts: dict[str, int], now: frozenset[str] = frozenset()
+) -> tuple[int, int, int, int, int, str]:
     """Pure ordering over recorded inputs only. Never a conjured score (#34).
 
+    0. now: a need in the now-set (see :func:`now_ids`) sorts before every other need. With no
+       releases declared the now-set is empty, so this tier changes nothing.
     1. must + state: a must-HOLE sits at the top, then BROKEN, PENDING, …, DELIVERED.
     2. evidence kind: a real `interview` outranks `proxy`/`internal`/opinion at the same
        state, because a user actually asked. This is what reorders the author's guesses.
@@ -849,26 +853,71 @@ def _rank_key(r: NeedResult, recurrence_counts: dict[str, int]) -> tuple[int, in
        first-order, objective signal, so it outranks the author's importance guess.
     4. `importance`: the author's optional ordinal, higher first; absent falls to the back
        of its tier, so it only refines 1-3 and never invents priority where none was set.
+
+    The now tier is a plan tier only: :func:`state_priority` and the ``status`` sort do not use it.
     """
+    now_rank = 0 if r.need.id in now else 1
     state_rank = state_priority(r)
     kind = r.need.strongest_kind
     kind_rank = list(SourceKind).index(kind) if kind is not None else len(SourceKind)
     recurrence_rank = -recurrence_counts.get(r.need.id, 0)
     importance_rank = -(r.need.importance or 0)
-    return (state_rank, kind_rank, recurrence_rank, importance_rank, r.need.id)
+    return (now_rank, state_rank, kind_rank, recurrence_rank, importance_rank, r.need.id)
 
 
 def rank(
-    results: list[NeedResult], recurrence_counts: dict[str, int] | None = None
+    results: list[NeedResult],
+    recurrence_counts: dict[str, int] | None = None,
+    now: frozenset[str] = frozenset(),
 ) -> list[NeedResult]:
     """Order a resolved board into a backlog by :func:`_rank_key`.
 
     ``recurrence_counts`` maps a baseline need id to how many clients share it (from
     :func:`recurrence`); a shared baseline then outranks a single-client need with the same
-    state and evidence. Omitted, recurrence contributes nothing.
+    state and evidence. Omitted, recurrence contributes nothing. ``now`` is the now-set from
+    :func:`now_ids`; its needs sort first. Omitted, the order is the one without releases.
     """
     counts = recurrence_counts or {}
-    return sorted(results, key=lambda r: _rank_key(r, counts))
+    return sorted(results, key=lambda r: _rank_key(r, counts, now))
+
+
+def current_release(results: list[NeedResult], releases: list[Release]) -> Release | None:
+    """The release being worked on now: derived from the board, never stored.
+
+    It is the first release, in declared ``releases:`` order, that has at least one counted need
+    not DELIVERED. It reads the same summary as :func:`release_report`, not the goal summary, so
+    an outcome that did not land does not reopen a shipped release. A release with no needs is
+    skipped. None when no release is declared or every release is DELIVERED.
+    """
+    for rel, s in release_report(results, releases):
+        if s.total and s.delivered < s.total:
+            return rel
+    return None
+
+
+def now_ids(results: list[NeedResult], releases: list[Release]) -> frozenset[str]:
+    """The now-set: the needs to work on first.
+
+    A need is in it when it is not DELIVERED and names the :func:`current_release`, or when it is
+    BROKEN in any release or none (a broken proof is a regression). Withdrawn needs are never in
+    it. Empty when no release is declared, so such a board keeps its plain order.
+    """
+    if not releases:
+        return frozenset()
+    current = current_release(results, releases)
+    return frozenset(
+        r.need.id
+        for r in results
+        if not r.need.is_withdrawn
+        and (
+            r.state is NeedState.BROKEN
+            or (
+                current is not None
+                and r.need.release == current.id
+                and r.state is not NeedState.DELIVERED
+            )
+        )
+    )
 
 
 def goal_report(

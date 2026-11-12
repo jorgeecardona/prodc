@@ -8,6 +8,7 @@ viewer never drift; these functions wrap that with the board/plan/brief/argument
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 
 from ..board import need_payload, warrant
 from ..dedup import DupPair, VariantGroup
@@ -246,12 +247,23 @@ def brief_json(
 
 
 def plan_json(
-    results: list[NeedResult], recurrence_counts: dict[str, int], *, revisit: bool = False
+    results: list[NeedResult],
+    recurrence_counts: dict[str, int],
+    *,
+    revisit: bool = False,
+    now: frozenset[str] = frozenset(),
+    current: Release | None = None,
+    issues: Mapping[str, tuple[str, ...]] | None = None,
 ) -> str:
-    ranked = rank(results, recurrence_counts)
+    """The plan as JSON: the ranked rows, plus the current release (``null`` when none)."""
+    ranked = rank(results, recurrence_counts, now)
+    cited = issues or {}
     return json.dumps(
         {
             "revisit": revisit,
+            "current_release": (
+                {"id": current.id, "text": current.text} if current is not None else None
+            ),
             "plan": [
                 {
                     "rank": i,
@@ -263,6 +275,10 @@ def plan_json(
                     "recurrence": recurrence_counts.get(r.need.id, 0),
                     "importance": r.need.importance,
                     "importance_is_guess": (r.need.importance is not None and r.need.is_opinion),
+                    "goal": r.need.goal,
+                    "release": r.need.release,
+                    "now": r.need.id in now,
+                    "issues": list(cited.get(r.need.id, ())),
                 }
                 for i, r in enumerate(ranked, 1)
             ],
