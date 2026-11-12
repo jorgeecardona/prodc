@@ -1,9 +1,13 @@
 ---
 title: "storybook proofs: read story test results, so a story can be really DELIVERED"
 status: open
+area: adapters
+owner: null
+filed: 2026-11-08
+needs:
+  - PD-15
 scope: M
 verify: test
-area: adapters
 ---
 
 ## Problem

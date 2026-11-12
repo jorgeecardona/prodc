@@ -1,9 +1,13 @@
 ---
 title: "Proof discovery: --apply, more adapter inventories, BROKEN relink (follow-up to #54)"
 status: open
-scope: "M"
-verify: test
 area: adapters
+owner: null
+filed: 2026-10-05
+needs:
+  - PD-14
+scope: M
+verify: test
 ---
 
 ## What is done (#54, 0.3.x)

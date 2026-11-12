@@ -1,9 +1,13 @@
 ---
-title: "Declared-only warning ignores a path proof"
+title: Declared-only warning ignores a path proof
 status: open
-scope: "XS"
-verify: test
 area: status
+owner: null
+filed: 2026-10-26
+needs:
+  - PD-18
+scope: XS
+verify: test
 ---
 
 ## Context

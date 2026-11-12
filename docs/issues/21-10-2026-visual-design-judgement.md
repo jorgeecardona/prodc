@@ -1,9 +1,13 @@
 ---
 title: "Visual needs need a designer's eye: a judge that is not Claude"
 status: open
+area: model
+owner: null
+filed: 2026-10-21
+needs:
+  - PD-17
 scope: "?"
 verify: inspect
-area: model
 ---
 
 ## Need

@@ -1,9 +1,13 @@
 ---
 title: "An idea with no need yet: a draft decision with empty `needs[]`"
 status: open
-scope: "S"
-verify: test
 area: model
+owner: null
+filed: 2026-10-21
+needs:
+  - PD-16
+scope: S
+verify: test
 ---
 
 ## Context

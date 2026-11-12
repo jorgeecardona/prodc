@@ -1,9 +1,13 @@
 ---
 title: "Importance rubric: plan --revisit, add --importance, git-blame fallback (follow-up to #59)"
 status: open
-scope: "S"
-verify: test
 area: cli
+owner: null
+filed: 2026-10-05
+needs:
+  - PD-13
+scope: S
+verify: test
 ---
 
 ## What is done (#59, 0.3.x)

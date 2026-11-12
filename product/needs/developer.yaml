@@ -83,3 +83,87 @@ needs:
       satisfaction.
     sources:
       - {kind: secondary, date: 2026-10-04, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/29"}
+  - id: PD-12
+    text: When a source has no observed_at date, the developer can still see how old
+      the evidence is, from the git date of the line that added it.
+    sources:
+    - kind: secondary
+      who: prodc docs/issues
+      date: '2026-11-12'
+      quote: 'Evidence staleness: git fallback + brief section'
+      locator: docs/issues/05-10-2026-evidence-staleness-git-fallback.md
+      observed_at: '2026-11-12'
+    draft: true
+    draft_added: '2026-11-12'
+  - id: PD-13
+    text: When the developer sets a need's importance, they can do it when adding the
+      need and see which importance values are due for review.
+    sources:
+    - kind: secondary
+      who: prodc docs/issues
+      date: '2026-11-12'
+      quote: 'Importance rubric: plan --revisit, add --importance, git-blame fallback'
+      locator: docs/issues/05-10-2026-importance-revisit-plan-gitblame.md
+      observed_at: '2026-11-12'
+    draft: true
+    draft_added: '2026-11-12'
+  - id: PD-14
+    text: When a need has no proof or a BROKEN proof, the developer can accept a suggested
+      test locator in one step instead of writing it by hand.
+    sources:
+    - kind: secondary
+      who: prodc docs/issues
+      date: '2026-11-12'
+      quote: 'Proof discovery: --apply, more adapter inventories, BROKEN relink'
+      locator: docs/issues/05-10-2026-proof-discovery-apply-relink.md
+      observed_at: '2026-11-12'
+    draft: true
+    draft_added: '2026-11-12'
+  - id: PD-15
+    text: When a need is proved by a Storybook story, the developer can see it DELIVERED
+      only when the story's test passed, not when the story merely exists.
+    sources:
+    - kind: secondary
+      who: prodc docs/issues
+      date: '2026-11-12'
+      quote: 'storybook proofs: read story test results, so a story can be really DELIVERED'
+      locator: docs/issues/08-11-2026-storybook-test-results.md
+      observed_at: '2026-11-12'
+    draft: true
+    draft_added: '2026-11-12'
+  - id: PD-16
+    text: When the PM has an idea with no known need, they can record it on the board
+      without it counting as a need or a decision.
+    sources:
+    - kind: secondary
+      who: prodc docs/issues
+      date: '2026-11-12'
+      quote: 'An idea with no need yet: a draft decision with empty needs[]'
+      locator: docs/issues/21-10-2026-draft-decision-idea.md
+      observed_at: '2026-11-12'
+    draft: true
+    draft_added: '2026-11-12'
+  - id: PD-17
+    text: When a need is visual, the developer can close it only on a verdict from a
+      judge that is not Claude.
+    sources:
+    - kind: secondary
+      who: prodc docs/issues
+      date: '2026-11-12'
+      quote: 'Visual needs need a designer''s eye: a judge that is not Claude'
+      locator: docs/issues/21-10-2026-visual-design-judgement.md
+      observed_at: '2026-11-12'
+    draft: true
+    draft_added: '2026-11-12'
+  - id: PD-18
+    text: When a must-have need is proved by a path proof backed by test results, the
+      developer can trust lint not to report it as declared-only.
+    sources:
+    - kind: secondary
+      who: prodc docs/issues
+      date: '2026-11-12'
+      quote: Declared-only warning ignores a path proof
+      locator: docs/issues/26-10-2026-declared-only-path-proof.md
+      observed_at: '2026-11-12'
+    draft: true
+    draft_added: '2026-11-12'

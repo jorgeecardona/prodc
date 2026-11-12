@@ -1,9 +1,13 @@
 ---
 title: "Evidence staleness: git fallback + brief section (follow-up to #58)"
 status: open
-scope: "S"
-verify: test
 area: status
+owner: null
+filed: 2026-10-05
+needs:
+  - PD-12
+scope: S
+verify: test
 ---
 
 ## What is done (#58, 0.3.x)
