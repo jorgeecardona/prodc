@@ -13,7 +13,7 @@ id that other records point at and its own slot in the model; everything else is
 | **Source** | where it came from; `primary`/`secondary`/`assumption`; no primary/secondary = opinion | `sources:` on a need |
 | **Proof** | `<adapter>:<payload>` resolved against the repo | `proofs:` on a need |
 | **Goal** | measurable objective needs trace up to; `id`, `text`, `metric`, `description`, `target` | `goals:` |
-| **Release** | ship slice; list order = ship order; `id`, `text` | `releases:` |
+| **Release** | ship slice; list order = ship order; `id`, `text`. The current release is derived, never stored: the first release with a need not DELIVERED. `plan` ranks it first and `issue next` picks from it | `releases:` |
 | **Role** | a named function in the product's world; `who`+`client` is an instance of it (John@Sincerely is the `owner`); `id`, `text` | `roles:` |
 | **Principle** | the vision, held as given (not validated); `scope`, `sources`, `revised_at`, guard `proofs` + `implemented_in`; an `out_of_scope` withdrawal cites it, and revising it re-opens decisions taken under it | `principles:` |
 | **Decision** | the solution chosen for a need over the `alternatives` rejected (OST), resting on which `principles`; `needs` required (what it *serves*); optional `awaits` (the research it *waits on*) | `decisions:` |

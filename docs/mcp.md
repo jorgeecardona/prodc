@@ -77,6 +77,7 @@ Issue register tools (`docs/issues`):
 | Tool | CLI |
 |---|---|
 | `issue_board` | `prodc issue board` (read) |
+| `issue_next` | `prodc issue next` (read): the ready issue to work on next, or the `skip` reason; takes `owner`, `limit` |
 | `issue_list` | `prodc issue list` (read): each issue with its needs and their state |
 | `issue_show` | `prodc issue show` (read) |
 | `issue_check` | `prodc issue check` (read) |

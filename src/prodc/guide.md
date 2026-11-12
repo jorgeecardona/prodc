@@ -42,7 +42,12 @@ Then run `prodc status`. You get one board line per need, with its state and cov
 |---|---|
 | `prodc status` | the whole board and coverage |
 | `prodc show <id>` | one need as a citable answer |
-| `prodc plan` | the backlog, ranked |
+| `prodc plan` | the backlog, ranked; the current release first |
+| `prodc issue next` | the ready issue to work on now |
+
+`prodc issue next` picks from the current release: the first release in `releases:` with a need
+not DELIVERED. It never picks an issue with no need, an issue on a draft need, or a bug on a
+DELIVERED need whose proof passes.
 | `prodc brief <client>` | what to ask a client before a call |
 
 ## Record a need
@@ -100,6 +105,7 @@ A HOLE (no proof yet) or an opinion (no evidence yet) is honest output, not a fa
 | see the board | `prodc status` |
 | read one need | `prodc show <id>` |
 | rank the backlog | `prodc plan` |
+| pick the next issue | `prodc issue next` |
 | prep a client call | `prodc brief <client>` |
 | add a need | `prodc add need <id> --text "..." --who you --kind assumption --file <f>` |
 | declare a role | `prodc add role <id> --text "..." --file <f>` |

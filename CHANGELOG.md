@@ -4,6 +4,25 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 ## [Unreleased]
 
+## [0.10.6] - 2026-11-12
+
+### Added
+
+- `prodc issue next [--limit N] [--owner H]` gives the ready issue to work on now, from the
+  current release. With no pick it says why (`skip`). MCP tool `issue_next`.
+- `prodc plan` ranks the current release first: the first release in `releases:` with a need not
+  DELIVERED. A BROKEN need ranks there too. Without `releases:` the order is unchanged.
+- `prodc plan --json` rows carry `goal`, `release`, `now` and `issues`; the top level carries
+  `current_release`.
+- `prodc lint` warns on a need with no release when releases are declared, on a must need in a
+  release after the current one, and on a release no need names.
+- `prodc issue update --clear-needs` removes every need an issue serves.
+
+### Fixed
+
+- `prodc issue update --field needs=` now clears the list. It wrote `needs: [""]` before. Any
+  `--field KEY=` with no value clears that field.
+
 ## [0.10.0] - 2026-11-12
 
 ### Added

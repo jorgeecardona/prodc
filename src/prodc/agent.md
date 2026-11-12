@@ -51,6 +51,11 @@ Decide where a thing goes before you write it.
 - `prodc issue list` shows each issue with the needs it serves and their state.
 - `prodc issue close` warns "closed but unproven" when a linked need is not DELIVERED. Add or
   fix the proof; closing the issue does not deliver the need.
+- `prodc issue next` gives the issue to work on now. It walks the current release (the first
+  release with a need not DELIVERED) in `plan` order and picks a ready issue that cites a need.
+- These are never picked: an issue with no need, an issue on a draft need (drafts are off the
+  board), and a bug on a DELIVERED need whose proof passes. Make the proof fail first; a BROKEN
+  need is picked in any release.
 - A bug that breaks a delivered need shows up on its own: the proof turns PENDING or BROKEN. Fix
   the code. Do not edit the need.
 - A bug that shows users cannot do something at all is a missing want. Write that as a need.

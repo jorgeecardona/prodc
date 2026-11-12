@@ -11,7 +11,7 @@ Commands take `--config prodc.toml` (default) and `--json`, except: `report` and
 | `show <id>` | One need as a citable answer (grounds, warrant, sources, proofs), or one decision (what it serves, rejected, rests on, and BLOCKED/READY on the research it `awaits`) | `prodc show N-1` |
 | `brief <client>` | Pre-meeting agenda for one client: its opinions and HOLEs, must first | `prodc brief acme` |
 | `inbox` | Open decisions only a person can make: must-have opinions with no decision, and warrant reviews that returned `concerns` or `fail`. Each item lists its options as ready commands. It only lists; it never records an answer (#113) | `prodc inbox` |
-| `plan` | Ranked backlog: must + state + evidence + recurrence; `importance` refines; `--revisit DAYS` lists only needs whose importance is undated or older than DAYS; `--include-drafts` | `prodc plan --json` |
+| `plan` | Ranked backlog: must + state + evidence + recurrence; `importance` refines; `--revisit DAYS` lists only needs whose importance is undated or older than DAYS; `--include-drafts`. With `releases:` declared, the now-set ranks first: needs of the current release not DELIVERED, plus every BROKEN need. Text output puts a `---- later` line after it. `--json` rows carry `goal`, `release`, `now` and `issues` (slugs of ready issues citing the need); the top level carries `current_release` (`{id, text}` or `null`) | `prodc plan --json` |
 | `review` | Triage the capture funnel (captured and triaged needs): `--promote ID…` moves each one stage (captured to triaged, triaged to committed), `--promote-all` commits all of them (except any in `--drop`), `--drop ID…` (deletes a staged need, never a committed one); `--dry-run` | `prodc review --promote N-9` |
 | `diff <snapshot>` | State changes since a saved `status --json` | `prodc diff last.json` |
 | `portfolio <path>…` | Many boards, one scoreboard (+ totals footer); a path is a prodc.toml or a dir to discover boards under (prunes VCS/vendor/hidden dirs, `--max-depth` default 4) | `prodc portfolio projects/` |
@@ -74,13 +74,24 @@ name the folder when it is somewhere else (`CABILDO_ISSUES_DIR` is still read).
 | Command | Does |
 |---|---|
 | `issue board [--status S] [--area A] [--owner O]` | issues ready to pick up and what the rest waits on; a filter gives a flat list |
+| `issue next [--limit N] [--owner H]` | the ready issue to work on next. Walks the now-set of `plan` in order and takes the ready issues that cite each need. With `--owner`, issues that owner holds count as ready. `--json`: `release` (`{id, text, open_needs}`), `pick`, `candidates`, `needs_without_issue`, `skip`. Exit 0 with a pick or a skip; exit 2 when the board does not load |
 | `issue list [--need ID] [--config F]` | each issue, the needs it serves, and each need's state; `--need` keeps one need's issues |
 | `issue show <name>` | print one issue (a filename or part of its slug) |
 | `issue file --title T --area A --body B [--need ID] [--blocked-by SLUG] [--field K=V]` | file a new issue (`--body -` reads stdin). `--need` (repeatable) names a need it serves; an unknown id is refused (exit 2). With no `--need` it files and warns "issue serves no need" |
-| `issue update <name> [--title] [--status] [--area] [--owner NAME] [--blocked-by SLUG \| --clear-blocked-by] [--field K=V]` | change only what you pass. An in-progress issue needs an owner; `--owner none` clears it |
+| `issue update <name> [--title] [--status] [--area] [--owner NAME] [--blocked-by SLUG \| --clear-blocked-by] [--clear-needs] [--field K=V]` | change only what you pass. An in-progress issue needs an owner; `--owner none` clears it. `--field K=` with no value clears that field; `--clear-needs` is the same as `--field needs=` |
 | `issue close <name> --fixed-in SHA` | mark done; the file stays, carrying the sha. Prints each linked need's state and warns "closed but unproven" when one is not DELIVERED (exit 0) |
 | `issue check` | grade the folder against its `config.toml`; exit 1 on problems |
 | `issue reindex` | rewrite the README index table |
+
+`issue next` gives `skip` when it has no pick:
+
+| `skip` | Means |
+|---|---|
+| `no-board` | no `prodc.toml`, or no need on the board |
+| `no-register` | no `docs/issues/` folder |
+| `no-releases` | no `releases:` declared, so there is no current release |
+| `all-delivered` | every release is DELIVERED |
+| `no-linked-issue` | no ready issue cites a need in the now-set; see `needs_without_issue` |
 
 ## MCP
 

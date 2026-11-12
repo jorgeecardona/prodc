@@ -1,9 +1,10 @@
 ---
 title: issue update --field needs= writes a list with one empty string instead of clearing it
-status: open
+status: done
 area: cli
 owner: null
 filed: 2026-11-12
+fixed_in: 81048b3
 scope: XS
 verify: test
 ---
