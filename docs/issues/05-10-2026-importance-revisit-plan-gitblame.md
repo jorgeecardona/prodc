@@ -1,11 +1,10 @@
 ---
 title: "Importance rubric: plan --revisit, add --importance, git-blame fallback (follow-up to #59)"
-status: open
+status: done
 area: cli
 owner: null
 filed: 2026-10-05
-needs:
-  - PD-13
+fixed_in: fa3d298
 scope: S
 verify: test
 ---
@@ -32,3 +31,5 @@ verify: test
 3. **git-blame fallback for `importance_set_at`** — when a need was hand-edited without the
    date, fall back to the file's git blame for that line. Same per-need file-provenance gap as
    the #58 fallback (docs/issues/05-10-2026-evidence-staleness-git-fallback.md); deferred with it.
+
+Items 2 and 3 (add --importance, git-blame fallback) are not planned.

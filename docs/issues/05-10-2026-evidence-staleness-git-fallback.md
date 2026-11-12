@@ -1,5 +1,5 @@
 ---
-title: "Evidence staleness: git fallback + brief section (follow-up to #58)"
+title: "Evidence age: fall back to the source date when observed_at is missing (follow-up to #58)"
 status: open
 area: status
 owner: null

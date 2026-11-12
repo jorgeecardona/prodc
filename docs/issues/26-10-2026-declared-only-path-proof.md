@@ -4,8 +4,6 @@ status: open
 area: status
 owner: null
 filed: 2026-10-26
-needs:
-  - PD-18
 scope: XS
 verify: test
 ---

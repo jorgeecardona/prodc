@@ -1,11 +1,10 @@
 ---
 title: "Proof discovery: --apply, more adapter inventories, BROKEN relink (follow-up to #54)"
-status: open
+status: done
 area: adapters
 owner: null
 filed: 2026-10-05
-needs:
-  - PD-14
+fixed_in: ece29e1
 scope: M
 verify: test
 ---
