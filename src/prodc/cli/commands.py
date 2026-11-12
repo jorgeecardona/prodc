@@ -66,6 +66,7 @@ from ..status import (
     principle_report,
     proof_suggestions,
     recurrence,
+    release_warnings,
     relink_suggestions,
     resolve,
     stale_decisions,
@@ -290,6 +291,8 @@ def cmd_lint(args: argparse.Namespace) -> int:
         | {n.client for n in needs if n.client is not None}
     )
     warnings += tag_warnings(needs, structural_ids, cfg.duplicate_threshold)
+    # Releases: an unscheduled need, a must parked after the current release, an empty release.
+    warnings += release_warnings(results, list(model.releases))
     # View inventory hygiene (#102, #106, #104, #108): an untyped view, an orphan view, a link
     # without its reason, and (opt in) a view no need points at. A dangling link is an error.
     errors += view_link_errors(cfg.adapters)

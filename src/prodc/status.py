@@ -48,6 +48,7 @@ from .model import (
     Release,
     Role,
     SourceKind,
+    Stage,
     Verdict,
     ears_warnings,
 )
@@ -918,6 +919,42 @@ def now_ids(results: list[NeedResult], releases: list[Release]) -> frozenset[str
             )
         )
     )
+
+
+def release_warnings(results: list[NeedResult], releases: list[Release]) -> list[tuple[str, str]]:
+    """Release hygiene for ``lint``: ``(id, warning)`` pairs. Silent when no release is declared.
+
+    Over the counted board needs (no drafts, no withdrawn, no flows):
+
+    - unscheduled: a need not DELIVERED names no release.
+    - a must need sits in a release after the current one.
+    - an empty release: no need names it.
+    """
+    if not releases:
+        return []
+    board = [
+        r for r in results if r.need.counts_toward_coverage and r.need.stage is Stage.COMMITTED
+    ]
+    order = {rel.id: i for i, rel in enumerate(releases)}
+    current = current_release(board, releases)
+    out: list[tuple[str, str]] = []
+    for r in sorted(board, key=lambda x: x.need.id):
+        rel = r.need.release
+        if rel is None and r.state is not NeedState.DELIVERED:
+            out.append((r.need.id, "unscheduled: releases are declared, but this need names none"))
+        elif (
+            r.need.must and rel in order and current is not None and order[rel] > order[current.id]
+        ):
+            out.append(
+                (
+                    r.need.id,
+                    f"must need in release {rel}, after the current release {current.id}: "
+                    "move it to an earlier release or drop must",
+                )
+            )
+    used = {r.need.release for r in board}
+    out += [(rel.id, "empty release: no need names it") for rel in releases if rel.id not in used]
+    return out
 
 
 def goal_report(
