@@ -14,6 +14,7 @@ from typing import Any
 
 from .. import issue_store as store
 from ..config import Config, ConfigError
+from ..issues import Candidate, Next, SkipReason, next_issues
 from ..loader import LoaderError, load
 from ..model import NeedState
 from ..status import resolve as resolve_needs
@@ -22,7 +23,7 @@ from .serialize import issue_payload
 
 
 def add_issue_parser(ip: argparse.ArgumentParser) -> None:
-    """Fill ``prodc issue {board,list,show,file,update,close,check,reindex}``."""
+    """Fill ``prodc issue {board,list,show,file,update,close,next,check,reindex}``."""
 
     def bare(_args: argparse.Namespace) -> int:
         ip.print_help(sys.stderr)
@@ -88,6 +89,11 @@ def add_issue_parser(ip: argparse.ArgumentParser) -> None:
     cl.add_argument("name")
     cl.add_argument("--fixed-in", required=True, metavar="SHA", help="the sha on the mainline")
     cl.set_defaults(func=cmd_issue_close)
+
+    nx = sub("next", "the ready issue to work on next, from the current release")
+    nx.add_argument("--limit", type=int, default=5, help="most candidates to list (default 5)")
+    nx.add_argument("--owner", default=None, help="also count issues this owner holds as ready")
+    nx.set_defaults(func=cmd_issue_next)
 
     ck = sub("check", "grade the folder against its config.toml (exit 1 on problems)")
     ck.set_defaults(func=cmd_issue_check)
@@ -347,6 +353,66 @@ def cmd_issue_close(args: argparse.Namespace) -> int:
         print(f"prodc: warning: {w}", file=sys.stderr)
     data = {**_row(updated), "unblocked": unblocked, "need_states": shown, "warnings": warnings}
     _emit(args.json, data, text)
+    return 0
+
+
+def _candidate(c: Candidate) -> dict[str, Any]:
+    return {
+        "issue": c.issue.slug,
+        "path": str(c.issue.path),
+        "title": c.issue.title,
+        "need": c.need.id,
+        "need_text": c.need.text,
+        "need_rank": c.need_rank,
+        "why": c.why,
+    }
+
+
+def next_payload(nxt: Next) -> dict[str, Any]:
+    """``prodc issue next --json``: the pick, the other candidates, and the skip reason."""
+    rel = nxt.release
+    return {
+        "release": (
+            {"id": rel.id, "text": rel.text, "open_needs": nxt.open_needs} if rel else None
+        ),
+        "pick": _candidate(nxt.pick) if nxt.pick else None,
+        "candidates": [_candidate(c) for c in nxt.candidates],
+        "needs_without_issue": [n.id for n in nxt.needs_without_issue],
+        "skip": nxt.skip.value if nxt.skip else None,
+    }
+
+
+def _next_text(nxt: Next) -> str:
+    lines: list[str] = []
+    if nxt.release is not None:
+        lines.append(
+            f"release {nxt.release.id} ({nxt.release.text}): {nxt.open_needs} open need(s)"
+        )
+    if nxt.pick is None:
+        lines.append(f"no pick: {nxt.skip.value if nxt.skip else 'none'}")
+    for i, c in enumerate(nxt.candidates):
+        lines.append(f"{'pick' if i == 0 else '    '}  {c.issue.slug}: {c.issue.title}")
+        lines.append(f"        {c.why}")
+    if nxt.needs_without_issue:
+        ids = ", ".join(n.id for n in nxt.needs_without_issue)
+        lines.append(f"needs with no ready issue: {ids}")
+    return "\n".join(lines)
+
+
+def cmd_issue_next(args: argparse.Namespace) -> int:
+    """Print the ready issue to work on next; exit 0 with or without a pick, 2 on load failure."""
+    try:
+        cfg = _board_config()
+        if cfg is None:
+            nxt = Next(None, skip=SkipReason.NO_BOARD)
+        else:
+            nxt = next_issues(
+                cfg, load(cfg), store.find_folder(cfg.root), owner=args.owner, limit=args.limit
+            )
+    except (LoaderError, store.IssueFormatError, OSError) as exc:
+        print(f"prodc: {exc}", file=sys.stderr)
+        return 2
+    _emit(args.json, next_payload(nxt), _next_text(nxt))
     return 0
 
 

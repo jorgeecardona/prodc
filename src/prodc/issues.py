@@ -11,11 +11,15 @@ files; this module loads them for the board and lints them against it through tw
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 from . import issue_store as store
 from .adapters import SourceAdapter
-from .model import Issue, NeedResult, NeedState
+from .board import warrant
+from .config import Config
+from .model import Issue, Model, Need, NeedResult, NeedState, Release, board_needs
+from .status import current_release, now_ids, rank, recurrence, resolve
 
 
 @dataclass(frozen=True)
@@ -145,3 +149,107 @@ def _ready(folder: Path, owner: str | None) -> tuple[Issue, ...]:
         if i.status is not store.Status.BLOCKED and not any(s in open_slugs for s in i.blocked_by)
     ]
     return tuple(sorted((*b.ready, *mine), key=config.rank_key))
+
+
+class SkipReason(StrEnum):
+    """Why :func:`next_issues` has no pick."""
+
+    NO_BOARD = "no-board"  # no needs on the board (no prodc.toml, or every need draft/withdrawn)
+    NO_REGISTER = "no-register"  # no docs/issues/ folder
+    NO_RELEASES = "no-releases"  # no ``releases:`` declared, so there is no "now"
+    ALL_DELIVERED = "all-delivered"  # every release is DELIVERED
+    NO_LINKED_ISSUE = "no-linked-issue"  # no ready issue cites a need in the now-set
+
+
+@dataclass(frozen=True)
+class Candidate:
+    """A ready issue that serves a now-set need, with the reason it is offered."""
+
+    issue: Issue
+    need: Need  # the best-ranked now-set need the issue cites
+    need_rank: int  # that need's 1-based position in ``prodc plan``
+    why: str  # "PD-17 is rank 1 in release R1: must, HOLE, primary:Jorge"
+
+
+@dataclass(frozen=True)
+class Next:
+    """What to work on next: the candidates in order, or why there are none."""
+
+    release: Release | None  # the current release; None when skipped before one is found
+    candidates: tuple[Candidate, ...] = ()
+    needs_without_issue: tuple[Need, ...] = ()  # now-set needs no ready issue cites
+    skip: SkipReason | None = None
+    open_needs: int = 0  # needs in ``release`` not DELIVERED
+
+    @property
+    def pick(self) -> Candidate | None:
+        """The first candidate, or None."""
+        return self.candidates[0] if self.candidates else None
+
+
+def next_issues(
+    cfg: Config, model: Model, folder: Path | None, *, owner: str | None = None, limit: int = 5
+) -> Next:
+    """The ready issues to work on next, walked from the top of ``prodc plan``.
+
+    The walk covers only the now-set (:func:`prodc.status.now_ids`) in plan order and never reads
+    past the current release. Per need, it takes the ready issues that cite it, in the store's rank
+    order. An issue that cites two needs appears once, under its better-ranked need. A need with
+    no ready issue goes to ``needs_without_issue`` and the walk continues. With ``owner``, an
+    issue is ready when it is unowned or held by ``owner``.
+
+    These are never picked: an issue with no need, an issue whose needs are all off the board
+    (drafts, withdrawn), and an issue on a DELIVERED need (a DELIVERED need is not in the
+    now-set, so a bug on it with a passing proof waits until its proof breaks).
+    """
+    needs = board_needs(list(model.needs), include_drafts=False)
+    if not needs:
+        return Next(None, skip=SkipReason.NO_BOARD)
+    if folder is None:
+        return Next(None, skip=SkipReason.NO_REGISTER)
+    releases = list(model.releases)
+    if not releases:
+        return Next(None, skip=SkipReason.NO_RELEASES)
+    results = resolve(needs, cfg.adapters, cfg.source_adapters)
+    current = current_release(results, releases)
+    if current is None:
+        return Next(None, skip=SkipReason.ALL_DELIVERED)
+    open_needs = sum(
+        1
+        for r in results
+        if r.need.release == current.id
+        and r.need.counts_toward_coverage
+        and r.state is not NeedState.DELIVERED
+    )
+    now = now_ids(results, releases)
+    counts = {rec.baseline.id: rec.count for rec in recurrence(needs)}
+    by_need: dict[str, list[Issue]] = {}
+    for issue in _ready(folder, owner):
+        for n in issue.needs:
+            by_need.setdefault(n, []).append(issue)
+    seen: set[str] = set()
+    candidates: list[Candidate] = []
+    without: list[Need] = []
+    for position, r in enumerate(rank(results, counts, now), 1):
+        if r.need.id not in now:
+            break  # the now-set ranks first: past it is later work
+        found = [i for i in by_need.get(r.need.id, []) if i.slug not in seen]
+        if not by_need.get(r.need.id):
+            without.append(r.need)
+        where = (
+            f"in release {current.id}"
+            if r.need.release == current.id
+            else "in the now-set (BROKEN outside the current release)"
+        )
+        parts = (["must"] if r.need.must else []) + [r.state.value.upper(), warrant(r.need)]
+        why = f"{r.need.id} is rank {position} {where}: {', '.join(parts)}"
+        for issue in found:
+            seen.add(issue.slug)
+            candidates.append(Candidate(issue, r.need, position, why))
+    return Next(
+        current,
+        tuple(candidates[:limit]),
+        tuple(without),
+        None if candidates else SkipReason.NO_LINKED_ISSUE,
+        open_needs,
+    )
