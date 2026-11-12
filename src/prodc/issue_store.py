@@ -450,7 +450,7 @@ def _as_list(value: str | tuple[str, ...] | None) -> tuple[str, ...]:
     if value is None:
         return ()
     if isinstance(value, str):
-        return (value,)
+        return (value,) if value else ()
     return tuple(v for v in value if v)
 
 
@@ -1264,7 +1264,11 @@ def update(
         if isinstance(raw_extra, Mapping)
         else {}
     )
-    extra = dict(issue.extra) | dict(extra_patch)
+    # an empty list in the patch clears that field: the key is removed, not written empty
+    extra = {k: v for k, v in (dict(issue.extra) | dict(extra_patch)).items() if v != ()}
+    for key in ("needs", "sources"):
+        if extra_patch.get(key) == ():
+            changes.setdefault(key, ())
     for key in ("needs", "sources"):
         if key in extra:
             changes.setdefault(key, _as_list(extra.pop(key)))

@@ -154,3 +154,26 @@ def test_update_sets_and_clears_the_owner(repo: Path, capsys: pytest.CaptureFixt
     capsys.readouterr()
     assert main(["issue", "update", "work", "--owner", "none", "--json"]) == 0
     assert _json(capsys)["owner"] is None
+
+
+@pytest.mark.parametrize("how", [["--field", "needs="], ["--clear-needs"]])
+def test_update_with_an_empty_needs_clears_the_list(
+    board: Path, capsys: pytest.CaptureFixture[str], how: list[str]
+) -> None:
+    assert _file("--need", "N-1") == 0
+    capsys.readouterr()
+    assert main(["issue", "update", "work", *how, "--json"]) == 0
+    assert _json(capsys)["needs"] == []
+    (path,) = (board / "docs" / "issues").glob("*-work.md")
+    assert "needs" not in path.read_text()
+
+
+def test_update_with_an_empty_extra_field_removes_the_key(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert _file("--field", "tags=a", "--field", "tags=b") == 0
+    capsys.readouterr()
+    assert main(["issue", "update", "work", "--field", "tags=", "--json"]) == 0
+    assert "tags" not in _json(capsys)["fields"]
+    (path,) = (repo / "docs" / "issues").glob("*-work.md")
+    assert "tags" not in path.read_text()

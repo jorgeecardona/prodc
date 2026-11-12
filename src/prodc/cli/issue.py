@@ -80,6 +80,7 @@ def add_issue_parser(ip: argparse.ArgumentParser) -> None:
     up.add_argument("--owner", default=None, help="who is doing it ('none' clears it)")
     up.add_argument("--blocked-by", action="append", default=None, metavar="SLUG")
     up.add_argument("--clear-blocked-by", action="store_true")
+    up.add_argument("--clear-needs", action="store_true", help="remove every need it serves")
     up.add_argument("--field", action="append", default=[], metavar="KEY=VALUE")
     up.set_defaults(func=cmd_issue_update)
 
@@ -144,13 +145,18 @@ def _need_states(ids: tuple[str, ...]) -> dict[str, NeedState | None]:
 
 
 def _fields(pairs: list[str]) -> dict[str, str | tuple[str, ...]]:
-    """``KEY=VALUE`` pairs to front-matter fields; a repeated key becomes a list."""
+    """``KEY=VALUE`` pairs to front-matter fields; a repeated key becomes a list.
+
+    ``KEY=`` with an empty value is an empty list: it clears the field on update.
+    """
     out: dict[str, list[str]] = {}
     for pair in pairs:
         key, sep, value = pair.partition("=")
         if not sep or not key:
             raise store.IssueFormatError(f"--field wants KEY=VALUE, got {pair!r}")
-        out.setdefault(key, []).append(value)
+        out.setdefault(key, [])
+        if value:
+            out[key].append(value)
     return {k: v[0] if len(v) == 1 else tuple(v) for k, v in out.items()}
 
 
@@ -310,6 +316,8 @@ def cmd_issue_update(args: argparse.Namespace) -> int:
         changes["blocked_by"] = tuple(args.blocked_by)
     if args.field:
         changes["extra"] = _fields(args.field)
+    if args.clear_needs:
+        changes["needs"] = ()
     if not changes:
         print("prodc: nothing to change", file=sys.stderr)
         return 2
