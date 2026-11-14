@@ -79,7 +79,7 @@ needs:
     sources:
       - {kind: secondary, date: 2026-10-04, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/37"}
       - {kind: secondary, date: 2026-10-05, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/50"}
-    goal: G-1
+    draft: true
 
   - id: PD-10
     text: >
@@ -87,7 +87,7 @@ needs:
       live against the tracker API.
     sources:
       - {kind: secondary, date: 2026-10-05, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/38"}
-    goal: G-2
+    draft: true
 
   - id: PD-11
     text: >
@@ -95,7 +95,7 @@ needs:
       satisfaction.
     sources:
       - {kind: secondary, date: 2026-10-04, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/29"}
-    goal: G-1
+    draft: true
   - id: PD-12
     text: When a source has a date but no observed_at, the developer can still see how
       old the need's evidence is, instead of an unknown age.
