@@ -1,5 +1,5 @@
 site_name: prodc
-site_description: Product management as code — roles, flows, and features traced to evidence.
+site_description: "A command-line tool for tracking user needs, their evidence and the tests that prove them."
 site_url: https://cardona-oss.gitlab.io/prodc/
 repo_url: https://gitlab.com/cardona-oss/prodc
 repo_name: cardona-oss/prodc
@@ -24,6 +24,27 @@ theme:
 # The issue register under docs/issues/ is plain config, not site content.
 exclude_docs: |
   issues/
+
+plugins:
+  - search
+  - llmstxt:
+      markdown_description: "User needs live as YAML in the repo; each need lists who asked for it and the test that proves it, and prodc status computes each need's state from the test suite."
+      full_output: llms-full.txt
+      sections:
+        Usage documentation:
+          - index.md
+          - quickstart.md
+          - commands.md
+          - mcp.md
+          - model.md
+          - config.md
+          - ci.md
+          - storybook.md
+          - lifecycle.md
+          - principles.md
+          - ux-laws.md
+          - visual.md
+          - grounding-torres.md
 
 nav:
   - Home: index.md
