@@ -121,3 +121,5 @@ and `status` shows which visual needs lack one.
 - DesignPref (2025, https://arxiv.org/html/2511.20513v1): personal design preference scoring.
 
 prodc records the verdict (who judged, which screenshot, the score); it does not call the model.
+
+Decision (Jorge, 14-11-2026): the judge is UIClip. The consumer repo runs it on the screenshots (for example each Storybook story URL) and prodc records the score as the verdict; prodc does not run the model.
