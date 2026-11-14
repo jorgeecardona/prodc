@@ -748,7 +748,7 @@ def build_parser() -> argparse.ArgumentParser:
     sy = sub.add_parser(
         "sync",
         parents=[config],
-        help="run lifecycle callbacks for needs whose state changed since the last sync (#71)",
+        help="deprecated, removed in 0.12: run [callbacks] for needs whose state changed (#71)",
     )
     sy.add_argument(
         "--dry-run",

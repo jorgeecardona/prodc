@@ -305,6 +305,8 @@ def _deprecated_toml(raw: dict[str, object]) -> tuple[str, ...]:
     out: list[str] = []
     if "profile" in _as_dict(raw.get("prodc", {}), "[prodc]"):
         out.append(deprecation("[prodc].profile", "delete it: a research board needs no profile"))
+    if "callbacks" in raw:
+        out.append(deprecation("[callbacks]", "run your own script on `prodc status --json`"))
     return tuple(out)
 
 

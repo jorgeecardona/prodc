@@ -29,6 +29,7 @@ from ..dedup import (
     tag_warnings,
     variant_suggestions,
 )
+from ..deprecation import warn_deprecated
 from ..glossary import glossary_findings
 from ..inbox import inbox
 from ..issues import issue_findings, ready_by_need
@@ -1443,6 +1444,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
     The first run records a baseline and fires nothing; a failed callback is reported and its need
     is left un-advanced so the next sync retries it. `--dry-run` shows what would fire.
     """
+    warn_deprecated("prodc sync", "run your own script on `prodc status --json`")
     loaded = load_or_report(args)
     if loaded is None:
         return 2
