@@ -1,6 +1,6 @@
 # Commands
 
-Commands take `--config prodc.toml` (default) and `--json`, except: `report` and `sync` have no `--json`; `agent` and `guide` take neither; `portfolio` takes paths instead of `--config`. `prodc -C DIR …` runs as if started in `DIR`. Exit 0 ok · 1 gate failed · 2 config/load error.
+Commands take `--config prodc.toml` (default) and `--json`, except: `report` and `sync` have no `--json`; `agent` takes neither; `portfolio` takes paths instead of `--config`. `prodc -C DIR …` runs as if started in `DIR`. Exit 0 ok · 1 gate failed · 2 config/load error.
 
 ## Read
 
@@ -23,7 +23,6 @@ Commands take `--config prodc.toml` (default) and `--json`, except: `report` and
 | `report` | Render the board as a shareable document for a PM to read, share, or print. `--format md` (default) is a readable markdown document; `--format html` is a single self-contained, interactive, read-only viewer (filter by state/client, search, expand a need, regroup by client/goal/release/state, print to PDF) with no external assets. `--format csv` writes one row per need (id, client, who, state, must, importance, goal, release, warrant, source type, proof detail, text) for a spreadsheet; `--format jira` writes Jira wiki markup and `--format confluence` writes Confluence storage format, both ready to paste. `-o PATH` (or `--out PATH`) writes a file. `--client ID`, `--goal ID` and `--only-must` scope the needs. The user signal column adds the source type read from the locator, for example `secondary (ticket)`. Identifiers with `-` or `_` are shown as titles. With `--format md` only: `--title TEXT` replaces the heading, `--hide-empty` drops the explainer and an empty Open questions section, `--only-open` prints just the Open questions brief | `prodc report --format html -o status.html` |
 | `sync` | Run the configured lifecycle callbacks (`[callbacks]`) for needs whose state changed since the last sync: resolves the board, diffs it against the state ledger, pipes each changed need + board context to the callback command as JSON on stdin, and writes the ledger forward. First run records a baseline and fires nothing; a failed callback is reported, exits non-zero, and leaves its need un-advanced so the next sync retries. `--dry-run` shows what would fire | `prodc sync` |
 | `agent` | Print prodc's agent playbook so a coding agent runs prodc as the project's PM; `--write PATH` writes it into the repo (`--force` to overwrite) | `prodc agent >> AGENTS.md` |
-| `guide` | Print prodc's short human CLI onboarding guide; `--write PATH` writes it into the repo | `prodc guide` |
 
 ### `status` flags
 

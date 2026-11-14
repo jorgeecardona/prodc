@@ -86,11 +86,11 @@ def test_issues_command_lists_issues_with_need_state(
             "b.md": _issue("Engineering only"),
         },
     )
-    assert main(["issues", "--config", cfg]) == 0
+    assert main(["issue", "list", "--config", cfg]) == 0
     out = capsys.readouterr().out
     assert "N-2:HOLE" in out and "Engineering only  [no need]" in out
     assert "issues: 2, serving no need: 1" in out
-    assert main(["issues", "--config", cfg, "--need", "N-2", "--json"]) == 0
+    assert main(["issue", "list", "--config", cfg, "--need", "N-2", "--json"]) == 0
     assert [i["id"] for i in json.loads(capsys.readouterr().out)] == ["a"]
 
 
@@ -103,7 +103,7 @@ def test_issues_command_needs_the_config_key(
     (tmp_path / "prodc.toml").write_text(
         _TOML.replace('issues = ["docs/issues/*.md"]\n', ""), "utf-8"
     )
-    assert main(["issues", "--config", cfg]) == 2
+    assert main(["issue", "list", "--config", cfg]) == 2
     assert "no issue register" in capsys.readouterr().err
 
 
@@ -114,7 +114,7 @@ def test_without_globs_the_register_is_found_from_the_root(
     (tmp_path / "prodc.toml").write_text(
         _TOML.replace('issues = ["docs/issues/*.md"]\n', ""), "utf-8"
     )
-    assert main(["issues", "--config", cfg, "--json"]) == 0
+    assert main(["issue", "list", "--config", cfg, "--json"]) == 0
     assert [i["id"] for i in json.loads(capsys.readouterr().out)] == ["01-01-2026-a"]
 
 
@@ -163,7 +163,7 @@ def test_show_lists_the_issues_serving_a_need(
     assert json.loads(capsys.readouterr().out)["issues"][0]["id"] == "a"
 
 
-def test_issue_list_shows_need_state_and_issues_is_a_deprecated_alias(
+def test_issue_list_shows_need_state_and_issues_is_gone(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     cfg = _project(tmp_path, {"a.md": _issue("Do the thing", needs="[N-1, N-2]")})
@@ -172,10 +172,8 @@ def test_issue_list_shows_need_state_and_issues_is_a_deprecated_alias(
     assert row["need_states"] == {"N-1": "DELIVERED", "N-2": "HOLE"}
     assert main(["issue", "list", "--config", cfg, "--need", "N-9"]) == 0
     assert "issues: 0" in capsys.readouterr().out
-    assert main(["issues", "--config", cfg]) == 0
-    out = capsys.readouterr()
-    assert "N-1:DELIVERED" in out.out
-    assert "deprecated; use `prodc issue list`" in out.err
+    with pytest.raises(SystemExit):
+        main(["issues", "--config", cfg])
 
 
 def test_only_an_open_issue_with_no_need_warns_and_repeats_group(

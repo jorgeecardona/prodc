@@ -145,13 +145,6 @@ def build_server(root: Path) -> MCPServer:
         return call(["brief", client])
 
     @server.tool(annotations=_READ)
-    def issues(need: str | None = None) -> dict[str, Any]:
-        """Deprecated: use ``issue_list``. The issues against the needs they serve."""
-        argv = ["issues"]
-        _flag(argv, "need", need)
-        return call(argv)
-
-    @server.tool(annotations=_READ)
     def suggest(id: str | None = None, relink: bool = False) -> dict[str, Any]:
         """Suggest test proofs for needs (or one need). Never applies them."""
         argv = ["suggest"]

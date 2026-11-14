@@ -544,21 +544,6 @@ def test_agent_write_creates_file_and_refuses_overwrite(
     assert main(["agent", "--write", str(dest), "--force"]) == 0
 
 
-def test_guide_prints_human_guide(capsys: pytest.CaptureFixture[str]) -> None:
-    code = main(["guide"])
-    out = capsys.readouterr().out
-    assert code == 0
-    assert "prodc in 60 seconds" in out
-    assert "The two rules" in out  # the human onboarding path is present
-
-
-def test_guide_write_creates_file_and_refuses_overwrite(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    dest = tmp_path / "sub" / "GUIDE.md"
-    assert main(["guide", "--write", str(dest)]) == 0
-    assert dest.exists() and "prodc" in dest.read_text(encoding="utf-8")
-    capsys.readouterr()
-    assert main(["guide", "--write", str(dest)]) == 2
-    assert "already exists" in capsys.readouterr().err
-    assert main(["guide", "--write", str(dest), "--force"]) == 0
+def test_guide_is_gone() -> None:
+    with pytest.raises(SystemExit):
+        main(["guide"])

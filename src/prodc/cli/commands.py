@@ -112,7 +112,6 @@ from .common import (
     load_or_report,
     portfolio_totals,
 )
-from .issue import cmd_issue_list
 from .render import (
     COLUMNS,
     provenance_counts,
@@ -1517,33 +1516,6 @@ def cmd_agent(args: argparse.Namespace) -> int:
         return 0
     print(text, end="")
     return 0
-
-
-def cmd_guide(args: argparse.Namespace) -> int:
-    """Print prodc's human CLI guide (a short onboarding path), or write it to a file.
-
-    The human sibling of :func:`cmd_agent`: where `agent` ships an instruction set for a coding
-    agent, `guide` is the 60-second path a person reads to try prodc. Ships versioned with prodc;
-    `--write` drops it into a repo.
-    """
-    text = importlib.resources.files("prodc").joinpath("guide.md").read_text(encoding="utf-8")
-    if args.write:
-        dest = Path(args.write)
-        if dest.exists() and not args.force:
-            print(f"prodc: {dest} already exists (use --force to overwrite)", file=sys.stderr)
-            return 2
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(text, encoding="utf-8")
-        print(f"wrote prodc guide to {dest}")
-        return 0
-    print(text, end="")
-    return 0
-
-
-def cmd_issues(args: argparse.Namespace) -> int:
-    """Deprecated alias of ``prodc issue list``: prints a notice to stderr, then runs it."""
-    print("prodc: `prodc issues` is deprecated; use `prodc issue list`", file=sys.stderr)
-    return cmd_issue_list(args)
 
 
 def cmd_views(args: argparse.Namespace) -> int:

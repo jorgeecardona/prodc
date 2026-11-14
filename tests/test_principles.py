@@ -260,7 +260,14 @@ def test_lint_hard_fails_broken_principle(tmp_path: Path) -> None:
     # a principle whose only proof is an unresolvable locator (no 'ghost' adapter) is BROKEN.
     needs = "principles:\n  - id: P-1\n    text: a principle\n    proofs:\n      - 'ghost:x'\n"
     cfg_path = _project(tmp_path, needs=needs)
-    args = argparse.Namespace(config=str(cfg_path), strict=False, all_warnings=False, json=False)
+    args = argparse.Namespace(
+        config=str(cfg_path),
+        strict=False,
+        all_warnings=False,
+        json=False,
+        baseline=None,
+        write_baseline=None,
+    )
     assert cmd_lint(args) == 1
 
 

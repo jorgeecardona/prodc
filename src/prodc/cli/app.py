@@ -21,9 +21,7 @@ from .commands import (
     cmd_capture,
     cmd_diff,
     cmd_dupes,
-    cmd_guide,
     cmd_inbox,
-    cmd_issues,
     cmd_lint,
     cmd_outcome,
     cmd_plan,
@@ -694,14 +692,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     du.set_defaults(func=cmd_dupes)
 
-    isp = sub.add_parser(
-        "issues",
-        parents=[config, json_out],
-        help="deprecated: use `prodc issue list`",
-    )
-    isp.add_argument("--need", default=None, metavar="ID", help="only issues serving this need")
-    isp.set_defaults(func=cmd_issues)
-
     vw = sub.add_parser(
         "views",
         parents=[config, json_out],
@@ -786,18 +776,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ag.add_argument("--force", action="store_true", help="overwrite PATH if it already exists")
     ag.set_defaults(func=cmd_agent)
-
-    gd = sub.add_parser(
-        "guide", help="print prodc's human CLI guide (a short, scannable onboarding path)"
-    )
-    gd.add_argument(
-        "--write",
-        default=None,
-        metavar="PATH",
-        help="write the guide to PATH instead of stdout",
-    )
-    gd.add_argument("--force", action="store_true", help="overwrite PATH if it already exists")
-    gd.set_defaults(func=cmd_guide)
 
     df = sub.add_parser(
         "diff",

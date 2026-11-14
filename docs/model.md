@@ -146,7 +146,7 @@ sources: ["gitlab:#123"]     # pointers into other systems
 | a `sources` pointer does not resolve | warning |
 | a file in the glob has no front matter | one warning for the folder |
 
-`prodc issues` lists them, and `prodc show <need>` lists the issues that serve it. A ticket's state
+`prodc issue list` lists them, and `prodc show <need>` lists the issues that serve it. A ticket's state
 never makes a need DELIVERED: only a proof does.
 
 ## Where things go

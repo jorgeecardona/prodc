@@ -57,7 +57,6 @@ Read tools (marked read-only for the client):
 | `lint` | `prodc lint` |
 | `inbox` | `prodc inbox` |
 | `brief` | `prodc brief <client>` |
-| `issues` | `prodc issues` (deprecated: use `issue_list`) |
 | `suggest` | `prodc suggest` (never applies) |
 | `review` | `prodc review` (lists drafts) |
 | `dupes` | `prodc dupes` |

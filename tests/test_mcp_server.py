@@ -41,7 +41,7 @@ async def test_tools_are_the_agent_safe_set(board: Path) -> None:
     async with Client(build_server(board)) as c:
         names = {t.name for t in (await c.list_tools()).tools}
     assert names == {
-        "status", "show", "plan", "lint", "inbox", "brief", "issues", "suggest", "review",
+        "status", "show", "plan", "lint", "inbox", "brief", "suggest", "review",
         "dupes", "add_need", "add_decision", "set", "capture", "promote",
         "issue_board", "issue_next", "issue_list", "issue_show", "issue_check", "issue_file", "issue_update", "issue_close",
     }  # fmt: skip
@@ -104,7 +104,6 @@ def test_every_tool_argv_parses_with_the_real_parser() -> None:
         ["plan", "--include-drafts", "--revisit", "30"],
         ["lint", "--strict"],
         ["brief", "c"],
-        ["issues", "--need", "N-1"],
         ["issue", "file", "--title", "t", "--area", "a", "--body", "b", "--need", "N-1",
          "--need", "N-2"],
         ["issue", "update", "x", "--owner", "me"],
