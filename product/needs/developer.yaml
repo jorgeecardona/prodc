@@ -55,6 +55,9 @@ needs:
       collects test results.
     sources:
       - {kind: secondary, date: 2026-11-06, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/118"}
+    proofs:
+      - "test:tests/test_ci_doc.py::test_the_documented_job_pins_an_exact_prodc_version"
+      - "test:tests/test_ci_doc.py::test_the_documented_config_reads_the_junit_report"
     goal: G-2
 
   - id: PD-7

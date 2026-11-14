@@ -32,6 +32,7 @@ nav:
   - MCP server: mcp.md
   - Model: model.md
   - Config: config.md
+  - CI job: ci.md
   - Storybook: storybook.md
   - Lifecycle: lifecycle.md
   - Principles: principles.md

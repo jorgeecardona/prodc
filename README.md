@@ -185,7 +185,7 @@ prodc also has goals, releases, roles, principles, and decisions
 - **Repository:** https://gitlab.com/cardona-oss/prodc
 - **PyPI:** https://pypi.org/project/prodc/
 - **Changelog:** [CHANGELOG.md](https://gitlab.com/cardona-oss/prodc/-/blob/main/CHANGELOG.md)
-- **Documentation:** <https://cardona-oss.gitlab.io/prodc/> ([Quickstart](https://cardona-oss.gitlab.io/prodc/quickstart/), [Commands](https://cardona-oss.gitlab.io/prodc/commands/), [Model](https://cardona-oss.gitlab.io/prodc/model/), [Config](https://cardona-oss.gitlab.io/prodc/config/), [Lifecycle](https://cardona-oss.gitlab.io/prodc/lifecycle/))
+- **Documentation:** <https://cardona-oss.gitlab.io/prodc/> ([Quickstart](https://cardona-oss.gitlab.io/prodc/quickstart/), [Commands](https://cardona-oss.gitlab.io/prodc/commands/), [Model](https://cardona-oss.gitlab.io/prodc/model/), [Config](https://cardona-oss.gitlab.io/prodc/config/), [CI job](https://cardona-oss.gitlab.io/prodc/ci/), [Lifecycle](https://cardona-oss.gitlab.io/prodc/lifecycle/))
 
 ## Contributing
 
