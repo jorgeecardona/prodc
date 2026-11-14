@@ -10,7 +10,11 @@ real user asked for it, and the test that shows it is delivered. The files live 
 to the code.
 
 prodc reads the YAML files and your test suite, and shows what is missing. It does not call a
-model, run a UI, or replace your issue tracker.
+model or run a UI.
+
+prodc also keeps the issue register: engineering work and bugs as markdown files in `docs/issues/`
+(`prodc issue file`, `prodc issue next`). If your team already has an external tracker, keep it:
+prodc does not replace it, and a source can point at its tickets.
 
 It follows two rules:
 

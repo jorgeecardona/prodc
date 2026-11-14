@@ -159,7 +159,7 @@ Link checks run only for a client whose file has at least one link:
   locator, unless a view fits it: a client and an adapter may share a name such as `web`.
 
 A view that exists is a declared DELIVERED (`*`): it proves the view is there, not that the need
-works. A child view and its parent are graded separately. Views appear in `prodc orphans`, and
+works. A child view and its parent are graded separately. Views count toward `prodc status --max-orphans`, and
 `prodc suggest` leaves them out unless you pass `--kind views`. A missing or malformed file
 resolves to UNRESOLVED.
 
@@ -183,7 +183,7 @@ url = "https://sb.example.com"         # optional: show and report link each sto
   does not prove the need works. A story or component not in the index is BROKEN.
 - A missing, empty or unknown-version index resolves to UNRESOLVED. The detail says when the
   index was built, so a stale `storybook-static/` is visible.
-- `prodc orphans` and `[lint].unjustified_stories` work per component, not per story.
+- `prodc status --max-orphans` and `[lint].unjustified_stories` work per component, not per story.
 - `prodc suggest` leaves stories out unless you pass `--kind sb`.
 - `results` is reserved for test results (a junit report from the Storybook Vitest addon). It is
   not read yet; see `docs/issues/08-11-2026-storybook-test-results.md`.

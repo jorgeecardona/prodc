@@ -82,7 +82,8 @@ Read first, then act, then check.
 
 1. **Read the board.** `prodc status` (add `--client <id>` to scope to one client, `--only-must`
    for the must-haves). `prodc show <id>` prints one need as a citable answer. `prodc plan` ranks
-   the backlog by must + state + evidence + recurrence.
+   the backlog: needs in the current release first (and any BROKEN need), then must-have HOLEs, then
+   state, then evidence strength, then recurrence across clients, then importance.
 2. **Before a conversation with a client**, run `prodc brief <client>`: it lists that client's
    open questions (opinions with no evidence, HOLEs with no proof), so you walk in knowing what to
    ask.
@@ -162,5 +163,5 @@ passing the last `sha_after` as `expect_sha`.
 Every write command takes `--dry-run` (preview the diff without writing); the need-editing writers
 (`set`, `add`, `capture`, `attest`, `accept`) also take `--expect-sha <sha>` (optimistic lock:
 refuse the write if the file changed under you). Run `prodc <command> --help` before you first use a
-command for its exact flags, and read `docs/model.md` for the nouns (Need, Source, Proof, Goal,
-Release, Role) and every field a need can carry. Proof locators are `<adapter>:<payload>`.
+command for its exact flags, and read `docs/model.md` for the 8 nouns (Need, Source, Proof, Goal,
+Release, Role, Principle, Decision) and every field a need can carry. Proof locators are `<adapter>:<payload>`.
