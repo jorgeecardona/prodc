@@ -616,6 +616,8 @@ _DEPRECATED_NEED_FIELDS: dict[str, str] = {
     "contradicts": "withdraw one need out_of_scope citing the principle that decides",
     "terms": "define the word in the need text",
     "expects": "leave the need a HOLE until a proof exists",
+    "children": "flows are removed: list the needs under a release or goal instead",
+    "seam": "flows are removed: give the end-to-end test its own need",
 }
 
 

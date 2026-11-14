@@ -96,3 +96,15 @@ def test_a_board_without_deprecated_fields_is_quiet(
 ) -> None:
     main(["status", "--config", _board(tmp_path)])
     assert "deprecated" not in capsys.readouterr().err
+
+
+def test_flows_warn_once(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    needs = (
+        "  - id: F-1\n    text: When I shop, I can pay.\n    children: [N-1]\n"
+        '    seam: ["x:y"]\n' + _NEED
+    )
+    cfg = _board(tmp_path, '[flows]\nsteps = ["start", "end"]\n', needs)
+    main(["status", "--config", cfg])
+    err = capsys.readouterr().err
+    for thing in ("need field children", "need field seam", "[flows].steps"):
+        assert len(_lines(err, thing)) == 1, thing

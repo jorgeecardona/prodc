@@ -318,6 +318,8 @@ def _deprecated_toml(raw: dict[str, object]) -> tuple[str, ...]:
         out.append(deprecation("[importance]", "use must: true, or the release order"))
     if "importance_revisit_days" in _as_dict(raw.get("lint", {}), "[lint]"):
         out.append(deprecation("[lint].importance_revisit_days", "delete it"))
+    if "flows" in raw:
+        out.append(deprecation("[flows].steps", "flows are removed: delete the [flows] table"))
     if "callbacks" in raw:
         out.append(deprecation("[callbacks]", "run your own script on `prodc status --json`"))
     return tuple(out)
