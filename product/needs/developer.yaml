@@ -28,6 +28,8 @@ needs:
       since a saved baseline.
     sources:
       - {kind: secondary, date: 2026-11-06, locator: "https://gitlab.com/cardona-oss/prodc/-/work_items/115"}
+    proofs:
+      - "test:tests/test_lint_baseline.py::test_baseline_hides_known_warnings_and_shows_new_ones"
     goal: G-2
     release: R-2
 

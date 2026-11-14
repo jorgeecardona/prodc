@@ -134,7 +134,19 @@ def build_parser() -> argparse.ArgumentParser:
     ln.add_argument(
         "--all-warnings",
         action="store_true",
-        help="list every unattested-proof warning instead of one summary line (#87)",
+        help="list each warning per id instead of one summary line per repeated message (#87)",
+    )
+    ln.add_argument(
+        "--baseline",
+        metavar="FILE",
+        default=None,
+        help="show only the warnings not in FILE (written by --write-baseline)",
+    )
+    ln.add_argument(
+        "--write-baseline",
+        metavar="FILE",
+        default=None,
+        help="save the current warnings to FILE, to pass later with --baseline",
     )
     ln.set_defaults(func=cmd_lint)
 

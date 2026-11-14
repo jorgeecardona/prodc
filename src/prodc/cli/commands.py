@@ -171,6 +171,30 @@ def _lint_errors(results: list[NeedResult], decisions: list[Decision]) -> list[s
     return errors
 
 
+_VOLATILE_COUNT = re.compile(r"\d+")
+
+
+def baseline_key(wid: str, warning: str) -> str:
+    """The stable key of one warning: its id and its message with every number replaced by ``N``.
+
+    Numbers in a message are counts and dates that change from run to run, so a baseline written
+    today still matches the same warning tomorrow.
+    """
+    return f"{wid}\t{_VOLATILE_COUNT.sub('N', warning)}"
+
+
+def write_baseline(path: Path, warnings: list[tuple[str, str]]) -> None:
+    """Save the keys of ``warnings`` to ``path``, one per line, sorted, so the file diffs well."""
+    keys = sorted({baseline_key(i, w) for i, w in warnings})
+    path.write_text("".join(f"{k}\n" for k in keys), encoding="utf-8")
+
+
+def read_baseline(path: Path) -> frozenset[str]:
+    """The warning keys saved in ``path``. Blank lines are skipped."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    return frozenset(ln for ln in lines if ln.strip())
+
+
 def group_repeats(warnings: list[tuple[str, str]]) -> list[tuple[str, str]]:
     """Replace each warning message that repeats over several ids with one summary line.
 
@@ -376,6 +400,16 @@ def cmd_lint(args: argparse.Namespace) -> int:
         if slots:
             warnings.append((p.id, f"principle text has unfilled slot(s): {', '.join(slots)}"))
     warnings += [("deprecated", line) for line in deprecations(cfg, model)]
+    if args.write_baseline:
+        write_baseline(Path(args.write_baseline), warnings)
+        print(f"lint: wrote {len(warnings)} warning(s) to {args.write_baseline}", file=sys.stderr)
+    if args.baseline:
+        try:
+            known = read_baseline(Path(args.baseline))
+        except OSError as exc:
+            print(f"prodc: cannot read baseline {args.baseline}: {exc}", file=sys.stderr)
+            return 2
+        warnings = [(i, w) for i, w in warnings if baseline_key(i, w) not in known]
     if not (args.all_warnings or args.strict):
         warnings = group_repeats(warnings)
     if args.json:
