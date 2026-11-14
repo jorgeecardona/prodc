@@ -29,3 +29,9 @@ def test_sync_and_callbacks_warn_once(tmp_path: Path, capsys: pytest.CaptureFixt
     assert len(_lines(err, "[callbacks]")) == 1
     assert main(["lint", "--config", cfg]) == 0
     assert len(_lines(capsys.readouterr().out, "[callbacks]")) == 1
+
+
+def test_gitlab_source_warns_once(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    cfg = _board(tmp_path, '[sources.gl]\nkind = "gitlab"\nproject = "a/b"\n')
+    assert main(["status", "--config", cfg]) == 0
+    assert len(_lines(capsys.readouterr().err, '[sources.gl] kind = "gitlab"')) == 1

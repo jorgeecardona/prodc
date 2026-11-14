@@ -305,6 +305,15 @@ def _deprecated_toml(raw: dict[str, object]) -> tuple[str, ...]:
     out: list[str] = []
     if "profile" in _as_dict(raw.get("prodc", {}), "[prodc]"):
         out.append(deprecation("[prodc].profile", "delete it: a research board needs no profile"))
+    sources = _as_dict(raw.get("sources", {}), "[sources]")
+    for name, body in sources.items():
+        if isinstance(body, dict) and cast("dict[str, object]", body).get("kind") == "gitlab":
+            out.append(
+                deprecation(
+                    f'[sources.{name}] kind = "gitlab"',
+                    "cite the ticket URL as a secondary source locator",
+                )
+            )
     if "callbacks" in raw:
         out.append(deprecation("[callbacks]", "run your own script on `prodc status --json`"))
     return tuple(out)
