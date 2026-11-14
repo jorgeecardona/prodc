@@ -16,14 +16,21 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..config import Config, ConfigError
+from ..deprecation import unique
 from ..loader import LoaderError, load
 from ..model import Model, NeedResult, NeedState
 from ..status import Summary
 from ..writer import Edit
 
 
-def load_or_report(args: argparse.Namespace) -> tuple[Config, Model] | None:
-    """Load config + the whole model, or print the error to stderr and return None."""
+def load_or_report(
+    args: argparse.Namespace, print_deprecations: bool = True
+) -> tuple[Config, Model] | None:
+    """Load config + the whole model, or print the error to stderr and return None.
+
+    Each deprecation line goes to stderr once per run. ``lint`` passes
+    ``print_deprecations=False`` and lists them as warnings instead.
+    """
     cfg_path = Path(args.config)
     if not cfg_path.exists():
         print(f"prodc: no config at {cfg_path}", file=sys.stderr)
@@ -38,7 +45,15 @@ def load_or_report(args: argparse.Namespace) -> tuple[Config, Model] | None:
     # every read. stderr keeps --json output clean. `lint` fails on these.
     for notice in (*cfg.notices, *model.notices):
         print(f"prodc: {notice}", file=sys.stderr)
+    if print_deprecations:
+        for line in deprecations(cfg, model):
+            print(f"prodc: {line}", file=sys.stderr)
     return cfg, model
+
+
+def deprecations(cfg: Config, model: Model) -> tuple[str, ...]:
+    """Every deprecation line the config and the loaded files raise, each once."""
+    return unique([*cfg.deprecations])
 
 
 def git_rev(root: Path) -> str | None:

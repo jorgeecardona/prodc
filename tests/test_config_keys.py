@@ -22,13 +22,13 @@ def _write(tmp_path: Path, toml: str) -> Path:
 def test_unknown_keys_are_named_at_every_level(tmp_path: Path) -> None:
     toml = (
         _BASE
-        + 'profile = "research"\n[lint]\nstale_after_day = 3\n'
+        + 'profil = "research"\n[lint]\nstale_after_day = 3\n'
         + '[proofs.t]\nkind = "pytest"\nresult = "x"\n[extra]\na = 1\n'
         + '[[callbacks.hooks]]\non = "state_change"\ncommand = ["x"]\nwhen = "y"\n'
     )
     assert list(Config.load(_write(tmp_path, toml)).notices) == [
         "prodc.toml: top level: unknown key 'extra' is ignored",
-        "prodc.toml: [prodc]: unknown key 'profile' is ignored",
+        "prodc.toml: [prodc]: unknown key 'profil' is ignored (did you mean 'profile'?)",
         "prodc.toml: [lint]: unknown key 'stale_after_day' is ignored "
         "(did you mean 'stale_after_days'?)",
         "prodc.toml: [proofs.t]: unknown key 'result' is ignored (did you mean 'results'?)",
@@ -39,9 +39,9 @@ def test_unknown_keys_are_named_at_every_level(tmp_path: Path) -> None:
 def test_lint_fails_on_an_unknown_key_and_status_still_runs(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    cfg = str(_write(tmp_path, _BASE + 'profile = "research"\n'))
+    cfg = str(_write(tmp_path, _BASE + 'colour = "red"\n'))
     assert main(["status", "--config", cfg]) == 0
-    assert "unknown key 'profile'" in capsys.readouterr().err
+    assert "unknown key 'colour'" in capsys.readouterr().err
     assert main(["lint", "--config", cfg]) == 1
 
 
@@ -52,3 +52,20 @@ def test_a_clean_config_has_no_notices(tmp_path: Path) -> None:
 def test_playwright_ct_is_gone(tmp_path: Path) -> None:
     with pytest.raises(Exception, match="unknown kind 'playwright-ct'"):
         Config.load(_write(tmp_path, _BASE + '[proofs.c]\nkind = "playwright-ct"\n'))
+
+
+def test_research_profile_is_a_deprecated_key_not_a_lint_failure(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cfg = str(_write(tmp_path, _BASE + 'profile = "research"\n'))
+    assert Config.load(Path(cfg)).notices == ()
+    assert main(["lint", "--config", cfg]) == 0
+    out = capsys.readouterr()
+    lines = [ln for ln in out.out.splitlines() if "[prodc].profile" in ln]
+    assert lines == [
+        "  warn   deprecated: deprecated, removed in 0.12: [prodc].profile; "
+        "delete it: a research board needs no profile"
+    ]
+    assert "profile" not in out.err
+    assert main(["status", "--config", cfg]) == 0
+    assert capsys.readouterr().err.count("[prodc].profile") == 1

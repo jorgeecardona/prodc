@@ -105,6 +105,7 @@ from ..writer import (
 )
 from .common import (
     RepoRow,
+    deprecations,
     discover_configs,
     emit_edit,
     exit_code,
@@ -203,7 +204,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
     The red-gate counterpart to `status`. Drift is a CI failure, not something you notice
     by eye. `--strict` also fails on any hygiene warning.
     """
-    loaded = load_or_report(args)
+    loaded = load_or_report(args, print_deprecations=False)
     if loaded is None:
         return 2
     cfg, model = loaded
@@ -382,6 +383,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
         slots = _SLOT_RE.findall(p.text)
         if slots:
             warnings.append((p.id, f"principle text has unfilled slot(s): {', '.join(slots)}"))
+    warnings += [("deprecated", line) for line in deprecations(cfg, model)]
     if args.json:
         print(
             json.dumps(

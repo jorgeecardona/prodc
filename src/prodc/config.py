@@ -36,6 +36,7 @@ from .adapters import (
 )
 from .callbacks import Callback
 from .catalog import PACKS as CATALOG_PACKS
+from .deprecation import deprecation
 from .model import NeedState
 
 
@@ -255,7 +256,7 @@ _SOURCE_KEYS = frozenset(
 )
 _HOOK_KEYS = frozenset({"on", "command", "timeout", "from", "to"})
 _TABLE_KEYS: dict[str, frozenset[str]] = {
-    "prodc": frozenset({"files", "needs", "issues", "name"}),
+    "prodc": frozenset({"files", "needs", "issues", "name", "profile"}),
     "lint": frozenset(
         {
             "duplicate_threshold",
@@ -297,6 +298,14 @@ def _unknown_packs(packs: tuple[str, ...]) -> tuple[str, ...]:
         for name in packs
         if name not in CATALOG_PACKS
     )
+
+
+def _deprecated_toml(raw: dict[str, object]) -> tuple[str, ...]:
+    """The deprecation lines for ``prodc.toml`` settings that 0.12 removes."""
+    out: list[str] = []
+    if "profile" in _as_dict(raw.get("prodc", {}), "[prodc]"):
+        out.append(deprecation("[prodc].profile", "delete it: a research board needs no profile"))
+    return tuple(out)
 
 
 def _unknown_toml_keys(raw: dict[str, object]) -> tuple[str, ...]:
@@ -347,6 +356,8 @@ class Config:
     missing_catalog_principles: str = "warn"  # [lint].missing_catalog_principles: warn|error|off
     flow_steps: tuple[str, ...] = ()  # [flows].steps: ordered step vocab; () = undeclared (#90)
     notices: tuple[str, ...] = ()  # unknown prodc.toml keys: printed on reads, fail lint
+    # Settings 0.11 still reads and 0.12 removes: printed once per run, a lint warning, never fatal.
+    deprecations: tuple[str, ...] = ()
     name: str = ""  # [prodc].name: the board's name; "" means the directory's name (#125)
 
     @property
@@ -569,5 +580,6 @@ class Config:
             missing_catalog_principles=missing_catalog_level,
             flow_steps=flow_steps,
             notices=_unknown_toml_keys(raw) + _unknown_packs(principle_packs),
+            deprecations=_deprecated_toml(raw),
             name=board_name.strip(),
         )
