@@ -69,7 +69,7 @@ def issue_findings(
     """Lint an issue list against the board: ``(errors, warnings keyed by issue id)`` (#36).
 
     - error: ``needs`` names a need that does not exist.
-    - warning: an issue serves no need; a closed issue whose need is not DELIVERED
+    - warning: an open issue serves no need; a closed issue whose need is not DELIVERED
       ("closed but unproven"); an open issue whose every need is DELIVERED ("proven but open");
       a ``sources`` pointer that its source adapter says does not exist.
 
@@ -79,7 +79,7 @@ def issue_findings(
     errors: list[str] = []
     warnings: list[tuple[str, str]] = []
     for issue in issues:
-        if not issue.needs:
+        if not issue.needs and issue.open:
             warnings.append(
                 (
                     issue.id,

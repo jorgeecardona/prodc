@@ -34,7 +34,6 @@ from .status import (
     Recurrence,
     Summary,
     evidence_age_days,
-    flow_orphan_warnings,
     goal_report,
     handoffs,
     is_ai_attested_warning,
@@ -269,14 +268,11 @@ def path_payload(r: NeedResult) -> dict[str, object] | None:
 
 
 def annotate_board_warnings(results: list[NeedResult], needs: list[Need]) -> None:
-    """Append the cross-need hygiene warnings (shared proofs #45, seam coverage #44)."""
+    """Append the cross-need hygiene warnings (shared proofs #45)."""
     shared = shared_proof_warnings(results)
-    flow_orphans = flow_orphan_warnings(needs)
     for r in results:
         if r.need.id in shared:
             r.warnings.append(shared[r.need.id])
-        if r.need.id in flow_orphans:
-            r.warnings.append("belongs to no flow: seam not covered (#44)")
 
 
 def need_payload(r: NeedResult, *, flavor: Literal["board", "html"] = "board") -> dict[str, object]:

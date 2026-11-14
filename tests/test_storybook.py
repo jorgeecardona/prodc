@@ -197,7 +197,14 @@ def test_unjustified_stories_is_opt_in(tmp_path: Path, capsys: pytest.CaptureFix
 
 
 def test_unjustified_stories_warns(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    rc = main(["lint", "--config", _board(tmp_path, '\n[lint]\nunjustified_stories = "warn"\n')])
+    rc = main(
+        [
+            "lint",
+            "--config",
+            _board(tmp_path, '\n[lint]\nunjustified_stories = "warn"\n'),
+            "--all-warnings",
+        ]
+    )
     out = capsys.readouterr().out
     assert rc == 0
     assert "sb:components-changelog: unjustified component" in out

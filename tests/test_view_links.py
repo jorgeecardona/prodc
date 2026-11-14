@@ -280,7 +280,7 @@ def test_graph_writes_a_file(tmp_path: Path, capsys: pytest.CaptureFixture[str])
 
 
 def _lint(cfg: str, capsys: pytest.CaptureFixture[str]) -> tuple[int, str]:
-    code = main(["lint", "--config", cfg])
+    code = main(["lint", "--config", cfg, "--all-warnings"])
     return code, capsys.readouterr().out
 
 

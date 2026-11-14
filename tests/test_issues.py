@@ -176,3 +176,23 @@ def test_issue_list_shows_need_state_and_issues_is_a_deprecated_alias(
     out = capsys.readouterr()
     assert "N-1:DELIVERED" in out.out
     assert "deprecated; use `prodc issue list`" in out.err
+
+
+def test_only_an_open_issue_with_no_need_warns_and_repeats_group(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cfg = _project(
+        tmp_path,
+        {
+            "a.md": _issue("first"),
+            "b.md": _issue("second"),
+            "done.md": _issue("old work", status="done"),
+        },
+    )
+    _, out = _lint(cfg, capsys)
+    assert "2 ids: issue serves no need" in out
+    assert "done: issue serves no need" not in out
+    main(["lint", "--config", cfg, "--all-warnings"])
+    full = capsys.readouterr().out
+    assert "a: issue serves no need" in full or "first: issue serves no need" in full
+    assert "old work" not in full and "done: issue serves no need" not in full

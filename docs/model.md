@@ -140,7 +140,7 @@ sources: ["gitlab:#123"]     # pointers into other systems
 | Finding | Level |
 |---|---|
 | `needs` names an id that is not a need | error |
-| the issue serves no need | warning |
+| an open issue serves no need | warning |
 | closed, but a need it serves is not DELIVERED | warning (closed but unproven) |
 | open, but every need it serves is DELIVERED | warning (proven but open) |
 | a `sources` pointer does not resolve | warning |

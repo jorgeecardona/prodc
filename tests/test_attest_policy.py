@@ -74,7 +74,10 @@ def test_unattested_warnings_group_into_one_line(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     out = _lint(_project(tmp_path), capsys)
-    assert "2 delivered needs have an unattested proof link (N-1, N-2)" in out
+    assert (
+        "2 ids: DELIVERED on an unattested proof link (warrant not reviewed) (#13) "
+        "(pass --all-warnings to list them)"
+    ) in out
     assert "N-1: DELIVERED on an unattested proof link" not in out
 
 

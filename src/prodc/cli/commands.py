@@ -48,7 +48,6 @@ from ..report import render_markdown
 from ..report_export import export_rows, render_confluence, render_csv, render_jira
 from ..report_html import render_html
 from ..status import (
-    UNATTESTED_WARNING,
     ProofSuggestion,
     RelinkSuggestion,
     active_decisions,
@@ -172,29 +171,24 @@ def _lint_errors(results: list[NeedResult], decisions: list[Decision]) -> list[s
     return errors
 
 
-def _group_unattested(warnings: list[tuple[str, str]]) -> list[tuple[str, str]]:
-    """Replace every unattested-proof warning with one summary line, so a new one stands out (#87).
+def group_repeats(warnings: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """Replace each warning message that repeats over several ids with one summary line.
 
-    The summary sits where the first one was. ``--strict`` and ``--all-warnings`` skip this and
-    list each need.
+    The summary sits where the first one was and gives the count, so one new warning stands out
+    in a long list (#87). ``--strict`` and ``--all-warnings`` skip this and list each id.
     """
-    ids = [i for i, w in warnings if w == UNATTESTED_WARNING]
-    if len(ids) < 2:
-        return warnings
-    summary = (
-        "attestation",
-        f"{len(ids)} delivered needs have an unattested proof link ({', '.join(ids)}): "
-        "pass --all-warnings to list each (#87)",
-    )
+    counts: dict[str, int] = {}
+    for _, w in warnings:
+        counts[w] = counts.get(w, 0) + 1
     out: list[tuple[str, str]] = []
-    placed = False
+    placed: set[str] = set()
     for item in warnings:
-        if item[1] == UNATTESTED_WARNING:
-            if not placed:
-                out.append(summary)
-                placed = True
-            continue
-        out.append(item)
+        n = counts[item[1]]
+        if n < 2:
+            out.append(item)
+        elif item[1] not in placed:
+            placed.add(item[1])
+            out.append((f"{n} ids", f"{item[1]} (pass --all-warnings to list them)"))
     return out
 
 
@@ -258,8 +252,6 @@ def cmd_lint(args: argparse.Namespace) -> int:
     warnings = [
         (r.need.id, w) for r in sorted(results, key=lambda x: x.need.id) for w in r.warnings
     ] + principle_warnings
-    if not (args.all_warnings or args.strict):
-        warnings = _group_unattested(warnings)
     # Decision drift (keyed by the decision id, not a need): a decision left serving only
     # withdrawn/non-product needs is engineering with no live product reason; a decision decided
     # under a principle that was revised later comes back up (the same ripple a withdrawal gets).
@@ -384,6 +376,8 @@ def cmd_lint(args: argparse.Namespace) -> int:
         if slots:
             warnings.append((p.id, f"principle text has unfilled slot(s): {', '.join(slots)}"))
     warnings += [("deprecated", line) for line in deprecations(cfg, model)]
+    if not (args.all_warnings or args.strict):
+        warnings = group_repeats(warnings)
     if args.json:
         print(
             json.dumps(
