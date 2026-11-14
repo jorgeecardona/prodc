@@ -108,3 +108,12 @@ def test_flows_warn_once(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> 
     err = capsys.readouterr().err
     for thing in ("need field children", "need field seam", "[flows].steps"):
         assert len(_lines(err, thing)) == 1, thing
+
+
+@pytest.mark.parametrize("kind", ["coverage", "field", "prototype"])
+def test_deprecated_proof_kinds_warn_once(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], kind: str
+) -> None:
+    cfg = _board(tmp_path, f'[proofs.p]\nkind = "{kind}"\n')
+    main(["status", "--config", cfg])
+    assert len(_lines(capsys.readouterr().err, f'[proofs.p] kind = "{kind}"')) == 1

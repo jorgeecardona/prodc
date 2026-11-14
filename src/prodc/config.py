@@ -300,11 +300,24 @@ def _unknown_packs(packs: tuple[str, ...]) -> tuple[str, ...]:
     )
 
 
+_DEPRECATED_PROOF_KINDS: dict[str, str] = {
+    "coverage": "use a test that checks the catalog (pytest, vitest)",
+    "field": "use a test that checks the schema (pytest, vitest)",
+    "prototype": "use accept:<who>@<date> after a person tried it",
+}
+
+
 def _deprecated_toml(raw: dict[str, object]) -> tuple[str, ...]:
     """The deprecation lines for ``prodc.toml`` settings that 0.12 removes."""
     out: list[str] = []
     if "profile" in _as_dict(raw.get("prodc", {}), "[prodc]"):
         out.append(deprecation("[prodc].profile", "delete it: a research board needs no profile"))
+    for name, body in _as_dict(raw.get("proofs", {}), "[proofs]").items():
+        kind = cast("dict[str, object]", body).get("kind") if isinstance(body, dict) else None
+        if kind in _DEPRECATED_PROOF_KINDS:
+            out.append(
+                deprecation(f'[proofs.{name}] kind = "{kind}"', _DEPRECATED_PROOF_KINDS[str(kind)])
+            )
     sources = _as_dict(raw.get("sources", {}), "[sources]")
     for name, body in sources.items():
         if isinstance(body, dict) and cast("dict[str, object]", body).get("kind") == "gitlab":
