@@ -108,3 +108,16 @@ threshold for "desaturated").
 
 A visual need on a real board can be closed only by a recorded verdict from a non-Claude judge,
 and `status` shows which visual needs lack one.
+
+## Judge candidates (14-11-2026 search)
+
+- OUI-1 (Thesys, 08-09-2026, https://huggingface.co/thesysdev/OUI-1): a generative UI model,
+  prompt to UI screen. It does not score screenshots, so it is not a judge. It could generate
+  the N palette or layout candidates a person picks from (visual-palette-chosen).
+- UIClip (UW/CMU, UIST 2024, https://arxiv.org/html/2404.12500v1): screenshot plus description
+  to a design-quality score. Closest to a judge; research code.
+- UICrit (Google Research 2024, https://arxiv.org/html/2407.08850v3): dataset of region-grounded
+  critiques and ratings; useful to calibrate a judge, not a judge itself.
+- DesignPref (2025, https://arxiv.org/html/2511.20513v1): personal design preference scoring.
+
+prodc records the verdict (who judged, which screenshot, the score); it does not call the model.
