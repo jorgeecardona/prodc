@@ -4,6 +4,14 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-11-14
+
+### Changed
+
+- PyPI summary now says what prodc does: track user needs, their evidence and their tests.
+- PyPI page: the `prodc status` output is shown first, and the quickstart output matches the
+  current version.
+
 ## [0.11.0] - 2026-11-14
 
 A consolidation release: no new noun and no new proof kind.

@@ -5,39 +5,30 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/prodc.svg)](https://pypi.org/project/prodc/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://gitlab.com/cardona-oss/prodc/-/blob/main/LICENSE)
 
-Product management as code. You write user needs in YAML. Each need lists the evidence that a
-real user asked for it, and the test that shows it is delivered. The files live in the repo, next
-to the code.
+Product management as code. You write user needs in YAML, in the repo. Each need lists its
+evidence (who asked for it) and its proof (a test). `prodc status` reads the YAML and your test
+suite and computes the state of each need. Nobody sets a status by hand.
 
-prodc reads the YAML files and your test suite, and shows what is missing. It does not call a
-model or run a UI.
+```text
+$ prodc status
+gaps: 2 HOLE  ·  1 opinion    coverage 1/3 (33%)
+
+      N-2  HOLE                   export the day's delivery run sheet                 secondary
+      N-3  HOLE                   implement a settings page                           opinion
+  !!  N-1  DELIVERED* (weak) 1/1  see which orders are past due at a glance           primary:Jordan
+```
+
+(output trimmed: header, legend and warnings removed)
+
+Two rules:
+
+1. A need with no evidence is an opinion. Record who asked: an interview quote, a ticket, an
+   email.
+2. A need is done when its proof points to a test. The states are DELIVERED, PENDING, HOLE and
+   BROKEN. `prodc lint` exits 1 on a BROKEN proof, so CI can block the merge.
 
 prodc also keeps the issue register: engineering work and bugs as markdown files in `docs/issues/`
-(`prodc issue file`, `prodc issue next`). If your team already has an external tracker, keep it:
-prodc does not replace it, and a source can point at its tickets.
-
-It follows two rules:
-
-1. A need with no evidence is an opinion. Record who asked (an interview quote, a ticket, an
-   email). If you don't, prodc marks the need as an opinion.
-2. You never mark a need as done by hand. You attach a proof, which points to a test, and
-   `prodc status` computes the state: DELIVERED, PENDING, HOLE, or BROKEN.
-
-## Compared to other tools
-
-- Jira, Linear and other trackers store work items with a status that someone sets by hand.
-  prodc stores needs and computes their status from tests. It has no assignees, sprints, or
-  notifications. You can use both: a source can point to a GitLab ticket (`kind = "gitlab"`,
-  read-only), a proof can be any script (`kind = "command"`), and `prodc sync` runs a hook when a
-  need changes state.
-- A PRD in Notion or a wiki is not checked after it is written. prodc files are validated on
-  every load, linted in CI, and reviewed in merge requests.
-- You could keep the same YAML by hand. prodc adds the schema, proof checks against real test
-  suites, the source kinds, the lint, and write commands that keep the files consistent.
-
-prodc does not run your tests, call an LLM, or contact a tracker by itself. It does not model the
-full discovery process (opportunity-solution trees, testing several solutions in parallel). It
-records needs, their evidence, and the decisions made about them.
+(`prodc issue file`, `prodc issue next`).
 
 ## Install
 
@@ -103,7 +94,7 @@ Feature: Orders board
     Then the order is highlighted as past due
 ```
 
-Run `prodc status` (output trimmed):
+Run `prodc status` (output trimmed: header and legend removed):
 
 ```text
 $ prodc status
@@ -112,15 +103,19 @@ gaps: 2 HOLE  ·  1 opinion    coverage 1/3 (33%)
 jordan    1 DELIVERED   2 HOLE
     provenance: 1 primary  ·  1 secondary  ·  0 assumption  ·  1 opinion
 
-      N-2  HOLE            export the day's delivery run sheet          secondary
-      N-3  HOLE            implement a settings page                    opinion
+      N-2  HOLE                   export the day's delivery run sheet                 secondary
+       ⚠ EARS: no observable outcome. Try 'When <trigger>, <who> can <outcome>'
+      N-3  HOLE                   implement a settings page                           opinion
        ⚠ text may be a solution in disguise (starts with 'implement')
-  !!  N-1  DELIVERED* 1/1  see which orders are past due at a glance    primary:Jordan
-       ⚠ DELIVERED on an unattested proof link (warrant not reviewed)
+  !!  N-1  DELIVERED* (weak) 1/1  see which orders are past due at a glance           primary:Jordan
+       ⚠ EARS: no observable outcome. Try 'When <trigger>, <who> can <outcome>'
+       ⚠ DELIVERED on an unattested proof link (warrant not reviewed) (#13)
+       ⚠ must-have DELIVERED on declared proofs only: add a results-backed proof (#103)
 ```
 
 N-1 is DELIVERED because a tagged scenario proves it. The `*` means the state comes from the tag,
-because no test results were loaded. N-2 has evidence but no proof, so it is a HOLE. N-3 has
+because no test results were loaded. `(weak)` means a must-have rests only on such declared
+proofs. N-2 has evidence but no proof, so it is a HOLE. N-3 has
 neither, so it is an opinion.
 
 You fix these from the command line. Each write command changes one YAML file, validates the
@@ -144,6 +139,25 @@ prodc lint        # CI gate: exit 1 on a BROKEN proof or a must-have with no evi
 
 If you rename a scenario and do not update the need, the proof becomes BROKEN and `prodc lint`
 exits 1.
+
+## Compared to other tools
+
+- Jira, Linear and other trackers store work items with a status that someone sets by hand.
+  prodc stores needs and computes their status from tests. It has no assignees, sprints, or
+  notifications. You can use both: a source can point to a GitLab ticket (`kind = "gitlab"`,
+  read-only), a proof can be any script (`kind = "command"`), and `prodc sync` runs a hook when a
+  need changes state.
+- A PRD in Notion or a wiki is not checked after it is written. prodc files are validated on
+  every load, linted in CI, and reviewed in merge requests.
+- You could keep the same YAML by hand. prodc adds the schema, proof checks against real test
+  suites, the source kinds, the lint, and write commands that keep the files consistent.
+
+prodc does not run your tests, call an LLM, or contact a tracker by itself. It does not model the
+full discovery process (opportunity-solution trees, testing several solutions in parallel). It
+records needs, their evidence, and the decisions made about them.
+
+If your team already has an external tracker, keep it: prodc does not replace it, and a source
+can point at its tickets. prodc does not call a model or run a UI.
 
 ## Python
 
