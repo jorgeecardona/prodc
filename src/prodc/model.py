@@ -660,6 +660,8 @@ class Model:
     issues_skipped: tuple[str, ...] = ()  # "<file>: <why>" per issue file the store could not read
     # Removed keys (0.3 `label:`, `argument:`) found and ignored. `lint` fails on any (#96).
     notices: tuple[str, ...] = ()
+    # Fields 0.12 removes that the files still use: printed once per run, a lint warning.
+    deprecations: tuple[str, ...] = ()
 
 
 # A leading verb that usually signals a solution-in-disguise, not a need (Torres, Ch. 6).

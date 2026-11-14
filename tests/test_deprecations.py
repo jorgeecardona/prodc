@@ -61,3 +61,38 @@ def test_deprecated_commands_warn_once(
 def test_plain_recurrence_does_not_warn(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     main(["recurrence", "--config", _board(tmp_path)])
     assert "deprecated" not in capsys.readouterr().err
+
+
+def test_deprecated_need_fields_warn_once_per_field_not_per_need(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    needs = (
+        "  - id: N-1\n    text: When I log in, I can see my orders.\n    tags: [a]\n"
+        "    importance: 2\n    terms: [order]\n    expects: test\n    contradicts: [N-2]\n"
+        "  - id: N-2\n    text: When I log out, I can see nothing.\n    tags: [b]\n"
+        "    importance: 1\n"
+    )
+    top = "glossary:\n  - term: order\n    text: a purchase\n"
+    toml = '[importance]\nlevels = [[1, "low", "nice"], [2, "high", "core"]]\n'
+    cfg = _board(tmp_path, toml, needs, top)
+    main(["status", "--config", cfg])
+    err = capsys.readouterr().err
+    for thing in (
+        "need field tags",
+        "need field importance",
+        "need field terms",
+        "need field expects",
+        "need field contradicts",
+        "glossary:",
+        "[importance]",
+    ):
+        assert len(_lines(err, thing)) == 1, thing
+    main(["plan", "--config", cfg, "--revisit", "30"])
+    assert len(_lines(capsys.readouterr().err, "prodc plan --revisit")) == 1
+
+
+def test_a_board_without_deprecated_fields_is_quiet(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    main(["status", "--config", _board(tmp_path)])
+    assert "deprecated" not in capsys.readouterr().err

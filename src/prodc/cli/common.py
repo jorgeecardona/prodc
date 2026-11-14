@@ -53,7 +53,7 @@ def load_or_report(
 
 def deprecations(cfg: Config, model: Model) -> tuple[str, ...]:
     """Every deprecation line the config and the loaded files raise, each once."""
-    return unique([*cfg.deprecations])
+    return unique([*cfg.deprecations, *model.deprecations])
 
 
 def git_rev(root: Path) -> str | None:

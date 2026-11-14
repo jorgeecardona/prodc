@@ -650,6 +650,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
     now = now_ids(results, releases)
     revisit = args.revisit is not None
     if revisit:
+        warn_deprecated("prodc plan --revisit", "use must: true, or the release order")
         today = date.today()
         results = [r for r in results if importance_revisit_due(r.need, today, args.revisit)]
     if args.json:

@@ -20,6 +20,7 @@ import yaml
 from .catalog import find as find_catalog_entry
 from .catalog import reserved_pack
 from .config import Config
+from .deprecation import deprecation
 from .issues import read_issues
 from .model import (
     Answer,
@@ -537,6 +538,7 @@ class _Loaded:
     decisions: list[Decision] = field(default_factory=list[Decision])
     glossary: list[Term] = field(default_factory=list[Term])
     notices: list[str] = field(default_factory=list[str])
+    deprecations: list[str] = field(default_factory=list[str])
 
 
 @dataclass(frozen=True)
@@ -602,6 +604,30 @@ def _unknown_keys(raw: object, shape: _Shape, where: str) -> list[str]:
             out.append(f"{where}: unknown key '{key}' is ignored{hint}")
         elif isinstance(key, str) and key in shape.nested:
             out += _unknown_keys(value, shape.nested[key], f"{where}.{key}")
+    return out
+
+
+# Need fields 0.12 removes, with what to do instead. Each loads as before; a board that uses one
+# gets one line per field per run, not one per need.
+_DEPRECATED_NEED_FIELDS: dict[str, str] = {
+    "tags": "use goal:, release: or role: for structure",
+    "importance": "use must: true, or the release order",
+    "importance_set_at": "use must: true, or the release order",
+    "contradicts": "withdraw one need out_of_scope citing the principle that decides",
+    "terms": "define the word in the need text",
+    "expects": "leave the need a HOLE until a proof exists",
+}
+
+
+def _deprecated_fields(tbl: Mapping[str, object], where: str) -> list[str]:
+    """One deprecation line per deprecated need field or top-level key the file uses."""
+    used: list[str] = []
+    for i, raw in enumerate(_as_list(tbl.get("needs"), f"{where}.needs")):
+        item = _as_mapping(raw, f"{where}.needs[{i}]")
+        used += [k for k in _DEPRECATED_NEED_FIELDS if k in item]
+    out = [deprecation(f"need field {k}", _DEPRECATED_NEED_FIELDS[k]) for k in dict.fromkeys(used)]
+    if "glossary" in tbl:
+        out.append(deprecation("glossary:", "define the word in the need text"))
     return out
 
 
@@ -711,6 +737,7 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
         out.glossary.append(_term(raw, f"{where}.glossary[{i}]"))
     out.notices.extend(_unknown_keys(tbl, _FILE_SHAPE, where))
     out.notices.extend(_deprecated_values(tbl, where))
+    out.deprecations.extend(_deprecated_fields(tbl, where))
     return out
 
 
@@ -754,6 +781,7 @@ def load(config: Config) -> Model:
         acc.decisions.extend(f.decisions)
         acc.glossary.extend(f.glossary)
         acc.notices.extend(f.notices)
+        acc.deprecations.extend(f.deprecations)
     _check_variants(acc.needs)
     _check_children(acc.needs)
     _check_contradicts(acc.needs)
@@ -783,6 +811,7 @@ def load(config: Config) -> Model:
         decisions=tuple(acc.decisions),
         glossary=tuple(acc.glossary),
         notices=tuple(acc.notices),
+        deprecations=tuple(dict.fromkeys(acc.deprecations)),
         issues=folder.issues,
         issues_skipped=folder.skipped,
     )
