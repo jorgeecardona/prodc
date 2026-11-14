@@ -4,6 +4,66 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-14
+
+A consolidation release: no new noun and no new proof kind.
+
+### Added
+
+- `prodc lint --write-baseline FILE` saves the current warnings. `prodc lint --baseline FILE` then
+  shows only the warnings that are not in the file (PD-3).
+- `docs/ci.md`: the official GitLab CI job, with a pinned version and junit results (PD-6).
+
+### Changed
+
+- `prodc lint` prints a warning that repeats over several ids as one line with a count.
+  `--all-warnings` lists each id.
+- `prodc lint` warns "issue serves no need" only for open issues.
+- `prodc lint` no longer warns "belongs to no flow".
+- The README says prodc keeps the issue register (`docs/issues`). It does not replace a team's
+  external tracker.
+- `prodc agent` lists the 12 commands an agent needs. The rest are in `docs/commands.md`.
+
+### Fixed
+
+- A research board with `[prodc] profile = "research"` passes `prodc lint` again. The key is
+  ignored and reported as a deprecation warning.
+
+### Removed
+
+- `prodc issues`: use `prodc issue list`. The MCP tool `issues` is gone too: use `issue_list`.
+- `prodc guide`.
+
+### Deprecated (removed in 0.12)
+
+Each still works in 0.11. A run prints one line per deprecated thing:
+`deprecated, removed in 0.12: <thing>; <what to use instead>`. `prodc lint` lists them as
+warnings.
+
+- `prodc sync` and `[callbacks]`: run your own script on `prodc status --json`.
+- The gitlab source adapter (`[sources.X] kind = "gitlab"`): cite the ticket URL as a `secondary`
+  source locator.
+- `prodc outcome`: edit the need's `outcome:` field. The field itself stays.
+- `prodc accept`: use `prodc set <id> proofs+=accept:<who>@<date>`.
+- `prodc brief`: use `prodc status --client <id>`.
+- `prodc recurrence --suggest` and `--apply`: link a variant by hand with `variant_of`.
+- `prodc dupes`: `prodc add` and `prodc review` already check for duplicates.
+- Need fields `tags`, `importance` (with `[importance]`, `[lint].importance_revisit_days` and
+  `prodc plan --revisit`), `contradicts`, `terms`, `expects`, and the top-level `glossary:`.
+- Flows: need fields `children` and `seam`, and `[flows].steps`.
+- Proof kinds `coverage`, `field` and `prototype`.
+- `prodc report --format csv`, `jira` and `confluence`: use `md` or `html`.
+- `[prodc].profile`: delete it.
+
+### Migration
+
+1. Run `prodc lint` and read the `deprecated` lines. Each one says what to use instead.
+2. Delete `profile = "research"` from `prodc.toml`.
+3. Replace `prodc issues` with `prodc issue list` in scripts and CI.
+4. Move CI to the job in `docs/ci.md` with `prodc==0.11.0`.
+5. To adopt lint on a noisy board, run `prodc lint --write-baseline lint-baseline.txt` once and
+   commit the file. Then run `prodc lint --baseline lint-baseline.txt` in CI.
+
 ## [0.10.6] - 2026-11-12
 
 ### Added
