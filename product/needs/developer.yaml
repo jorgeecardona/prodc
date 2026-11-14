@@ -180,5 +180,8 @@ needs:
       date: '2026-11-12'
       quote: "prodc should hold goals, meaning which needs matter now. Cabildo's autopilot currently takes any ready issue, and the result is busy work with no direction."
       locator: cabildo message 6579
+    proofs:
+      - "test:tests/test_issue_next.py::test_walks_down_past_a_need_without_issue"
+      - "test:tests/test_issue_next.py::test_no_linked_issue_lists_the_needs"
     goal: G-1
     release: R-1
