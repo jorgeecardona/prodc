@@ -1412,6 +1412,7 @@ def cmd_report(args: argparse.Namespace) -> int:
     if args.format == "html":
         text = render_html(cfg, model, client=args.client, rev=git_rev(cfg.root))
     elif args.format in ("csv", "jira", "confluence"):
+        warn_deprecated(f"prodc report --format {args.format}", "use --format md or html")
         rows = export_rows(gather(cfg, model).results)
         heading = f"{cfg.board_name}{': ' + args.client if args.client else ''}: product status"
         if args.format == "csv":

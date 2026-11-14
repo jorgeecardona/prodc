@@ -117,3 +117,12 @@ def test_deprecated_proof_kinds_warn_once(
     cfg = _board(tmp_path, f'[proofs.p]\nkind = "{kind}"\n')
     main(["status", "--config", cfg])
     assert len(_lines(capsys.readouterr().err, f'[proofs.p] kind = "{kind}"')) == 1
+
+
+@pytest.mark.parametrize("fmt", ["csv", "jira", "confluence"])
+def test_deprecated_report_formats_warn_once(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], fmt: str
+) -> None:
+    cfg = _board(tmp_path)
+    main(["report", "--config", cfg, "--format", fmt, "-o", str(tmp_path / "out")])
+    assert len(_lines(capsys.readouterr().err, f"prodc report --format {fmt}")) == 1
