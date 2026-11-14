@@ -595,6 +595,7 @@ def cmd_show(args: argparse.Namespace) -> int:
 
 def cmd_brief(args: argparse.Namespace) -> int:
     """Pre-meeting agenda for one client: its applicable needs that lack evidence or proof."""
+    warn_deprecated("prodc brief", "use prodc status --client <id>")
     loaded = load_or_report(args)
     if loaded is None:
         return 2
@@ -935,6 +936,7 @@ def cmd_attest(args: argparse.Namespace) -> int:
 
 def cmd_outcome(args: argparse.Namespace) -> int:
     """Record whether a delivered need moved its goal (#97)."""
+    warn_deprecated("prodc outcome", "edit the need's outcome: field by hand")
     cfg_path = Path(args.config)
     if not cfg_path.exists():
         print(f"prodc: no config at {cfg_path}", file=sys.stderr)
@@ -959,6 +961,7 @@ def cmd_outcome(args: argparse.Namespace) -> int:
 
 def cmd_accept(args: argparse.Namespace) -> int:
     """Record (or --revoke) a human acceptance pass on a need."""
+    warn_deprecated("prodc accept", "use prodc set <id> proofs+=accept:<who>@<date>")
     cfg_path = Path(args.config)
     if not cfg_path.exists():
         print(f"prodc: no config at {cfg_path}", file=sys.stderr)
@@ -1755,6 +1758,10 @@ def _apply_relinks(
 
 def cmd_recurrence(args: argparse.Namespace) -> int:
     """Show baselines shared across clients; `--suggest` proposes unlinked variant groups (#56)."""
+    if args.suggest:
+        warn_deprecated(
+            "prodc recurrence --suggest/--apply", "link a variant by hand with variant_of: <id>"
+        )
     loaded = load_or_report(args)
     if loaded is None:
         return 2
@@ -1861,6 +1868,7 @@ def _apply_recurrence(cfg: Config, groups: list[VariantGroup], args: argparse.Na
 
 def cmd_dupes(args: argparse.Namespace) -> int:
     """List candidate duplicate need pairs, ranked by text similarity (#55)."""
+    warn_deprecated("prodc dupes", "prodc add and prodc review already check for duplicates")
     loaded = load_or_report(args)
     if loaded is None:
         return 2

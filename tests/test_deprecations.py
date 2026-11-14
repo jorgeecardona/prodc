@@ -35,3 +35,29 @@ def test_gitlab_source_warns_once(tmp_path: Path, capsys: pytest.CaptureFixture[
     cfg = _board(tmp_path, '[sources.gl]\nkind = "gitlab"\nproject = "a/b"\n')
     assert main(["status", "--config", cfg]) == 0
     assert len(_lines(capsys.readouterr().err, '[sources.gl] kind = "gitlab"')) == 1
+
+
+@pytest.mark.parametrize(
+    ("argv", "thing"),
+    [
+        (["brief", "acme"], "prodc brief"),
+        (["dupes"], "prodc dupes"),
+        (["recurrence", "--suggest"], "prodc recurrence --suggest/--apply"),
+        (["accept", "N-1", "--who", "ana", "--date", "2026-11-14", "--dry-run"], "prodc accept"),
+        (
+            ["outcome", "N-1", "--not-landed", "--by", "ana", "--date", "2026-11-14", "--dry-run"],
+            "prodc outcome",
+        ),
+    ],
+)
+def test_deprecated_commands_warn_once(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], argv: list[str], thing: str
+) -> None:
+    cfg = _board(tmp_path)
+    main([*argv, "--config", cfg])
+    assert len(_lines(capsys.readouterr().err, thing)) == 1
+
+
+def test_plain_recurrence_does_not_warn(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    main(["recurrence", "--config", _board(tmp_path)])
+    assert "deprecated" not in capsys.readouterr().err

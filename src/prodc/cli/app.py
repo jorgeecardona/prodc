@@ -157,7 +157,7 @@ def build_parser() -> argparse.ArgumentParser:
     br = sub.add_parser(
         "brief",
         parents=[config, json_out],
-        help="pre-meeting agenda for one client: open opinions and HOLEs",
+        help="deprecated, removed in 0.12: use status --client",
     )
     br.add_argument("client", help="the client/variant id to brief, e.g. acme")
     br.set_defaults(func=cmd_brief)
@@ -420,7 +420,7 @@ def build_parser() -> argparse.ArgumentParser:
     oc = sub.add_parser(
         "outcome",
         parents=[config, json_out],
-        help="record whether a delivered need moved its goal (#97)",
+        help="deprecated, removed in 0.12: record whether a delivered need moved its goal (#97)",
     )
     oc.add_argument("need_id", help="the need id")
     landed = oc.add_mutually_exclusive_group(required=True)
@@ -445,7 +445,7 @@ def build_parser() -> argparse.ArgumentParser:
     ac = sub.add_parser(
         "accept",
         parents=[config, json_out],
-        help="record a human acceptance pass (accept proof) on a need",
+        help="deprecated, removed in 0.12: use set <id> proofs+=accept:who@date",
     )
     ac.add_argument("need_id", help="the need id that was accepted")
     ac.add_argument("--who", required=True, help="who accepted it")
@@ -681,7 +681,7 @@ def build_parser() -> argparse.ArgumentParser:
     du = sub.add_parser(
         "dupes",
         parents=[config, json_out],
-        help="list candidate duplicate need pairs by text similarity",
+        help="deprecated, removed in 0.12: add and review already check for duplicates",
     )
     du.add_argument(
         "--threshold",
