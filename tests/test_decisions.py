@@ -364,3 +364,12 @@ decisions:
     out = capsys.readouterr().out
     assert "D-ORPHAN: decision serves only withdrawn/non-product needs" in out
     assert "D-STALE: decided 2026-10-10 under principle P-1, revised later" in out
+
+
+def test_decision_id_used_by_a_need_rejected(tmp_path: Path) -> None:
+    needs = (
+        "needs:\n  - id: D-1\n    text: a need\n"
+        "decisions:\n  - id: D-1\n    text: a choice\n    needs: [D-1]\n"
+    )
+    with pytest.raises(LoaderError, match=r"decision id 'D-1' in a\.yaml is already a need id"):
+        load(Config.load(_project(tmp_path, needs=needs)))

@@ -4,6 +4,11 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 ## [Unreleased]
 
+### Fixed
+
+- `prodc lint` and `add decision` reject an id that a need, role, principle or decision already
+  uses, also across kinds and files (#126).
+
 ## [0.11.1] - 2026-11-14
 
 ### Changed

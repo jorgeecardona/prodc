@@ -688,6 +688,9 @@ def yaml_error_message(where: str, text: str, exc: yaml.YAMLError) -> str:
     return msg
 
 
+_SHARED_ID_KINDS = ("need", "role", "principle", "decision")
+
+
 def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
     """Parse one prodc file for every noun list it carries (``needs:``/``goals:``/``principles:``/…)."""
     where = path.name
@@ -709,6 +712,14 @@ def _load_file(path: Path, seen: dict[str, dict[str, Path]]) -> _Loaded:
         prior = seen[kind].get(nid)
         if prior is not None:
             raise LoaderError(f"duplicate {kind} id {nid!r} in {where} and {prior.name}")
+        # A need, role, principle and decision share one id space: a child may name any of them.
+        if kind in _SHARED_ID_KINDS:
+            for other in _SHARED_ID_KINDS:
+                clash = seen[other].get(nid) if other != kind else None
+                if clash is not None:
+                    raise LoaderError(
+                        f"{kind} id {nid!r} in {where} is already a {other} id in {clash.name}"
+                    )
         seen[kind][nid] = path
 
     for i, raw in enumerate(_as_list(tbl.get("needs"), f"{where}.needs")):
