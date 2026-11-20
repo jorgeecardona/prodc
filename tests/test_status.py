@@ -11,11 +11,16 @@ from prodc.status import Summary, group_state, resolve
 
 
 def _summary(**kw: int) -> Summary:
-    base = dict(
-        total=0, delivered=0, pending=0, hole=0, must_hole=0, broken=0, unresolved=0, opinion=0
+    return Summary(
+        total=kw.get("total", 0),
+        delivered=kw.get("delivered", 0),
+        pending=kw.get("pending", 0),
+        hole=kw.get("hole", 0),
+        must_hole=kw.get("must_hole", 0),
+        broken=kw.get("broken", 0),
+        unresolved=kw.get("unresolved", 0),
+        opinion=kw.get("opinion", 0),
     )
-    base.update(kw)
-    return Summary(**base)
 
 
 def test_group_state_rolls_up_members() -> None:
