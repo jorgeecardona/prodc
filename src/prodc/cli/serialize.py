@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from dataclasses import asdict
 
 from ..board import need_payload, warrant
 from ..dedup import DupPair, VariantGroup
@@ -76,6 +77,8 @@ def _summary_payload(summary: Summary, orphan_map: dict[str, list[str]]) -> dict
         "broken": summary.broken,
         "unresolved": summary.unresolved,
         "opinion": summary.opinion,
+        "evidence": asdict(summary.evidence),
+        "must_evidence": asdict(summary.must_evidence),
         "coverage": round(summary.coverage, 4),
         "orphans": sum(len(v) for v in orphan_map.values()),
     }

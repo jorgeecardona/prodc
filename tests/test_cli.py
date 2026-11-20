@@ -90,6 +90,17 @@ def test_json_has_summary_and_grounds_warrant(
     assert d1["grounds"] == "delivered" and d1["warrant"] == "primary:John"
 
 
+def test_json_summary_counts_needs_by_strongest_source(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import json
+
+    main(["status", "--config", str(_project(tmp_path)), "--json"])
+    summary = json.loads(capsys.readouterr().out)["summary"]
+    assert summary["evidence"] == {"primary": 1, "secondary": 1, "assumption": 0, "opinion": 1}
+    assert summary["must_evidence"] == {"primary": 0, "secondary": 1, "assumption": 0, "opinion": 0}
+
+
 def test_min_coverage_gate_fails(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     code = main(["status", "--config", str(_project(tmp_path)), "--min-coverage", "0.9"])
     capsys.readouterr()

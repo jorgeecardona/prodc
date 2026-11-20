@@ -590,6 +590,27 @@ def resolve(
 
 
 @dataclass(frozen=True)
+class EvidenceCounts:
+    """How many needs have each strongest source kind; ``opinion`` is a need with no source."""
+
+    primary: int = 0
+    secondary: int = 0
+    assumption: int = 0
+    opinion: int = 0
+
+
+def _evidence_counts(needs: list[Need]) -> EvidenceCounts:
+    """Count ``needs`` by their strongest source kind (the same tier ``status`` shows per need)."""
+    kinds = [n.strongest_kind for n in needs]
+    return EvidenceCounts(
+        primary=kinds.count(SourceKind.PRIMARY),
+        secondary=kinds.count(SourceKind.SECONDARY),
+        assumption=kinds.count(SourceKind.ASSUMPTION),
+        opinion=kinds.count(None),
+    )
+
+
+@dataclass(frozen=True)
 class Summary:
     """The gap at a glance: how many needs sit in each state, and how many are opinions."""
 
@@ -601,6 +622,8 @@ class Summary:
     broken: int  # a dangling proof locator
     unresolved: int  # a proof whose source could not be read (e.g. sibling repo absent)
     opinion: int  # a need with no source of any kind
+    evidence: EvidenceCounts = EvidenceCounts()  # leaf needs by strongest source kind (#120)
+    must_evidence: EvidenceCounts = EvidenceCounts()  # the same, for must-have leaf needs
 
     @property
     def coverage(self) -> float:
@@ -632,6 +655,8 @@ def summarize(results: list[NeedResult]) -> Summary:
         broken=by_state[NeedState.BROKEN],
         unresolved=by_state[NeedState.UNRESOLVED],
         opinion=sum(1 for r in leaves if r.need.is_opinion),
+        evidence=_evidence_counts([r.need for r in leaves]),
+        must_evidence=_evidence_counts([r.need for r in leaves if r.need.must]),
     )
 
 

@@ -4,6 +4,13 @@ All notable changes are documented here. Versioning is [SemVer](https://semver.o
 
 ## [Unreleased]
 
+### Added
+
+- `status --json` has `summary.evidence` and `summary.must_evidence`: how many needs have a
+  primary, secondary or assumption source as their strongest, and how many have none (#120).
+  `summary.total` counts leaf needs only, so it is lower than the number of needs in the YAML when
+  some needs are flows (they have `children`).
+
 ### Fixed
 
 - `prodc lint` and `add decision` reject an id that a need, role, principle or decision already
