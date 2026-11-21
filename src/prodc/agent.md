@@ -19,8 +19,9 @@ text tables.
    until someone outside the room has asked.
 2. **"Done" is a claim the tests back.** You do not mark a need done; you attach a *proof*. A
    locator into the real test suite. `prodc status` resolves those and reports each need as
-   DELIVERED, PENDING, HOLE (an honest gap, no proof yet), or BROKEN (a proof that points at
-   nothing). Status is read from the repo, never remembered from a standup.
+   DELIVERED, PENDING, HOLE (an honest gap, no proof yet), BROKEN (a proof that points at
+   nothing), or UNRESOLVED (a proof whose source could not be read, for example a sibling repo
+   that is not checked out). Status is read from the repo, never remembered from a standup.
 
 ## Guardrails: do not break these
 
@@ -114,7 +115,7 @@ Read first, then act, then check.
 | decide against a need (won't-do) | `prodc withdraw <id> --reason "…" [--kind out_of_scope\|duplicate]` |
 | gate in CI | `prodc lint` (`--strict` also fails on warnings) |
 | file engineering work or a bug | `prodc issue file --title "…" --area <a> --body "…" --need <id>` |
-| close an issue | `prodc issue close <id>` (warns "closed but unproven" when its need is not DELIVERED) |
+| close an issue | `prodc issue close <name> --fixed-in <sha>` (warns "closed but unproven" when its need is not DELIVERED) |
 
 `--file` takes any file matched by `[prodc].files`. Every other command (roles, principles,
 decisions, attest, review, report, portfolio, diff, and the rest) is in `docs/commands.md`; run
@@ -139,7 +140,7 @@ passing the last `sha_after` as `expect_sha`.
 ## Reference
 
 Every write command takes `--dry-run` (preview the diff without writing); the need-editing writers
-(`set`, `add`, `capture`, `attest`) also take `--expect-sha <sha>` (optimistic lock:
+(`set`, `add`, `capture`, `attest`, `withdraw`) also take `--expect-sha <sha>` (optimistic lock:
 refuse the write if the file changed under you). Run `prodc <command> --help` before you first use a
 command for its exact flags, and read `docs/model.md` for the 8 nouns (Need, Source, Proof, Goal,
 Release, Role, Principle, Decision) and every field a need can carry. Proof locators are `<adapter>:<payload>`.

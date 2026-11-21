@@ -945,7 +945,7 @@ def relink_proof(
 
     The write path for ``suggest --relink --apply``: a renamed test keeps its adapter kind but
     gets a new id, so this swaps ``old_locator`` for ``new_locator`` on the need and de-duplicates
-    (if the replacement already sits on the need, the broken one is simply dropped). Errors if the
+    (if the replacement already sits on the need, the broken one is dropped). Errors if the
     old locator is not actually on the need. One reload-gated single-file splice, like
     :func:`add_proof`.
     """

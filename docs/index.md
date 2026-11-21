@@ -1,44 +1,57 @@
 # prodc
 
-prodc is about sharing product work across a team. Understanding what users need, and whether you've delivered it, tends to get locked inside one role and one set of tools. But AI assistants now help everyone read and shape software, so everyone can take part in the product thinking too. prodc gives that work a home inside the repo, next to the code it's about.
+prodc keeps user needs as YAML files in your repo. Each need lists where it came from (its
+sources) and the test that proves it is delivered (its proofs).
 
-The work lives as plain files: you note what a person needs, where the need came from, and the test that proves it's done. They get reviewed in pull requests like anything else, so when someone asks "is this feature done?", the answer is read from the repo, not remembered from the last standup.
+Everyone on the team reads and edits the same files, and they are reviewed in merge requests like
+code. The answer to "is this feature done?" is read from the repo and the test suite.
 
-prodc only records that structure and checks it holds together. It does not call a model or ping a tracker
-on its own. It reads your files and your tests and shows you the gaps. (A `gitlab` source adapter can
-check a ticket exists, read-only, and a `command` hook runs only the script you configure.)
+prodc reads your files and your tests and shows the gaps. It does not call a model or contact a
+tracker by itself. A `gitlab` source adapter can check that a ticket exists (read-only), and a
+`command` proof runs only the script you configure.
 
 ## Two rules
 
 Both rules are about evidence.
 
-The first: **a need with no evidence is just an opinion.** When you write down that a user wants something,
-record the source: a quote from an interview, a ticket, an email. A need with nothing behind it still
-loads, but prodc flags it as an opinion, because no one outside the team has said so.
+1. A need with no evidence is an **opinion**. When you write that a user wants something, record
+   the source: a quote from an interview, a ticket, an email. A need with no primary or
+   secondary source still loads, and prodc marks it as an opinion.
+2. A need is done when a test proves it. You do not set a need to delivered by hand. You attach a
+   **proof**: a locator that points into your test suite. `prodc status` resolves the locators
+   and computes the state of each need.
 
-The second: **"done" is a claim your tests have to back.** You do not mark a need delivered by hand. You
-attach a *proof* (a locator that points into your actual test suite). `prodc status` then resolves those
-locators and reports each need as DELIVERED, PENDING, a HOLE (an honest gap, no proof yet), or BROKEN
-(a proof that points at nothing). The state comes from the repo; it cannot drift away from reality the
-way a standup update does.
+The five states:
+
+| State | Means |
+|---|---|
+| DELIVERED | every proof passes |
+| PENDING | the proof exists and is not green yet |
+| HOLE | the need has no proof |
+| BROKEN | a proof points at nothing; `prodc lint` exits 1 |
+| UNRESOLVED | a proof's source could not be read, for example a sibling repo that is not checked out |
 
 ## Install
 
+Add prodc as a dev dependency. Your package does not import it.
+
 ```bash
-pip install prodc
-prodc status
+uv add --dev prodc
+uv run prodc status
 ```
 
-Run it against a project that already has needs defined. To start from nothing, the Quickstart covers
-the three files you need.
+Without uv, run `pip install prodc` in your dev environment.
+
+Run it in a project that already has needs. To start from nothing, the
+[Quickstart](quickstart.md) has the three files you need.
 
 ## Where to go next
 
 | Go to | For |
 |---|---|
-| [Quickstart](quickstart.md) | a working board in 60 seconds |
+| [Quickstart](quickstart.md) | a working board from three files |
 | [Commands](commands.md) | every verb and flag |
-| [Model](model.md) | the nouns, the Need and Source fields, the two ladders |
+| [Model](model.md) | the nouns, the Need and Source fields, the source and attestation kinds |
 | [Config](config.md) | every `prodc.toml` section |
 | [Lifecycle](lifecycle.md) | how a need moves through its states as evidence arrives |
 | [Grounding (Torres)](grounding-torres.md) | how prodc maps onto *Continuous Discovery Habits* |

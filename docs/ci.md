@@ -13,7 +13,7 @@ on a BROKEN proof or a must-have with no evidence.
      image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
      needs: [test]
      script:
-       - uvx --from prodc==0.11.0 prodc lint
+       - uvx --from prodc==0.11.3 prodc lint
    ```
 
 2. Make your test job write a junit report and keep it as an artifact:

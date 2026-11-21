@@ -1,11 +1,28 @@
-# prodc
+<h1 align="center">prodc</h1>
 
-[![pipeline status](https://gitlab.com/cardona-oss/prodc/badges/main/pipeline.svg)](https://gitlab.com/cardona-oss/prodc/-/pipelines)
-[![PyPI version](https://img.shields.io/pypi/v/prodc.svg)](https://pypi.org/project/prodc/)
-[![Python versions](https://img.shields.io/pypi/pyversions/prodc.svg)](https://pypi.org/project/prodc/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://gitlab.com/cardona-oss/prodc/-/blob/main/LICENSE)
+<p align="center"><strong>Keep user needs as YAML in your repo, each with who asked for it and the test that proves it is delivered.</strong></p>
 
-Product management as code. You write user needs in YAML, in the repo. Each need lists its
+<p align="center">
+  <a href="https://pypi.org/project/prodc/"><img alt="PyPI" src="https://img.shields.io/pypi/v/prodc?style=flat-square"></a>
+  <a href="https://pypi.org/project/prodc/"><img alt="Python versions" src="https://img.shields.io/pypi/pyversions/prodc?style=flat-square"></a>
+  <a href="https://cardona-oss.gitlab.io/prodc/"><img alt="Docs" src="https://img.shields.io/badge/docs-cardona--oss.gitlab.io%2Fprodc-blue?style=flat-square"></a>
+  <a href="https://gitlab.com/cardona-oss/prodc/-/pipelines"><img alt="Pipeline" src="https://img.shields.io/gitlab/pipeline-status/cardona-oss%2Fprodc?branch=main&style=flat-square"></a>
+  <a href="https://gitlab.com/cardona-oss/prodc/-/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square"></a>
+</p>
+
+<p align="center">
+  <a href="https://cardona-oss.gitlab.io/prodc/quickstart/">Quickstart</a> ·
+  <a href="https://cardona-oss.gitlab.io/prodc/commands/">Commands</a> ·
+  <a href="https://cardona-oss.gitlab.io/prodc/model/">Model</a> ·
+  <a href="https://cardona-oss.gitlab.io/prodc/ci/">CI</a> ·
+  <a href="https://gitlab.com/cardona-oss/prodc/-/blob/main/CHANGELOG.md">Changelog</a>
+</p>
+
+---
+
+## Overview
+
+You write user needs in YAML, in the repo. Each need lists its
 evidence (who asked for it) and its proof (a test). `prodc status` reads the YAML and your test
 suite and computes the state of each need. Nobody sets a status by hand.
 
@@ -20,23 +37,37 @@ gaps: 2 HOLE  ·  1 opinion    coverage 1/3 (33%)
 
 (output trimmed: header, legend and warnings removed)
 
+How to read it:
+
+- `!!` marks a must-have.
+- HOLE: the need has no proof.
+- opinion: the need has no primary or secondary source.
+- `*`: the proof is declared by a tag, and no test results were loaded.
+- `(weak)`: the lowest confidence of a DELIVERED need. Here the cause is the declared proof.
+
 Two rules:
 
 1. A need with no evidence is an opinion. Record who asked: an interview quote, a ticket, an
    email.
-2. A need is done when its proof points to a test. The states are DELIVERED, PENDING, HOLE and
-   BROKEN. `prodc lint` exits 1 on a BROKEN proof, so CI can block the merge.
+2. A need is done when its proof points to a test. The states are DELIVERED, PENDING, HOLE,
+   BROKEN and UNRESOLVED. `prodc lint` exits 1 on a BROKEN proof, so CI can block the merge.
 
 prodc also keeps the issue register: engineering work and bugs as markdown files in `docs/issues/`
 (`prodc issue file`, `prodc issue next`).
 
+Status: beta.
+
 ## Install
 
+Add prodc as a dev dependency. Your package does not import it.
+
 ```bash
-pip install prodc          # or: uv add prodc
+uv add --dev prodc
 ```
 
-Python 3.12+. The only runtime dependency is PyYAML.
+Without uv, run `pip install prodc` in your dev environment.
+
+Python 3.12+. The only runtime dependency of prodc is PyYAML.
 
 ## Quickstart
 
@@ -114,9 +145,9 @@ jordan    1 DELIVERED   2 HOLE
 ```
 
 N-1 is DELIVERED because a tagged scenario proves it. The `*` means the state comes from the tag,
-because no test results were loaded. `(weak)` means a must-have rests only on such declared
-proofs. N-2 has evidence but no proof, so it is a HOLE. N-3 has
-neither, so it is an opinion.
+because no test results were loaded. `(weak)` is the confidence of the delivery: a declared
+proof, with no results file, keeps it weak. N-2 has evidence but no proof, so it is a HOLE. N-3
+has neither, so it is a HOLE and an opinion.
 
 You fix these from the command line. Each write command changes one YAML file, validates the
 whole model again, and prints the diff.
@@ -145,8 +176,7 @@ exits 1.
 - Jira, Linear and other trackers store work items with a status that someone sets by hand.
   prodc stores needs and computes their status from tests. It has no assignees, sprints, or
   notifications. You can use both: a source can point to a GitLab ticket (`kind = "gitlab"`,
-  read-only), a proof can be any script (`kind = "command"`), and `prodc sync` runs a hook when a
-  need changes state.
+  read-only), and a proof can be any script (`kind = "command"`).
 - A PRD in Notion or a wiki is not checked after it is written. prodc files are validated on
   every load, linted in CI, and reviewed in merge requests.
 - You could keep the same YAML by hand. prodc adds the schema, proof checks against real test
@@ -168,44 +198,46 @@ The Python modules are not a public API. Use the CLI, `--json` and the YAML file
 - Source kinds: `primary` (the user's own words), `secondary` (a report, a ticket, an internal
   doc), or `assumption` (a guess). A need with no primary or secondary source is an opinion.
   `lint` fails on a must-have opinion; `status --strict` fails on any opinion.
-- Proof adapters: Gherkin scenarios and tags, pytest node ids, file existence, human sign-off,
-  prototypes, citations, eval metric gates, external result files, and a generic `command`. Give
-  it cucumber-json or JUnit XML to use real test results instead of tags.
+- Proof adapters: Gherkin scenarios and tags, pytest node ids, vitest tests, Playwright tests,
+  Storybook stories, file existence, human sign-off, citations, eval metric gates, external
+  result files, and a generic `command`. Give it cucumber-json or JUnit XML to use real test
+  results instead of tags.
 - Five states: DELIVERED, PENDING, HOLE, BROKEN, UNRESOLVED. A HOLE does not fail the gate; BROKEN
   always does. A proof in a sibling repo that is not checked out is UNRESOLVED, not BROKEN.
-- Flows: a need with `children` rolls up its children, with `seam` proofs for the steps between
-  them. One BROKEN child breaks the flow. The flow is DELIVERED only when every child and seam is.
 - `tests/test_models.py` builds a [musil](https://pypi.org/project/musil/) model of the
   lifecycle and checks every reachable state against the real resolver.
-- Write commands: `set`, `capture`, `accept`, `attest`, `withdraw`, `add`. They change only the
+- Write commands: `set`, `capture`, `attest`, `withdraw`, `add`. They change only the
   edited need's block and keep the comments in the rest of the file. All take `--dry-run` and
   `--expect-sha`.
-- Read commands: `status`, `show`, `brief`, `plan`, `report --format html` (one self-contained
-  HTML file), `portfolio`, and `diff` against a snapshot. They take `--json`. Exit codes: 0 ok, 1
-  gate failed, 2 config or load error.
+- Read commands: `status`, `show`, `plan`, `inbox`, `portfolio`, and `diff` against a snapshot.
+  They take `--json`. `report --format html` writes one self-contained HTML file. Exit codes: 0
+  ok, 1 gate failed, 2 config or load error.
 - `prodc agent >> AGENTS.md` adds instructions for a coding agent to act as the project's product
   manager. An agent may record `assumption` or `secondary` sources; `primary` is only for a real
   user's own words.
 - `prodc mcp install` registers prodc as an MCP server, so an agent in Claude Code, Cursor, or VS
-  Code uses it through tools. Install with `pip install 'prodc[mcp]'`. See
+  Code uses it through tools. Install with `uv add --dev 'prodc[mcp]'`. See
   [MCP server](https://cardona-oss.gitlab.io/prodc/mcp/).
 
 prodc also has goals, releases, roles, principles, and decisions
-([model docs](https://cardona-oss.gitlab.io/prodc/model/)), and the commands `dupes`,
-`recurrence`, and `suggest`. See the [docs](https://cardona-oss.gitlab.io/prodc/) for all of it.
+([model docs](https://cardona-oss.gitlab.io/prodc/model/)), and the commands `recurrence`,
+`suggest`, `views` and `review`. See the [docs](https://cardona-oss.gitlab.io/prodc/) for all of
+it.
 
 ## Links
 
-- **Repository:** https://gitlab.com/cardona-oss/prodc
-- **PyPI:** https://pypi.org/project/prodc/
-- **Changelog:** [CHANGELOG.md](https://gitlab.com/cardona-oss/prodc/-/blob/main/CHANGELOG.md)
-- **Documentation:** <https://cardona-oss.gitlab.io/prodc/> ([Quickstart](https://cardona-oss.gitlab.io/prodc/quickstart/), [Commands](https://cardona-oss.gitlab.io/prodc/commands/), [Model](https://cardona-oss.gitlab.io/prodc/model/), [Config](https://cardona-oss.gitlab.io/prodc/config/), [CI job](https://cardona-oss.gitlab.io/prodc/ci/), [Lifecycle](https://cardona-oss.gitlab.io/prodc/lifecycle/))
+- Repository: https://gitlab.com/cardona-oss/prodc
+- PyPI: https://pypi.org/project/prodc/
+- Changelog: [CHANGELOG.md](https://gitlab.com/cardona-oss/prodc/-/blob/main/CHANGELOG.md)
+- Documentation: <https://cardona-oss.gitlab.io/prodc/> ([Quickstart](https://cardona-oss.gitlab.io/prodc/quickstart/), [Commands](https://cardona-oss.gitlab.io/prodc/commands/), [Model](https://cardona-oss.gitlab.io/prodc/model/), [Config](https://cardona-oss.gitlab.io/prodc/config/), [CI job](https://cardona-oss.gitlab.io/prodc/ci/), [Lifecycle](https://cardona-oss.gitlab.io/prodc/lifecycle/))
 
 ## Contributing
 
-Toolchain, CI, and the release process live in [CONTRIBUTING.md](https://gitlab.com/cardona-oss/prodc/-/blob/main/CONTRIBUTING.md); build and test
-instructions for coding agents are in [AGENTS.md](https://gitlab.com/cardona-oss/prodc/-/blob/main/AGENTS.md). In short: `make setup`
-then `make check` (lint + typecheck + test); `moon run :ci` is what CI runs.
+Toolchain, CI, and the release process are in
+[CONTRIBUTING.md](https://gitlab.com/cardona-oss/prodc/-/blob/main/CONTRIBUTING.md). Build and
+test instructions for coding agents are in
+[AGENTS.md](https://gitlab.com/cardona-oss/prodc/-/blob/main/AGENTS.md). Run `make setup`, then
+`make check` (lint, typecheck, test). CI runs `moon run :ci`.
 
 ## License
 

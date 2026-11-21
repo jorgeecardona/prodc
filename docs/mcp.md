@@ -33,7 +33,8 @@ Pin the project's own prodc instead of the latest:
 prodc mcp install --command "uv run prodc mcp serve"
 ```
 
-This needs `prodc[mcp]` in the project's dependencies.
+This needs `prodc[mcp]` in the project's dev dependencies (`uv add --dev 'prodc[mcp]'`). prodc is
+a dev tool: your package does not import it, so it never goes in runtime `dependencies`.
 
 ## What install does
 

@@ -93,7 +93,7 @@ describe("the main nav has at most {N} top-level sections per role", () => {
     const sections = sectionsForRole("primary");
     expect(
       sections.length,
-      `primary role now has ${sections.length} nav sections (threshold {N}) — ` +
+      `primary role now has ${sections.length} nav sections (threshold {N}): ` +
         "update this guard and the principle YAML if the addition is intentional",
     ).toBeLessThanOrEqual(MAX_NAV_ITEMS);
   });
@@ -196,7 +196,7 @@ describe("Miller's Law: list page cap stays within agreed bounds", () => {
   it(`page cap is at most ${LIMIT} rows`, () => {
     expect(
       PAGE_SIZE_CONSTANT,
-      `PAGE_SIZE_CONSTANT (${PAGE_SIZE_CONSTANT}) exceeds the ${LIMIT}-row cap — ` +
+      `PAGE_SIZE_CONSTANT (${PAGE_SIZE_CONSTANT}) exceeds the ${LIMIT}-row cap: ` +
         "update this guard and the ux-miller principle YAML if the change is intentional",
     ).toBeLessThanOrEqual(LIMIT);
   });
@@ -278,7 +278,7 @@ describe("Jakob's Law: app conventions match user expectations", () => {
   it("watches a real tree: at least 4 dialog/modal files must exist", () => {
     expect(
       dialogFiles(SRC).length,
-      "fewer than 4 dialog/modal files found — the guard may not be scanning the right directory",
+      "fewer than 4 dialog/modal files found: the guard may not be scanning the right directory",
     ).toBeGreaterThanOrEqual(4);
   });
 });

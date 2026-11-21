@@ -1,7 +1,7 @@
 [project]
 name = "prodc"
 dynamic = ["version"]  # the single source of truth is __version__ in src/prodc/__init__.py (see [tool.hatch.version])
-description = "A command-line tool for tracking user needs, their evidence and the tests that prove them"
+description = "Track user needs as YAML in your repo, each with its evidence and the tests that prove it"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
@@ -21,6 +21,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Testing",
     "Topic :: Scientific/Engineering",
     "Typing :: Typed",

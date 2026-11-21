@@ -185,7 +185,7 @@ that view. A route that only redirects is not a screen: leave it out of the view
 
 | Field | Means |
 |---|---|
-| `id` | unique across all files |
+| `id` | unique across all files, and across needs, roles, principles and decisions (#126) |
 | `text` | the need; EARS shape (`When …, who can …`) is checked softly |
 | `description` | optional free-form markdown detail (edge cases, rationale, a worked scenario); **not** EARS-checked, keeps the one-line `text` scannable (#73) |
 | `who` | the person (free text, e.g. John, Jacob) |

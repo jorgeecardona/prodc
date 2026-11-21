@@ -4,14 +4,16 @@ Guidance for AI coding agents working in this repo. Humans: read README.md and C
 
 ## Overview
 
-prodc is a product-management-as-code tool: roles, flows, and features traced to evidence. Needs live
-in YAML under `product/needs/`; each need carries sources, and "done" means a test proof. A need with
-no external evidence is an opinion. `primary` sources are real users' own words and are never added
-via `prodc add`.
+prodc is a command-line tool that tracks user needs, their evidence and the tests that prove them.
+Needs live in YAML under `product/needs/`; each need carries sources, and "done" means a test
+proof. A need with no external evidence is an opinion. `primary` sources are real users' own
+words and are never added via `prodc add`.
 
 ## Build
 
-- `make setup` once after cloning: syncs dependencies (`uv sync`) and installs the tracked git hooks (`make install-hooks`). Toolchain (moon, uv) is pinned in `.prototools`; `proto install` brings it up.
+- `make setup` once after cloning: syncs dependencies (`uv sync`) and installs the tracked git
+  hooks (`make install-hooks`). Toolchain (moon, uv) is pinned in `.prototools`; `proto install`
+  brings it up.
 
 ## Test
 
@@ -22,7 +24,8 @@ via `prodc add`.
 ## Style
 
 - Format and autofix: `make format` (ruff, line length 100).
-- Lint: `make lint` (ruff, `select = ["E","F","W","I","B","UP","SIM","RUF"]`). Types: `make typecheck` (pyright strict on `src/`, `tests/`, `examples/`).
+- Lint: `make lint` (ruff, `select = ["E","F","W","I","B","UP","SIM","RUF"]`). Types:
+  `make typecheck` (pyright strict on `src/`, `tests/`, `examples/`).
 - Python 3.12+ only.
 - Prefer frozen dataclasses and explicit types. Keep the public API typed (`py.typed`).
 - Dependencies: pyyaml only. An in-place write-back (`set`/`capture`/`accept`/`attest`) splices
@@ -33,5 +36,8 @@ via `prodc add`.
 
 ## Gotchas
 
-- The version is the `__version__` literal in `src/prodc/__init__.py`, which hatchling reads so `pyproject.toml` never disagrees. Do not edit it by hand: the pre-commit hook auto-bumps it when anything under `src/` changes, and CI's version-guard enforces that a `src/` change carries a bump.
+- The version is the `__version__` literal in `src/prodc/__init__.py`, which hatchling reads so
+  `pyproject.toml` never disagrees. Do not edit it by hand: the pre-commit hook auto-bumps it when
+  anything under `src/` changes, and CI's version-guard enforces that a `src/` change carries a
+  bump.
 - Record follow-ups in `docs/issues/`, not as scattered TODO comments.
