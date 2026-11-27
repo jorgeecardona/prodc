@@ -33,7 +33,7 @@ tasks:
 
   docs:
     command: 'uv run --extra docs mkdocs build --strict'
-    inputs: ['docs/**/*', 'mkdocs.yml', 'src/**/*.py']
+    inputs: ['docs/**/*', 'mkdocs.yml', 'src/**/*.py', 'README.md', 'CHANGELOG.md']
     outputs: ['site']
 
   # The issue register in docs/issues must pass its own config.toml.

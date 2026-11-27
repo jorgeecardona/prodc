@@ -1,5 +1,5 @@
 site_name: prodc
-site_description: "A command-line tool for tracking user needs, their evidence and the tests that prove them."
+site_description: "A command-line tool for tracking user needs, their evidence and the tests that prove them"
 site_url: https://cardona-oss.gitlab.io/prodc/
 repo_url: https://gitlab.com/cardona-oss/prodc
 repo_name: cardona-oss/prodc
@@ -28,7 +28,7 @@ exclude_docs: |
 plugins:
   - search
   - llmstxt:
-      markdown_description: "User needs live as YAML in the repo; each need lists who asked for it and the test that proves it, and prodc status computes each need's state from the test suite."
+      markdown_description: "A command-line tool for tracking user needs, their evidence and the tests that prove them. Each need lists who asked for it and the test that proves it; prodc status computes each need's state from the test suite."
       full_output: llms-full.txt
       sections:
         Usage documentation:

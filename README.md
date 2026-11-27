@@ -171,7 +171,7 @@ prodc lint        # CI gate: exit 1 on a BROKEN proof or a must-have with no evi
 If you rename a scenario and do not update the need, the proof becomes BROKEN and `prodc lint`
 exits 1.
 
-## Compared to other tools
+## Why prodc
 
 - Jira, Linear and other trackers store work items with a status that someone sets by hand.
   prodc stores needs and computes their status from tests. It has no assignees, sprints, or
@@ -182,18 +182,11 @@ exits 1.
 - You could keep the same YAML by hand. prodc adds the schema, proof checks against real test
   suites, the source kinds, the lint, and write commands that keep the files consistent.
 
-prodc does not run your tests, call an LLM, or contact a tracker by itself. It does not model the
-full discovery process (opportunity-solution trees, testing several solutions in parallel). It
-records needs, their evidence, and the decisions made about them.
-
-If your team already has an external tracker, keep it: prodc does not replace it, and a source
-can point at its tickets. prodc does not call a model or run a UI.
-
 ## Python
 
 The Python modules are not a public API. Use the CLI, `--json` and the YAML files.
 
-## Features
+## Key features
 
 - Source kinds: `primary` (the user's own words), `secondary` (a report, a ticket, an internal
   doc), or `assumption` (a guess). A need with no primary or secondary source is an opinion.
@@ -223,6 +216,15 @@ prodc also has goals, releases, roles, principles, and decisions
 ([model docs](https://cardona-oss.gitlab.io/prodc/model/)), and the commands `recurrence`,
 `suggest`, `views` and `review`. See the [docs](https://cardona-oss.gitlab.io/prodc/) for all of
 it.
+
+## Limits
+
+- prodc does not run your tests, call an LLM, or contact a tracker by itself.
+- It does not model the full discovery process (opportunity-solution trees, testing several
+  solutions in parallel). It records needs, their evidence, and the decisions made about them.
+- If your team already has an external tracker, keep it: prodc does not replace it. A source
+  can point at its tickets.
+- prodc does not call a model or run a UI.
 
 ## Links
 
